@@ -1,6 +1,16 @@
+# environment
 .env
 .env.local
+
+# node
 node_modules/
+
+# build
 dist/
+build/
+
+# editor
 .vscode/
+
+# mac
 .DS_Store

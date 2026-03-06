@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSV 업로드 - 시험 자동 생성</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 16px;
+      line-height: 1.5;
+    }
+    h1 {
+      margin-bottom: 8px;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    input, button, textarea {
+      font-size: 14px;
+      padding: 8px 10px;
+      box-sizing: border-box;
+    }
+    input[type="number"] {
+      width: 120px;
+    }
+    button {
+      cursor: pointer;
+      border: 1px solid #999;
+      border-radius: 8px;
+      background: #f7f7f7;
+      margin-right: 8px;
+    }
+    button:hover:not(:disabled) {
+      background: #efefef;
+    }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .muted {
+      color: #666;
+      font-size: 13px;
+    }
+    .success {
+      color: #0a7a2f;
+      font-weight: bold;
+    }
+    .error {
+      color: #b00020;
+      font-weight: bold;
+      white-space: pre-line;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background: #f3f3f3;
+    }
+    pre {
+      background: #f8f8f8;
+      padding: 12px;
+      border-radius: 8px;
+      overflow: auto;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>시험 CSV 업로드</h1>
+  <p class="muted">CSV 파일을 업로드해서 test_sets + test_items를 자동 생성합니다.</p>
+
+  <div class="card">
+    <h2>1. Supabase 연결 정보</h2>
+    <div class="row">
+      <label for="supabaseUrl">Supabase URL</label>
+      <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
+    </div>
+    <div class="row">
+      <label for="supabaseAnonKey">Supabase Anon Key</label>
+      <textarea id="supabaseAnonKey" rows="3" placeholder="eyJ..."></textarea>
+    </div>
+    <p class="muted">로컬 테스트용입니다. 나중에는 관리자 전용 백엔드로 옮기는 것이 안전합니다.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. 시험 기본 정보</h2>
+    <div class="row">
+      <label for="title">시험 제목</label>
+      <input id="title" type="text" placeholder="중3_전기와자기_숙제1" />
+    </div>
+    <div class="row">
+      <label for="sourceName">출처명</label>
+      <input id="sourceName" type="text" placeholder="쎈 중3 과학" />
+    </div>
+    <div class="row">
+      <label for="subject">과목</label>
+      <input id="subject" type="text" placeholder="과학" />
+    </div>
+    <div class="row">
+      <label for="gradeLevel">학년</label>
+      <input id="gradeLevel" type="text" placeholder="중3" />
+    </div>
+    <div class="row">
+      <label for="majorUnit">대단원</label>
+      <input id="majorUnit" type="text" placeholder="전기와 자기" />
+    </div>
+    <div class="row">
+      <label for="minorUnit">소단원</label>
+      <input id="minorUnit" type="text" placeholder="전류와 전압" />
+    </div>
+    <div class="row">
+      <label for="defaultChoiceCount">기본 보기 개수</label>
+      <input id="defaultChoiceCount" type="number" value="5" min="2" max="20" />
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. CSV 업로드</h2>
+    <div class="row">
+      <label for="csvFile">CSV 파일</label>
+      <input id="csvFile" type="file" accept=".csv,text/csv" />
+    </div>
+
+    <button id="previewBtn" type="button">미리보기</button>
+    <button id="uploadBtn" type="button">시험 생성</button>
+
+    <p class="muted">필수 컬럼: item_no, answer_key / 선택 컬럼: choice_count, topic_tag, note</p>
+
+    <div id="status" style="margin-top:12px;"></div>
+
+    <div id="previewArea" style="display:none;">
+      <h3>미리보기</h3>
+      <div id="previewSummary" class="muted"></div>
+      <table id="previewTable">
+        <thead>
+          <tr>
+            <th>item_no</th>
+            <th>choice_count</th>
+            <th>answer_key</th>
+            <th>topic_tag</th>
+            <th>note</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="resultArea" style="display:none;">
+      <h3>생성 결과</h3>
+      <pre id="resultBox"></pre>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <script>
+    let parsedRows = [];
+    let selectedFileName = '';
+
+    function setStatus(message, type = '') {
+      const el = document.getElementById('status');
+      el.className = type;
+      el.textContent = message || '';
+    }
+
+    function getFormValues() {
+      return {
+        supabaseUrl: document.getElementById('supabaseUrl').value.trim(),
+        supabaseAnonKey: document.getElementById('supabaseAnonKey').value.trim(),
+        title: document.getElementById('title').value.trim(),
+        sourceName: document.getElementById('sourceName').value.trim(),
+        subject: document.getElementById('subject').value.trim(),
+        gradeLevel: document.getElementById('gradeLevel').value.trim(),
+        majorUnit: document.getElementById('majorUnit').value.trim(),
+        minorUnit: document.getElementById('minorUnit').value.trim(),
+        defaultChoiceCount: Number(document.getElementById('defaultChoiceCount').value || 5)
+      };
+    }
+
+    function validateHeaders(row) {
+      const keys = Object.keys(row).map(k => k.trim());
+      return keys.includes('item_no') && keys.includes('answer_key');
+    }
+
+    function validateRows(rows) {
+      const errors = [];
+      const seen = new Set();
+
+      rows.forEach((row, idx) => {
+        const lineNo = idx + 2;
+        const itemNo = String(row.item_no ?? '').trim();
+        const answerKey = String(row.answer_key ?? '').trim();
+        const choiceCount = String(row.choice_count ?? '').trim();
+
+        if (!itemNo) {
+          errors.push(`${lineNo}행: item_no 비어 있음`);
+        } else if (!/^\d+$/.test(itemNo)) {
+          errors.push(`${lineNo}행: item_no는 숫자만 가능`);
+        } else if (seen.has(itemNo)) {
+          errors.push(`${lineNo}행: item_no 중복 (${itemNo})`);
+        } else {
+          seen.add(itemNo);
+        }
+
+        if (!answerKey) {
+          errors.push(`${lineNo}행: answer_key 비어 있음`);
+        }
+
+        if (choiceCount && !/^\d+$/.test(choiceCount)) {
+          errors.push(`${lineNo}행: choice_count는 숫자만 가능`);
+        }
+      });
+
+      return errors;
+    }
+
+    function normalizeRows(rows) {
+      return rows.map(row => ({
+        item_no: String(row.item_no ?? '').trim(),
+        choice_count: String(row.choice_count ?? '').trim(),
+        answer_key: String(row.answer_key ?? '').trim(),
+        topic_tag: String(row.topic_tag ?? '').trim(),
+        note: String(row.note ?? '').trim()
+      }));
+    }
+
+    function renderPreview(rows) {
+      const area = document.getElementById('previewArea');
+      const tbody = document.querySelector('#previewTable tbody');
+      const summary = document.getElementById('previewSummary');
+
+      tbody.innerHTML = '';
+
+      rows.slice(0, 10).forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.item_no}</td>
+          <td>${row.choice_count || '(기본값 5)'}</td>
+          <td>${row.answer_key}</td>
+          <td>${row.topic_tag || ''}</td>
+          <td>${row.note || ''}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const multiCount = rows.filter(r => {
+        const v = r.answer_key || '';
+        return v.includes('|') || v.includes(',');
+      }).length;
+
+      summary.textContent = `총 ${rows.length}문항 / 복수정답 문항 ${multiCount}개 / 미리보기는 최대 10개만 표시`;
+      area.style.display = 'block';
+    }
+
+    async function parseCsvFile() {
+      const fileInput = document.getElementById('csvFile');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        throw new Error('CSV 파일을 선택해 주세요.');
+      }
+
+      selectedFileName = file.name;
+
+      return new Promise((resolve, reject) => {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const rows = results.data;
+
+            if (!rows.length) {
+              reject(new Error('CSV에 데이터가 없습니다.'));
+              return;
+            }
+
+            if (!validateHeaders(rows[0])) {
+              reject(new Error('필수 컬럼(item_no, answer_key)이 없습니다.'));
+              return;
+            }
+
+            const normalized = normalizeRows(rows);
+            const errors = validateRows(normalized);
+
+            if (errors.length > 0) {
+              reject(new Error(errors.join('\n')));
+              return;
+            }
+
+            resolve(normalized);
+          },
+          error: (err) => reject(err)
+        });
+      });
+    }
+
+    document.getElementById('csvFile').addEventListener('change', () => {
+      parsedRows = [];
+      selectedFileName = '';
+      document.getElementById('title').value = '';
+      document.getElementById('previewArea').style.display = 'none';
+      document.getElementById('resultArea').style.display = 'none';
+      document.getElementById('resultBox').textContent = '';
+      setStatus('');
+    });
+
+    document.getElementById('previewBtn').addEventListener('click', async () => {
+      const previewBtn = document.getElementById('previewBtn');
+      const uploadBtn = document.getElementById('uploadBtn');
+
+      try {
+        previewBtn.disabled = true;
+        uploadBtn.disabled = true;
+
+        setStatus('CSV 파싱 중...');
+        parsedRows = await parseCsvFile();
+
+        const { title } = getFormValues();
+        if (!title) {
+          const autoTitle = selectedFileName.replace(/\.csv$/i, '');
+          document.getElementById('title').value = autoTitle;
+        }
+
+        renderPreview(parsedRows);
+        setStatus('미리보기 준비 완료', 'success');
+      } catch (err) {
+        console.error(err);
+        setStatus(err.message || 'CSV 파싱 실패', 'error');
+      } finally {
+        previewBtn.disabled = false;
+        uploadBtn.disabled = false;
+      }
+    });
+
+    document.getElementById('uploadBtn').addEventListener('click', async () => {
+      const uploadBtn = document.getElementById('uploadBtn');
+      const previewBtn = document.getElementById('previewBtn');
+      const originalUploadText = uploadBtn.textContent;
+
+      try {
+        uploadBtn.disabled = true;
+        previewBtn.disabled = true;
+        uploadBtn.textContent = '시험 생성 중...';
+
+        const form = getFormValues();
+
+        if (!form.supabaseUrl || !form.supabaseAnonKey) {
+          throw new Error('Supabase URL과 Anon Key를 입력해 주세요.');
+        }
+
+        if (!parsedRows.length) {
+          parsedRows = await parseCsvFile();
+        }
+
+        if (!form.title) {
+          document.getElementById('title').value = selectedFileName.replace(/\.csv$/i, '');
+          form.title = document.getElementById('title').value.trim();
+        }
+
+        if (!form.title) {
+          throw new Error('시험 제목이 비어 있습니다.');
+        }
+
+        setStatus('시험 생성 중...');
+
+        const supabase = window.supabase.createClient(
+          form.supabaseUrl,
+          form.supabaseAnonKey,
+          {
+            db: { schema: 'auto_grading' }
+          }
+        );
+
+        const { data, error } = await supabase.rpc('create_test_set_from_json', {
+          p_title: form.title,
+          p_original_filename: selectedFileName,
+          p_items: parsedRows,
+          p_source_type: 'csv_upload',
+          p_source_name: form.sourceName || null,
+          p_subject: form.subject || null,
+          p_grade_level: form.gradeLevel || null,
+          p_major_unit: form.majorUnit || null,
+          p_minor_unit: form.minorUnit || null,
+          p_default_choice_count: form.defaultChoiceCount
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        document.getElementById('resultArea').style.display = 'block';
+        document.getElementById('resultBox').textContent = JSON.stringify(data, null, 2);
+        setStatus('시험 세트 생성 완료', 'success');
+      } catch (err) {
+        console.error(err);
+        setStatus(err.message || '시험 생성 실패', 'error');
+      } finally {
+        uploadBtn.disabled = false;
+        previewBtn.disabled = false;
+        uploadBtn.textContent = originalUploadText;
+      }
+    });
+  </script>
+</body>
+</html>
