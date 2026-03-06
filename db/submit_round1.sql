@@ -29,7 +29,8 @@ begin
   select a.*
     into v_attempt
   from auto_grading.attempts as a
-  where a.id = p_attempt_id;
+  where a.id = p_attempt_id
+  for update;
 
   if not found then
     raise exception 'ATTEMPT_NOT_FOUND'

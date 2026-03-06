@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auto Grading - Student Answer</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #dbe1ea;
+      --primary: #2563eb;
+      --primary-soft: #e8f0ff;
+      --danger: #dc2626;
+      --success: #059669;
+      --warning: #d97706;
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    h1 { margin: 0 0 10px; font-size: 26px; }
+    h2 { margin: 0 0 12px; font-size: 20px; }
+    p { margin: 0; line-height: 1.55; }
+    .muted { color: var(--muted); }
+    .danger { color: var(--danger); }
+    .success { color: var(--success); }
+    .warning { color: var(--warning); }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+    .col-12 { grid-column: span 12; }
+    .col-6 { grid-column: span 6; }
+    @media (max-width: 760px) { .col-6 { grid-column: span 12; } }
+    label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: #fff; font-size: 15px;
+    }
+    button {
+      border: 0; border-radius: 12px; padding: 12px 16px; font-size: 15px; font-weight: 700; cursor: pointer; background: var(--primary); color: #fff;
+    }
+    button.secondary { background: #fff; color: var(--text); border: 1px solid var(--line); }
+    button.danger { background: var(--danger); color: #fff; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: 14px; color: var(--muted); margin-top: 10px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; background: #eef2ff; color: #3730a3;
+    }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+    .summary-item { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: #fff; }
+    .summary-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .summary-value { font-size: 20px; font-weight: 800; }
+    @media (max-width: 760px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .question-list { display: flex; flex-direction: column; gap: 10px; }
+    .question-row {
+      display: grid; grid-template-columns: 90px 1fr auto; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: #fff;
+    }
+    @media (max-width: 760px) { .question-row { grid-template-columns: 1fr; } }
+    .question-no { font-size: 16px; font-weight: 800; }
+    .choice-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .choice-button {
+      min-width: 46px; padding: 10px 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--text); font-weight: 700;
+    }
+    .choice-button.selected { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+    .choice-button.multiple.selected { background: #ecfeff; border-color: #0891b2; color: #0f766e; }
+    .question-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+    .pill {
+      display: inline-flex; align-items: center; justify-content: center; min-width: 42px; padding: 8px 10px; border-radius: 999px; background: #f3f4f6; color: #374151; font-size: 13px; font-weight: 700;
+    }
+    .result-box { border-radius: 14px; padding: 14px; border: 1px solid var(--line); background: #fff; line-height: 1.6; }
+    .hidden { display: none !important; }
+    .spacer { height: 4px; }
+    .code {
+      font-family: Consolas, Monaco, monospace; font-size: 13px; background: #111827; color: #f9fafb; border-radius: 12px; padding: 12px; white-space: pre-wrap; overflow-x: auto;
+    }
+    .line-list { margin: 0; padding-left: 18px; }
+    .autosave-note {
+      font-size: 13px; color: var(--muted); margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>학생 답안 입력</h1>
+      <p class="muted">종이 문제지는 오프라인에서 풀고, 여기에는 답만 입력합니다. 1차 제출 후 틀린 문제만 다시 입력할 수 있습니다.</p>
+    </div>
+
+    <div class="card" id="config-card">
+      <h2>Supabase 연결 설정</h2>
+      <div class="grid">
+        <div class="col-6">
+          <label for="supabase-url">Supabase URL</label>
+          <input id="supabase-url" type="text" placeholder="https://YOUR-PROJECT.supabase.co" />
+        </div>
+        <div class="col-6">
+          <label for="supabase-key">Supabase Anon Key</label>
+          <input id="supabase-key" type="password" placeholder="eyJ..." />
+        </div>
+        <div class="col-6">
+          <label for="assignment-id">assignment_id</label>
+          <input id="assignment-id" type="text" placeholder="URL 쿼리스트링에서도 자동으로 읽습니다" />
+        </div>
+        <div class="col-6">
+          <label for="student-code">학생 고유번호</label>
+          <input id="student-code" type="text" placeholder="예: S24001" />
+        </div>
+        <div class="col-12">
+          <div class="toolbar">
+            <button id="btn-start">시험 시작 / 이어서 하기</button>
+            <button id="btn-save-local" class="secondary">로컬 저장</button>
+            <button id="btn-load-local" class="secondary">로컬 불러오기</button>
+            <button id="btn-clear-local" class="danger">로컬 초기화</button>
+          </div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <p class="muted">주의: 이 페이지는 <span class="code">start_attempt()</span>가 아래와 같은 고정 스펙으로 응답한다고 가정합니다.</p>
+      <div class="code">{
+  "attempt_id": "uuid",
+  "test_set_id": "uuid",
+  "title": "중3_전기와자기_숙제1",
+  "status": "in_progress",
+  "current_round": 1,
+  "total_items": 20,
+  "retry_item_nos": [],
+  "items": [
+    {
+      "item_no": 1,
+      "choice_count": 5,
+      "allows_multiple": false,
+      "selected_answer": ""
+    }
+  ]
+}</div>
+      <div class="spacer"></div>
+      <p class="muted">복수 정답 여부는 <span class="code">items[].allows_multiple</span>만 사용합니다. 정답 원문(answer_key_raw)은 학생 페이지에 내려오면 안 됩니다.</p>
+    </div>
+
+    <div class="card hidden" id="exam-card">
+      <div class="toolbar" style="justify-content: space-between;">
+        <div>
+          <h2 id="exam-title">시험</h2>
+          <div class="meta">
+            <span id="meta-attempt-id"></span>
+            <span id="meta-student-code"></span>
+            <span id="meta-round"></span>
+            <span id="meta-status"></span>
+          </div>
+        </div>
+        <div class="badge" id="round-badge">Round 1</div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-label">전체 문항 수</div>
+          <div class="summary-value" id="summary-total-items">-</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">현재 라운드 문항 수</div>
+          <div class="summary-value" id="summary-active-items">-</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">입력 완료</div>
+          <div class="summary-value" id="summary-answered-items">-</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">미입력</div>
+          <div class="summary-value" id="summary-empty-items">-</div>
+        </div>
+      </div>
+      <div class="autosave-note">답을 선택할 때마다 브라우저에 자동 저장됩니다.</div>
+    </div>
+
+    <div class="card hidden" id="question-card">
+      <h2>답안 입력</h2>
+      <p class="muted">단일 정답 문항은 한 개만 선택, 복수 정답 문항은 여러 개를 선택할 수 있습니다. 미입력 상태도 제출 가능하지만 오답 처리됩니다.</p>
+      <div class="question-list" id="question-list"></div>
+      <div class="spacer"></div>
+      <div class="toolbar">
+        <button id="btn-submit-round1">1차 제출</button>
+        <button id="btn-submit-round2" class="hidden">2차 제출</button>
+        <button id="btn-refresh-summary" class="secondary">요약 새로고침</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="result-card">
+      <h2>제출 결과</h2>
+      <div class="result-box" id="result-box"></div>
+    </div>
+
+    <div class="card">
+      <h2>개발 로그</h2>
+      <div class="code" id="debug-box">아직 로그가 없습니다.</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const state = {
+      supabase: null,
+      assignmentId: '',
+      studentCode: '',
+      attemptId: '',
+      testSetId: '',
+      title: '시험',
+      status: '',
+      currentRound: 1,
+      totalItems: 0,
+      retryItemNos: [],
+      items: [],
+      answers: {},
+      multipleItems: new Set(),
+      activeItems: []
+    };
+
+    const el = {
+      supabaseUrl: document.getElementById('supabase-url'),
+      supabaseKey: document.getElementById('supabase-key'),
+      assignmentId: document.getElementById('assignment-id'),
+      studentCode: document.getElementById('student-code'),
+      btnStart: document.getElementById('btn-start'),
+      btnSaveLocal: document.getElementById('btn-save-local'),
+      btnLoadLocal: document.getElementById('btn-load-local'),
+      btnClearLocal: document.getElementById('btn-clear-local'),
+      examCard: document.getElementById('exam-card'),
+      questionCard: document.getElementById('question-card'),
+      resultCard: document.getElementById('result-card'),
+      examTitle: document.getElementById('exam-title'),
+      roundBadge: document.getElementById('round-badge'),
+      metaAttemptId: document.getElementById('meta-attempt-id'),
+      metaStudentCode: document.getElementById('meta-student-code'),
+      metaRound: document.getElementById('meta-round'),
+      metaStatus: document.getElementById('meta-status'),
+      summaryTotalItems: document.getElementById('summary-total-items'),
+      summaryActiveItems: document.getElementById('summary-active-items'),
+      summaryAnsweredItems: document.getElementById('summary-answered-items'),
+      summaryEmptyItems: document.getElementById('summary-empty-items'),
+      questionList: document.getElementById('question-list'),
+      btnSubmitRound1: document.getElementById('btn-submit-round1'),
+      btnSubmitRound2: document.getElementById('btn-submit-round2'),
+      btnRefreshSummary: document.getElementById('btn-refresh-summary'),
+      resultBox: document.getElementById('result-box'),
+      debugBox: document.getElementById('debug-box')
+    };
+
+    function logDebug(message, payload) {
+      const time = new Date().toLocaleTimeString();
+      const line = payload === undefined ? `[${time}] ${message}` : `[${time}] ${message}\n${JSON.stringify(payload, null, 2)}`;
+      el.debugBox.textContent = `${line}\n\n${el.debugBox.textContent}`;
+    }
+
+    function showResultLines(lines, tone = 'normal') {
+      el.resultCard.classList.remove('hidden');
+      el.resultBox.innerHTML = '';
+      el.resultBox.classList.remove('success', 'danger', 'warning');
+      if (tone === 'success') el.resultBox.classList.add('success');
+      if (tone === 'danger') el.resultBox.classList.add('danger');
+      if (tone === 'warning') el.resultBox.classList.add('warning');
+      const ul = document.createElement('ul');
+      ul.className = 'line-list';
+      lines.forEach(text => {
+        const li = document.createElement('li');
+        li.textContent = text;
+        ul.appendChild(li);
+      });
+      el.resultBox.appendChild(ul);
+    }
+
+    function getQueryParam(name) {
+      const params = new URLSearchParams(location.search);
+      return params.get(name) || '';
+    }
+
+    function getLocalKey() {
+      return `auto-grading:${state.assignmentId || 'no-assignment'}:${state.studentCode || 'no-student'}`;
+    }
+
+    function saveLocalDraft(options = {}) {
+      const { silent = false } = options;
+      if (!state.assignmentId || !state.studentCode) return;
+      localStorage.setItem(getLocalKey(), JSON.stringify({ answers: state.answers }));
+      if (!silent) {
+        showResultLines(['현재 입력한 답안을 브라우저에 저장했습니다.'], 'success');
+      }
+    }
+
+    function loadLocalDraft() {
+      const raw = localStorage.getItem(getLocalKey());
+      if (!raw) {
+        showResultLines(['저장된 로컬 답안이 없습니다.'], 'warning');
+        return;
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        state.answers = parsed.answers || {};
+        renderQuestions();
+        updateSummary();
+        showResultLines(['로컬 답안을 불러왔습니다.'], 'success');
+      } catch (error) {
+        console.error(error);
+        showResultLines(['로컬 답안 불러오기에 실패했습니다.', error.message || '알 수 없는 오류'], 'danger');
+      }
+    }
+
+    function clearLocalDraft() {
+      localStorage.removeItem(getLocalKey());
+      showResultLines(['로컬 답안을 삭제했습니다.'], 'success');
+    }
+
+    function createSupabaseClient() {
+      const url = el.supabaseUrl.value.trim();
+      const key = el.supabaseKey.value.trim();
+      if (!url || !key) throw new Error('Supabase URL과 Anon Key를 입력해 주세요.');
+      state.supabase = window.supabase.createClient(url, key);
+      return state.supabase;
+    }
+
+    function normalizeStartAttemptPayload(raw) {
+      const payload = raw?.data ?? raw;
+      if (!payload || typeof payload !== 'object') {
+        throw new Error('start_attempt 응답이 비어 있거나 형식이 잘못되었습니다.');
+      }
+
+      const requiredTopLevel = ['attempt_id', 'test_set_id', 'title', 'status', 'current_round', 'total_items', 'retry_item_nos', 'items'];
+      const missing = requiredTopLevel.filter(key => !(key in payload));
+      if (missing.length) {
+        throw new Error(`start_attempt 응답 스펙 불일치: ${missing.join(', ')} 누락`);
+      }
+      if (!Array.isArray(payload.items)) {
+        throw new Error('start_attempt 응답 스펙 불일치: items는 배열이어야 합니다.');
+      }
+
+      const normalizedItems = payload.items.map((item, index) => {
+        const requiredItemFields = ['item_no', 'choice_count', 'allows_multiple', 'selected_answer'];
+        const itemMissing = requiredItemFields.filter(key => !(key in item));
+        if (itemMissing.length) {
+          throw new Error(`items[${index}] 스펙 불일치: ${itemMissing.join(', ')} 누락`);
+        }
+        return {
+          item_no: Number(item.item_no),
+          choice_count: Number(item.choice_count),
+          allows_multiple: Boolean(item.allows_multiple),
+          selected_answer: item.selected_answer ?? ''
+        };
+      }).sort((a, b) => a.item_no - b.item_no);
+
+      return {
+        attemptId: payload.attempt_id,
+        testSetId: payload.test_set_id,
+        title: payload.title,
+        status: payload.status,
+        currentRound: Number(payload.current_round),
+        totalItems: Number(payload.total_items),
+        retryItemNos: Array.isArray(payload.retry_item_nos) ? payload.retry_item_nos.map(Number).sort((a, b) => a - b) : [],
+        items: normalizedItems
+      };
+    }
+
+    function setStateFromStartPayload(payload) {
+      state.attemptId = payload.attemptId;
+      state.testSetId = payload.testSetId;
+      state.title = payload.title;
+      state.status = payload.status;
+      state.currentRound = payload.currentRound;
+      state.totalItems = payload.totalItems;
+      state.retryItemNos = payload.retryItemNos;
+      state.items = payload.items;
+      state.multipleItems = new Set(payload.items.filter(item => item.allows_multiple).map(item => item.item_no));
+
+      const freshAnswers = {};
+      payload.items.forEach(item => {
+        if (item.allows_multiple) {
+          const values = String(item.selected_answer || '')
+            .split('|')
+            .map(v => v.trim())
+            .filter(Boolean);
+          freshAnswers[item.item_no] = values;
+        } else {
+          freshAnswers[item.item_no] = String(item.selected_answer || '');
+        }
+      });
+
+      const existing = state.answers || {};
+      payload.items.forEach(item => {
+        if (existing[item.item_no] !== undefined) {
+          freshAnswers[item.item_no] = existing[item.item_no];
+        }
+      });
+
+      state.answers = freshAnswers;
+      state.activeItems = getActiveItems();
+    }
+
+    function getActiveItems() {
+      if (state.currentRound === 2 && state.retryItemNos.length) {
+        const retrySet = new Set(state.retryItemNos.map(Number));
+        return state.items.filter(item => retrySet.has(item.item_no));
+      }
+      return [...state.items];
+    }
+
+    function renderMeta() {
+      el.examCard.classList.remove('hidden');
+      el.questionCard.classList.remove('hidden');
+      el.examTitle.textContent = state.title;
+      el.metaAttemptId.textContent = `attempt_id: ${state.attemptId}`;
+      el.metaStudentCode.textContent = `student_code: ${state.studentCode}`;
+      el.metaRound.textContent = `current_round: ${state.currentRound}`;
+      el.metaStatus.textContent = `status: ${state.status}`;
+      el.roundBadge.textContent = state.currentRound === 2 ? 'Round 2' : 'Round 1';
+      el.btnSubmitRound1.classList.toggle('hidden', state.currentRound !== 1);
+      el.btnSubmitRound2.classList.toggle('hidden', state.currentRound !== 2);
+    }
+
+    function renderQuestions() {
+      const items = state.activeItems;
+      el.questionList.innerHTML = '';
+      items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'question-row';
+
+        const no = document.createElement('div');
+        no.className = 'question-no';
+        no.textContent = `${item.item_no}번`;
+
+        const choices = document.createElement('div');
+        choices.className = 'choice-grid';
+
+        const selected = getAnswerValue(item.item_no, item.allows_multiple);
+        for (let i = 1; i <= item.choice_count; i += 1) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `choice-button ${item.allows_multiple ? 'multiple' : ''}`;
+          button.textContent = i;
+          if (item.allows_multiple) {
+            const arr = Array.isArray(selected) ? selected : [];
+            if (arr.includes(String(i))) button.classList.add('selected');
+            button.addEventListener('click', () => toggleMultipleChoice(item.item_no, String(i)));
+          } else {
+            if (String(selected) === String(i)) button.classList.add('selected');
+            button.addEventListener('click', () => setSingleChoice(item.item_no, String(i)));
+          }
+          choices.appendChild(button);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'question-actions';
+
+        const valuePill = document.createElement('div');
+        valuePill.className = 'pill';
+        valuePill.textContent = formatAnswerDisplay(item.item_no, item.allows_multiple);
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'secondary';
+        clearBtn.textContent = '지우기';
+        clearBtn.addEventListener('click', () => clearAnswer(item.item_no, item.allows_multiple));
+
+        actions.appendChild(valuePill);
+        actions.appendChild(clearBtn);
+
+        row.appendChild(no);
+        row.appendChild(choices);
+        row.appendChild(actions);
+        el.questionList.appendChild(row);
+      });
+    }
+
+    function getAnswerValue(itemNo, allowsMultiple) {
+      const raw = state.answers[itemNo];
+      if (allowsMultiple) return Array.isArray(raw) ? raw : [];
+      return raw || '';
+    }
+
+    function formatAnswerDisplay(itemNo, allowsMultiple) {
+      const raw = getAnswerValue(itemNo, allowsMultiple);
+      if (allowsMultiple) return raw.length ? raw.join('|') : '공란';
+      return raw || '공란';
+    }
+
+    function setSingleChoice(itemNo, value) {
+      state.answers[itemNo] = String(value);
+      saveLocalDraft({ silent: true });
+      renderQuestions();
+      updateSummary();
+    }
+
+    function toggleMultipleChoice(itemNo, value) {
+      const current = Array.isArray(state.answers[itemNo]) ? [...state.answers[itemNo]] : [];
+      const idx = current.indexOf(value);
+      if (idx >= 0) current.splice(idx, 1);
+      else current.push(value);
+      current.sort((a, b) => Number(a) - Number(b));
+      state.answers[itemNo] = current;
+      saveLocalDraft({ silent: true });
+      renderQuestions();
+      updateSummary();
+    }
+
+    function clearAnswer(itemNo, allowsMultiple) {
+      state.answers[itemNo] = allowsMultiple ? [] : '';
+      saveLocalDraft({ silent: true });
+      renderQuestions();
+      updateSummary();
+    }
+
+    function buildPayload(round) {
+      const items = round === 2 ? state.activeItems : state.items;
+      return items.map(item => ({
+        item_no: String(item.item_no),
+        answer: serializeAnswer(item.item_no, item.allows_multiple)
+      }));
+    }
+
+    function serializeAnswer(itemNo, allowsMultiple) {
+      const raw = getAnswerValue(itemNo, allowsMultiple);
+      return allowsMultiple ? (raw.length ? raw.join('|') : '') : (raw || '');
+    }
+
+    function updateSummary() {
+      const items = state.activeItems;
+      let answered = 0;
+      items.forEach(item => {
+        const value = serializeAnswer(item.item_no, item.allows_multiple);
+        if (value !== '') answered += 1;
+      });
+      el.summaryTotalItems.textContent = String(state.totalItems || state.items.length || 0);
+      el.summaryActiveItems.textContent = String(items.length);
+      el.summaryAnsweredItems.textContent = String(answered);
+      el.summaryEmptyItems.textContent = String(items.length - answered);
+    }
+
+    function setSubmitting(round, isSubmitting) {
+      if (round === 1) el.btnSubmitRound1.disabled = isSubmitting;
+      if (round === 2) el.btnSubmitRound2.disabled = isSubmitting;
+    }
+
+    function disableSubmissionButtons() {
+      el.btnSubmitRound1.disabled = true;
+      el.btnSubmitRound2.disabled = true;
+    }
+
+    async function startOrResume() {
+      el.btnStart.disabled = true;
+      try {
+        createSupabaseClient();
+        state.assignmentId = el.assignmentId.value.trim();
+        state.studentCode = el.studentCode.value.trim();
+        if (!state.assignmentId) throw new Error('assignment_id를 입력해 주세요.');
+        if (!state.studentCode) throw new Error('학생 고유번호를 입력해 주세요.');
+
+        logDebug('start_attempt 호출', {
+          p_assignment_id: state.assignmentId,
+          p_student_code: state.studentCode
+        });
+
+        const { data, error } = await state.supabase.rpc('start_attempt', {
+          p_assignment_id: state.assignmentId,
+          p_student_code: state.studentCode
+        });
+        if (error) throw error;
+
+        logDebug('start_attempt 응답', data);
+        const payload = normalizeStartAttemptPayload(data);
+        setStateFromStartPayload(payload);
+        renderMeta();
+        renderQuestions();
+        updateSummary();
+
+        if (state.currentRound === 2) {
+          showResultLines([
+            '재도전 대상 문항만 표시했습니다.',
+            '빈 답도 제출 가능하지만 오답 처리됩니다.'
+          ], 'success');
+        } else {
+          showResultLines([
+            '시험을 시작했습니다.',
+            '모든 문항의 답을 입력한 뒤 제출하세요.'
+          ], 'success');
+        }
+      } catch (error) {
+        console.error(error);
+        logDebug('start_attempt 오류', { message: error.message, details: error });
+        showResultLines(['시험 시작에 실패했습니다.', error.message || '알 수 없는 오류'], 'danger');
+      } finally {
+        el.btnStart.disabled = false;
+      }
+    }
+
+    function confirmSubmission(round) {
+      if (round === 1) {
+        return confirm('정말로 1차 제출하시겠습니까? 제출 후에는 1차 답안을 다시 수정할 수 없습니다.');
+      }
+      return confirm('정말로 2차 제출하시겠습니까? 제출 후에는 2차 답안을 다시 수정할 수 없습니다.');
+    }
+
+    async function submitRound(round) {
+      try {
+        if (!state.supabase) createSupabaseClient();
+        if (!state.attemptId) throw new Error('attempt_id가 없습니다. 먼저 시험을 시작해 주세요.');
+        if (!confirmSubmission(round)) return;
+
+        setSubmitting(round, true);
+        const payload = buildPayload(round);
+        logDebug(`submit_round${round} 호출`, {
+          p_attempt_id: state.attemptId,
+          p_responses: payload
+        });
+
+        const rpcName = round === 2 ? 'submit_round2' : 'submit_round1';
+        const { data, error } = await state.supabase.rpc(rpcName, {
+          p_attempt_id: state.attemptId,
+          p_responses: payload
+        });
+        if (error) throw error;
+
+        logDebug(`${rpcName} 응답`, data);
+        applySubmitResult(round, data);
+      } catch (error) {
+        console.error(error);
+        logDebug(`submit_round${round} 오류`, { message: error.message, details: error });
+        showResultLines(['제출에 실패했습니다.', error.message || '알 수 없는 오류'], 'danger');
+        setSubmitting(round, false);
+      }
+    }
+
+    function applySubmitResult(round, result) {
+      state.status = result.status || state.status;
+      state.currentRound = Number(result.current_round ?? state.currentRound ?? 1);
+      state.retryItemNos = Array.isArray(result.retry_item_nos)
+        ? result.retry_item_nos.map(Number)
+        : Array.isArray(result.remaining_item_nos)
+          ? result.remaining_item_nos.map(Number)
+          : [];
+      state.activeItems = getActiveItems();
+      renderMeta();
+      renderQuestions();
+      updateSummary();
+
+      if (round === 1 && state.status === 'awaiting_retry') {
+        showResultLines([
+          '1차 제출이 완료되었습니다.',
+          `정답: ${result.correct_count} / ${result.total_items}`,
+          `점수: ${result.first_score_percent}%`,
+          `재도전 문항: ${state.retryItemNos.join(', ') || '없음'}`
+        ], 'warning');
+        return;
+      }
+
+      if (round === 1 && state.status === 'completed') {
+        showResultLines([
+          '1차 제출로 종료되었습니다.',
+          `정답: ${result.correct_count} / ${result.total_items}`,
+          `점수: ${result.first_score_percent}%`
+        ], 'success');
+        disableSubmissionButtons();
+        return;
+      }
+
+      if (round === 2) {
+        const remaining = Array.isArray(result.remaining_item_nos) ? result.remaining_item_nos.join(', ') : '';
+        showResultLines([
+          '2차 제출이 완료되었습니다.',
+          `1차 정답: ${result.round1_correct_count}개`,
+          `2차 추가 정답: ${result.round2_correct_count}개`,
+          `최종 점수: ${result.final_score_percent}%`,
+          `남은 문항: ${remaining || '없음'}`
+        ], state.status === 'completed' ? 'success' : 'warning');
+        disableSubmissionButtons();
+      }
+    }
+
+    function seedFromQuery() {
+      const assignmentId = getQueryParam('assignment_id');
+      if (assignmentId) el.assignmentId.value = assignmentId;
+    }
+
+    function seedFromLocalStorageConfig() {
+      const savedUrl = localStorage.getItem('auto-grading:supabase-url');
+      const savedKey = localStorage.getItem('auto-grading:supabase-key');
+      if (savedUrl) el.supabaseUrl.value = savedUrl;
+      if (savedKey) el.supabaseKey.value = savedKey;
+    }
+
+    function persistConfig() {
+      localStorage.setItem('auto-grading:supabase-url', el.supabaseUrl.value.trim());
+      localStorage.setItem('auto-grading:supabase-key', el.supabaseKey.value.trim());
+    }
+
+    el.btnStart.addEventListener('click', async () => {
+      persistConfig();
+      await startOrResume();
+    });
+    el.btnSaveLocal.addEventListener('click', () => saveLocalDraft({ silent: false }));
+    el.btnLoadLocal.addEventListener('click', loadLocalDraft);
+    el.btnClearLocal.addEventListener('click', clearLocalDraft);
+    el.btnSubmitRound1.addEventListener('click', async () => submitRound(1));
+    el.btnSubmitRound2.addEventListener('click', async () => submitRound(2));
+    el.btnRefreshSummary.addEventListener('click', updateSummary);
+
+    seedFromQuery();
+    seedFromLocalStorageConfig();
+    logDebug('페이지 초기화 완료');
+  </script>
+</body>
+</html>
