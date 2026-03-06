@@ -1,14 +1,16 @@
+-- =========================================================
+-- auto_grading schema - full final version
+-- =========================================================
+
+create schema if not exists auto_grading;
 set search_path = auto_grading;
 
--- =========================================================
--- 0. extensions
--- =========================================================
 create extension if not exists pgcrypto;
 
 -- =========================================================
--- 1. updated_at 자동 갱신 함수
+-- 1. updated_at trigger function
 -- =========================================================
-create or replace function public.set_updated_at()
+create or replace function auto_grading.set_updated_at()
 returns trigger
 language plpgsql
 as $$
@@ -19,11 +21,11 @@ end;
 $$;
 
 -- =========================================================
--- 2. answer key / response 정규화 함수
+-- 2. normalize answer key
 --    내부 표준 구분자는 '|'
---    방어적으로 ',' 입력도 허용하여 모두 '|' 기준으로 정규화
+--    ',' 입력도 방어적으로 허용
 -- =========================================================
-create or replace function public.normalize_answer_key(input_text text)
+create or replace function auto_grading.normalize_answer_key(input_text text)
 returns text
 language sql
 immutable
@@ -50,7 +52,7 @@ $$;
 -- =========================================================
 -- 3. students
 -- =========================================================
-create table if not exists public.students (
+create table if not exists auto_grading.students (
   id uuid primary key default gen_random_uuid(),
   student_code text not null unique,
   name text not null,
@@ -62,16 +64,16 @@ create table if not exists public.students (
   updated_at timestamptz not null default now()
 );
 
-drop trigger if exists trg_students_updated_at on public.students;
+drop trigger if exists trg_students_updated_at on auto_grading.students;
 create trigger trg_students_updated_at
-before update on public.students
+before update on auto_grading.students
 for each row
-execute function public.set_updated_at();
+execute function auto_grading.set_updated_at();
 
 -- =========================================================
 -- 4. test_sets
 -- =========================================================
-create table if not exists public.test_sets (
+create table if not exists auto_grading.test_sets (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   source_type text not null default 'csv_upload',
@@ -94,21 +96,21 @@ create table if not exists public.test_sets (
     check (total_items >= 0)
 );
 
-drop trigger if exists trg_test_sets_updated_at on public.test_sets;
+drop trigger if exists trg_test_sets_updated_at on auto_grading.test_sets;
 create trigger trg_test_sets_updated_at
-before update on public.test_sets
+before update on auto_grading.test_sets
 for each row
-execute function public.set_updated_at();
+execute function auto_grading.set_updated_at();
 
-create index if not exists idx_test_sets_title on public.test_sets(title);
-create index if not exists idx_test_sets_subject on public.test_sets(subject);
+create index if not exists idx_test_sets_title on auto_grading.test_sets(title);
+create index if not exists idx_test_sets_subject on auto_grading.test_sets(subject);
 
 -- =========================================================
 -- 5. test_items
 -- =========================================================
-create table if not exists public.test_items (
+create table if not exists auto_grading.test_items (
   id uuid primary key default gen_random_uuid(),
-  test_set_id uuid not null references public.test_sets(id) on delete cascade,
+  test_set_id uuid not null references auto_grading.test_sets(id) on delete cascade,
   item_no integer not null,
   choice_count integer not null default 5,
   answer_key_raw text not null,
@@ -124,22 +126,22 @@ create table if not exists public.test_items (
   constraint chk_test_items_answer_key_normalized_not_empty check (answer_key_normalized <> '')
 );
 
-drop trigger if exists trg_test_items_updated_at on public.test_items;
+drop trigger if exists trg_test_items_updated_at on auto_grading.test_items;
 create trigger trg_test_items_updated_at
-before update on public.test_items
+before update on auto_grading.test_items
 for each row
-execute function public.set_updated_at();
+execute function auto_grading.set_updated_at();
 
-create index if not exists idx_test_items_test_set_id on public.test_items(test_set_id);
-create index if not exists idx_test_items_topic_tag on public.test_items(topic_tag);
+create index if not exists idx_test_items_test_set_id on auto_grading.test_items(test_set_id);
+create index if not exists idx_test_items_topic_tag on auto_grading.test_items(topic_tag);
 
 -- =========================================================
 -- 6. assignments
 -- =========================================================
-create table if not exists public.assignments (
+create table if not exists auto_grading.assignments (
   id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references public.students(id) on delete cascade,
-  test_set_id uuid not null references public.test_sets(id) on delete cascade,
+  student_id uuid not null references auto_grading.students(id) on delete cascade,
+  test_set_id uuid not null references auto_grading.test_sets(id) on delete cascade,
   assigned_at timestamptz not null default now(),
   assigned_by text,
   due_at timestamptz,
@@ -153,24 +155,24 @@ create table if not exists public.assignments (
     check (status in ('assigned', 'completed', 'archived'))
 );
 
-drop trigger if exists trg_assignments_updated_at on public.assignments;
+drop trigger if exists trg_assignments_updated_at on auto_grading.assignments;
 create trigger trg_assignments_updated_at
-before update on public.assignments
+before update on auto_grading.assignments
 for each row
-execute function public.set_updated_at();
+execute function auto_grading.set_updated_at();
 
-create index if not exists idx_assignments_student_id on public.assignments(student_id);
-create index if not exists idx_assignments_test_set_id on public.assignments(test_set_id);
-create index if not exists idx_assignments_status on public.assignments(status);
+create index if not exists idx_assignments_student_id on auto_grading.assignments(student_id);
+create index if not exists idx_assignments_test_set_id on auto_grading.assignments(test_set_id);
+create index if not exists idx_assignments_status on auto_grading.assignments(status);
 
 -- =========================================================
 -- 7. attempts
 -- =========================================================
-create table if not exists public.attempts (
+create table if not exists auto_grading.attempts (
   id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references public.students(id) on delete cascade,
-  test_set_id uuid not null references public.test_sets(id) on delete cascade,
-  assignment_id uuid references public.assignments(id) on delete set null,
+  student_id uuid not null references auto_grading.students(id) on delete cascade,
+  test_set_id uuid not null references auto_grading.test_sets(id) on delete cascade,
+  assignment_id uuid references auto_grading.assignments(id) on delete set null,
   attempt_no integer not null,
   status text not null default 'in_progress',
   max_rounds integer not null default 2,
@@ -211,26 +213,26 @@ create table if not exists public.attempts (
   )
 );
 
-drop trigger if exists trg_attempts_updated_at on public.attempts;
+drop trigger if exists trg_attempts_updated_at on auto_grading.attempts;
 create trigger trg_attempts_updated_at
-before update on public.attempts
+before update on auto_grading.attempts
 for each row
-execute function public.set_updated_at();
+execute function auto_grading.set_updated_at();
 
-create index if not exists idx_attempts_student_id on public.attempts(student_id);
-create index if not exists idx_attempts_test_set_id on public.attempts(test_set_id);
-create index if not exists idx_attempts_assignment_id on public.attempts(assignment_id);
-create index if not exists idx_attempts_status on public.attempts(status);
-create index if not exists idx_attempts_started_at on public.attempts(started_at desc);
-create index if not exists idx_attempts_student_status on public.attempts(student_id, status);
+create index if not exists idx_attempts_student_id on auto_grading.attempts(student_id);
+create index if not exists idx_attempts_test_set_id on auto_grading.attempts(test_set_id);
+create index if not exists idx_attempts_assignment_id on auto_grading.attempts(assignment_id);
+create index if not exists idx_attempts_status on auto_grading.attempts(status);
+create index if not exists idx_attempts_started_at on auto_grading.attempts(started_at desc);
+create index if not exists idx_attempts_student_status on auto_grading.attempts(student_id, status);
 
 -- =========================================================
 -- 8. responses
 -- =========================================================
-create table if not exists public.responses (
+create table if not exists auto_grading.responses (
   id uuid primary key default gen_random_uuid(),
-  attempt_id uuid not null references public.attempts(id) on delete cascade,
-  test_item_id uuid not null references public.test_items(id) on delete cascade,
+  attempt_id uuid not null references auto_grading.attempts(id) on delete cascade,
+  test_item_id uuid not null references auto_grading.test_items(id) on delete cascade,
   round_no integer not null,
   selected_answer_raw text,
   selected_answer_normalized text,
@@ -244,22 +246,22 @@ create table if not exists public.responses (
   constraint chk_responses_round_no check (round_no >= 1 and round_no <= 10)
 );
 
-drop trigger if exists trg_responses_updated_at on public.responses;
+drop trigger if exists trg_responses_updated_at on auto_grading.responses;
 create trigger trg_responses_updated_at
-before update on public.responses
+before update on auto_grading.responses
 for each row
-execute function public.set_updated_at();
+execute function auto_grading.set_updated_at();
 
-create index if not exists idx_responses_attempt_id on public.responses(attempt_id);
-create index if not exists idx_responses_test_item_id on public.responses(test_item_id);
-create index if not exists idx_responses_round_no on public.responses(round_no);
+create index if not exists idx_responses_attempt_id on auto_grading.responses(attempt_id);
+create index if not exists idx_responses_test_item_id on auto_grading.responses(test_item_id);
+create index if not exists idx_responses_round_no on auto_grading.responses(round_no);
 
 -- =========================================================
 -- 9. student_public_links
 -- =========================================================
-create table if not exists public.student_public_links (
+create table if not exists auto_grading.student_public_links (
   id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references public.students(id) on delete cascade,
+  student_id uuid not null references auto_grading.students(id) on delete cascade,
   public_token text not null unique,
   is_active boolean not null default true,
   expires_at timestamptz,
@@ -267,37 +269,37 @@ create table if not exists public.student_public_links (
 );
 
 create index if not exists idx_student_public_links_student_id
-  on public.student_public_links(student_id);
+  on auto_grading.student_public_links(student_id);
 
 create index if not exists idx_student_public_links_token
-  on public.student_public_links(public_token);
+  on auto_grading.student_public_links(public_token);
 
 create index if not exists idx_student_public_links_student_active
-  on public.student_public_links(student_id, is_active);
+  on auto_grading.student_public_links(student_id, is_active);
 
 -- =========================================================
 -- 10. test_items 정답 정규화 trigger
 -- =========================================================
-create or replace function public.set_test_item_answer_key_normalized()
+create or replace function auto_grading.set_test_item_answer_key_normalized()
 returns trigger
 language plpgsql
 as $$
 begin
-  new.answer_key_normalized := public.normalize_answer_key(new.answer_key_raw);
+  new.answer_key_normalized := auto_grading.normalize_answer_key(new.answer_key_raw);
   return new;
 end;
 $$;
 
-drop trigger if exists trg_test_items_normalize_answer_key on public.test_items;
+drop trigger if exists trg_test_items_normalize_answer_key on auto_grading.test_items;
 create trigger trg_test_items_normalize_answer_key
-before insert or update on public.test_items
+before insert or update on auto_grading.test_items
 for each row
-execute function public.set_test_item_answer_key_normalized();
+execute function auto_grading.set_test_item_answer_key_normalized();
 
 -- =========================================================
 -- 11. responses 응답 정규화 trigger
 -- =========================================================
-create or replace function public.set_response_answer_normalized()
+create or replace function auto_grading.set_response_answer_normalized()
 returns trigger
 language plpgsql
 as $$
@@ -305,28 +307,28 @@ begin
   if new.selected_answer_raw is null then
     new.selected_answer_normalized := null;
   else
-    new.selected_answer_normalized := public.normalize_answer_key(new.selected_answer_raw);
+    new.selected_answer_normalized := auto_grading.normalize_answer_key(new.selected_answer_raw);
   end if;
   return new;
 end;
 $$;
 
-drop trigger if exists trg_responses_normalize_answer on public.responses;
+drop trigger if exists trg_responses_normalize_answer on auto_grading.responses;
 create trigger trg_responses_normalize_answer
-before insert or update on public.responses
+before insert or update on auto_grading.responses
 for each row
-execute function public.set_response_answer_normalized();
+execute function auto_grading.set_response_answer_normalized();
 
 -- =========================================================
 -- 12. attempt_no 계산 보조 함수
 -- =========================================================
-create or replace function public.get_next_attempt_no(p_student_id uuid, p_test_set_id uuid)
+create or replace function auto_grading.get_next_attempt_no(p_student_id uuid, p_test_set_id uuid)
 returns integer
 language sql
 stable
 as $$
   select coalesce(max(attempt_no), 0) + 1
-  from public.attempts
+  from auto_grading.attempts
   where student_id = p_student_id
     and test_set_id = p_test_set_id;
 $$;
@@ -334,15 +336,15 @@ $$;
 -- =========================================================
 -- 13. test_set total_items 재계산 함수
 -- =========================================================
-create or replace function public.refresh_test_set_total_items(p_test_set_id uuid)
+create or replace function auto_grading.refresh_test_set_total_items(p_test_set_id uuid)
 returns void
 language plpgsql
 as $$
 begin
-  update public.test_sets
+  update auto_grading.test_sets
   set total_items = (
     select count(*)
-    from public.test_items
+    from auto_grading.test_items
     where test_set_id = p_test_set_id
   )
   where id = p_test_set_id;
@@ -351,20 +353,19 @@ $$;
 
 -- =========================================================
 -- 14. test_items -> test_sets.total_items 갱신
---     이벤트별로 함수/트리거 분리
+--     이벤트별 statement-level trigger
 -- =========================================================
 
--- 14-1. INSERT 전용
-create or replace function public.trg_refresh_test_set_total_items_ins()
+create or replace function auto_grading.trg_refresh_test_set_total_items_ins()
 returns trigger
 language plpgsql
 as $$
 begin
-  update public.test_sets ts
+  update auto_grading.test_sets ts
   set total_items = sub.cnt
   from (
     select ti.test_set_id, count(*)::int as cnt
-    from public.test_items ti
+    from auto_grading.test_items ti
     where ti.test_set_id in (
       select distinct test_set_id
       from new_table
@@ -378,20 +379,19 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_test_items_refresh_total_items_ins on public.test_items;
+drop trigger if exists trg_test_items_refresh_total_items_ins on auto_grading.test_items;
 create trigger trg_test_items_refresh_total_items_ins
-after insert on public.test_items
+after insert on auto_grading.test_items
 referencing new table as new_table
 for each statement
-execute function public.trg_refresh_test_set_total_items_ins();
+execute function auto_grading.trg_refresh_test_set_total_items_ins();
 
--- 14-2. DELETE 전용
-create or replace function public.trg_refresh_test_set_total_items_del()
+create or replace function auto_grading.trg_refresh_test_set_total_items_del()
 returns trigger
 language plpgsql
 as $$
 begin
-  update public.test_sets ts
+  update auto_grading.test_sets ts
   set total_items = coalesce(sub.cnt, 0)
   from (
     select affected.test_set_id, count(ti.id)::int as cnt
@@ -400,7 +400,7 @@ begin
       from old_table
       where test_set_id is not null
     ) affected
-    left join public.test_items ti
+    left join auto_grading.test_items ti
       on ti.test_set_id = affected.test_set_id
     group by affected.test_set_id
   ) sub
@@ -410,20 +410,19 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_test_items_refresh_total_items_del on public.test_items;
+drop trigger if exists trg_test_items_refresh_total_items_del on auto_grading.test_items;
 create trigger trg_test_items_refresh_total_items_del
-after delete on public.test_items
+after delete on auto_grading.test_items
 referencing old table as old_table
 for each statement
-execute function public.trg_refresh_test_set_total_items_del();
+execute function auto_grading.trg_refresh_test_set_total_items_del();
 
--- 14-3. UPDATE 전용
-create or replace function public.trg_refresh_test_set_total_items_upd()
+create or replace function auto_grading.trg_refresh_test_set_total_items_upd()
 returns trigger
 language plpgsql
 as $$
 begin
-  update public.test_sets ts
+  update auto_grading.test_sets ts
   set total_items = coalesce(sub.cnt, 0)
   from (
     select affected.test_set_id, count(ti.id)::int as cnt
@@ -436,7 +435,7 @@ begin
       ) moved
       where test_set_id is not null
     ) affected
-    left join public.test_items ti
+    left join auto_grading.test_items ti
       on ti.test_set_id = affected.test_set_id
     group by affected.test_set_id
   ) sub
@@ -446,17 +445,17 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_test_items_refresh_total_items_upd on public.test_items;
+drop trigger if exists trg_test_items_refresh_total_items_upd on auto_grading.test_items;
 create trigger trg_test_items_refresh_total_items_upd
-after update on public.test_items
+after update on auto_grading.test_items
 referencing old table as old_table new table as new_table
 for each statement
-execute function public.trg_refresh_test_set_total_items_upd();
+execute function auto_grading.trg_refresh_test_set_total_items_upd();
 
 -- =========================================================
 -- 15. 응답 채점 보조 view
 -- =========================================================
-create or replace view public.v_response_grading as
+create or replace view auto_grading.v_response_grading as
 select
   r.id as response_id,
   r.attempt_id,
@@ -475,14 +474,14 @@ select
   r.answered_at,
   r.created_at,
   r.updated_at
-from public.responses r
-join public.test_items ti on ti.id = r.test_item_id
-join public.attempts a on a.id = r.attempt_id;
+from auto_grading.responses r
+join auto_grading.test_items ti on ti.id = r.test_item_id
+join auto_grading.attempts a on a.id = r.attempt_id;
 
 -- =========================================================
 -- 16. 학생 대시보드 집계 view
 -- =========================================================
-create or replace view public.v_student_summary as
+create or replace view auto_grading.v_student_summary as
 select
   s.id as student_id,
   s.student_code,
@@ -493,14 +492,14 @@ select
   coalesce(round(avg(a.first_score_percent) filter (where a.status in ('completed', 'needs_review')), 2), 0) as avg_first_score,
   coalesce(round(avg(a.final_score_percent) filter (where a.status in ('completed', 'needs_review')), 2), 0) as avg_final_score,
   count(a.id) filter (where a.status = 'needs_review') as attempts_needing_review
-from public.students s
-left join public.attempts a on a.student_id = s.id
+from auto_grading.students s
+left join auto_grading.attempts a on a.student_id = s.id
 group by s.id, s.student_code, s.name, s.grade_level;
 
 -- =========================================================
 -- 17. 최근 시험 기록 view
 -- =========================================================
-create or replace view public.v_student_attempt_history as
+create or replace view auto_grading.v_student_attempt_history as
 select
   a.id as attempt_id,
   a.student_id,
@@ -523,28 +522,6 @@ select
   a.round1_submitted_at,
   a.round2_submitted_at,
   a.completed_at
-from public.attempts a
-join public.students s on s.id = a.student_id
-join public.test_sets ts on ts.id = a.test_set_id;
-
--- =========================================================
--- 18. 운영 메모
---
---  (1) CSV의 answer_key 내부 구분자는 '|'를 권장
---      다만 normalize_answer_key()가 ','도 허용하도록 방어 처리됨
---
---  (2) student_public_links 는 학생당 여러 개 허용
---      재발급 시 기존 링크는 is_active=false 로 비활성화 가능
---
---  (3) 1차 제출 저장 프로시저에서 반드시 아래 분기를 강제할 것
---      - 오답/미입력 0개 => status='completed'
---      - 오답/미입력 1개 이상 => status='awaiting_retry'
---
---  (4) RLS 정책은 아직 미포함
---
---  (5) total_items 갱신은 이벤트별 statement-level trigger 사용
---      - INSERT: new_table만 참조
---      - DELETE: old_table만 참조
---      - UPDATE: old/new 양쪽 모두 참조
---      - test_set_id 이동 update 시 기존/신규 시험지 모두 반영
--- =========================================================
+from auto_grading.attempts a
+join auto_grading.students s on s.id = a.student_id
+join auto_grading.test_sets ts on ts.id = a.test_set_id;
