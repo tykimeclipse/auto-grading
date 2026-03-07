@@ -739,6 +739,18 @@
       updateButtonStates(false);
 
       if (round === 1 && state.status === 'awaiting_retry') {
+        const retrySet = new Set(state.retryItemNos.map(Number));
+
+        state.items.forEach(item => {
+          if (retrySet.has(item.item_no)) {
+            state.answers[item.item_no] = item.allows_multiple ? [] : '';
+          }
+        });
+
+  state.activeItems = getActiveItems();
+  renderMeta();
+  renderQuestions();
+  updateSummary();
         showResultLines([
           '1차 제출이 완료되었습니다.',
           `정답: ${result.correct_count} / ${result.total_items}`,
