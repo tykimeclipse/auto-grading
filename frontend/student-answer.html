@@ -94,7 +94,10 @@
     }
     .line-list { margin: 0; padding-left: 18px; }
     .autosave-note {
-      font-size: 13px; color: var(--muted); margin-top: 8px;
+      font-size: 13px; color: var(--muted); margin-top: 8px; transition: color 0.25s ease, opacity 0.25s ease;
+    }
+    .autosave-note.saved {
+      color: var(--success);
     }
   </style>
 </head>
@@ -188,7 +191,7 @@
           <div class="summary-value" id="summary-empty-items">-</div>
         </div>
       </div>
-      <div class="autosave-note">답을 선택할 때마다 브라우저에 자동 저장됩니다.</div>
+      <div class="autosave-note" id="autosave-note">답을 선택할 때마다 브라우저에 자동 저장됩니다.</div>
     </div>
 
     <div class="card hidden" id="question-card">
@@ -260,8 +263,11 @@
       btnSubmitRound2: document.getElementById('btn-submit-round2'),
       btnRefreshSummary: document.getElementById('btn-refresh-summary'),
       resultBox: document.getElementById('result-box'),
-      debugBox: document.getElementById('debug-box')
+      debugBox: document.getElementById('debug-box'),
+      autosaveNote: document.getElementById('autosave-note')
     };
+
+    let autosaveTimer = null;
 
     function logDebug(message, payload) {
       const time = new Date().toLocaleTimeString();
@@ -286,6 +292,17 @@
       el.resultBox.appendChild(ul);
     }
 
+    function pulseAutosaveNote() {
+      if (!el.autosaveNote) return;
+      el.autosaveNote.textContent = '자동 저장됨 (방금)';
+      el.autosaveNote.classList.add('saved');
+      if (autosaveTimer) clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(() => {
+        el.autosaveNote.textContent = '답을 선택할 때마다 브라우저에 자동 저장됩니다.';
+        el.autosaveNote.classList.remove('saved');
+      }, 1400);
+    }
+
     function getQueryParam(name) {
       const params = new URLSearchParams(location.search);
       return params.get(name) || '';
@@ -299,7 +316,9 @@
       const { silent = false } = options;
       if (!state.assignmentId || !state.studentCode) return;
       localStorage.setItem(getLocalKey(), JSON.stringify({ answers: state.answers }));
-      if (!silent) {
+      if (silent) {
+        pulseAutosaveNote();
+      } else {
         showResultLines(['현재 입력한 답안을 브라우저에 저장했습니다.'], 'success');
       }
     }
@@ -336,15 +355,46 @@
     }
 
     function normalizeStartAttemptPayload(raw) {
-      const payload = raw?.data ?? raw;
+      const payload = Array.isArray(raw?.data)
+        ? raw.data[0]
+        : Array.isArray(raw)
+          ? raw[0]
+          : (raw?.data ?? raw);
+
       if (!payload || typeof payload !== 'object') {
         throw new Error('start_attempt 응답이 비어 있거나 형식이 잘못되었습니다.');
       }
 
-      const requiredTopLevel = ['attempt_id', 'test_set_id', 'title', 'status', 'current_round', 'total_items', 'retry_item_nos', 'items'];
-      const missing = requiredTopLevel.filter(key => !(key in payload));
-      if (missing.length) {
-        throw new Error(`start_attempt 응답 스펙 불일치: ${missing.join(', ')} 누락`);
+      const requiredBaseFields = ['attempt_id', 'test_set_id', 'status', 'current_round'];
+      const missingBase = requiredBaseFields.filter(key => !(key in payload));
+      if (missingBase.length) {
+        throw new Error(`start_attempt 응답 스펙 불일치: ${missingBase.join(', ')} 누락`);
+      }
+
+      const title = payload.title ?? payload.test_title;
+      if (!title) {
+        throw new Error('start_attempt 응답 스펙 불일치: title 또는 test_title 누락');
+      }
+
+      if (payload.should_lock === true || payload.should_lock === 'true') {
+        return {
+          mode: 'locked',
+          attemptId: payload.attempt_id,
+          testSetId: payload.test_set_id,
+          title,
+          status: payload.status,
+          currentRound: Number(payload.current_round),
+          totalItems: Number(payload.total_items ?? 0),
+          retryItemNos: Array.isArray(payload.retry_item_nos) ? payload.retry_item_nos.map(Number).sort((a, b) => a - b) : [],
+          lockMessage: payload.message || '이미 제출이 완료된 시험입니다.',
+          items: []
+        };
+      }
+
+      const requiredActiveFields = ['total_items', 'retry_item_nos', 'items'];
+      const missingActive = requiredActiveFields.filter(key => !(key in payload));
+      if (missingActive.length) {
+        throw new Error(`start_attempt 응답 스펙 불일치: ${missingActive.join(', ')} 누락`);
       }
       if (!Array.isArray(payload.items)) {
         throw new Error('start_attempt 응답 스펙 불일치: items는 배열이어야 합니다.');
@@ -365,9 +415,10 @@
       }).sort((a, b) => a.item_no - b.item_no);
 
       return {
+        mode: 'active',
         attemptId: payload.attempt_id,
         testSetId: payload.test_set_id,
-        title: payload.title,
+        title,
         status: payload.status,
         currentRound: Number(payload.current_round),
         totalItems: Number(payload.total_items),
@@ -550,18 +601,15 @@
       el.summaryEmptyItems.textContent = String(items.length - answered);
     }
 
-    function setSubmitting(round, isSubmitting) {
-      if (round === 1) el.btnSubmitRound1.disabled = isSubmitting;
-      if (round === 2) el.btnSubmitRound2.disabled = isSubmitting;
-    }
-
-    function disableSubmissionButtons() {
-      el.btnSubmitRound1.disabled = true;
-      el.btnSubmitRound2.disabled = true;
+    function updateButtonStates(loading = false) {
+      const finished = state.status === 'completed' || state.status === 'needs_review';
+      el.btnStart.disabled = loading;
+      el.btnSubmitRound1.disabled = loading || finished || state.currentRound !== 1;
+      el.btnSubmitRound2.disabled = loading || finished || state.currentRound !== 2;
     }
 
     async function startOrResume() {
-      el.btnStart.disabled = true;
+      updateButtonStates(true);
       try {
         createSupabaseClient();
         state.assignmentId = el.assignmentId.value.trim();
@@ -574,7 +622,9 @@
           p_student_code: state.studentCode
         });
 
-        const { data, error } = await state.supabase.rpc('start_attempt', {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('start_attempt', {
           p_assignment_id: state.assignmentId,
           p_student_code: state.studentCode
         });
@@ -582,10 +632,35 @@
 
         logDebug('start_attempt 응답', data);
         const payload = normalizeStartAttemptPayload(data);
+        logDebug('start_attempt 정규화 결과', payload);
+
+        if (payload.mode === 'locked') {
+          state.attemptId = payload.attemptId;
+          state.testSetId = payload.testSetId;
+          state.title = payload.title;
+          state.status = payload.status;
+          state.currentRound = payload.currentRound;
+          state.totalItems = payload.totalItems;
+          state.retryItemNos = payload.retryItemNos;
+          state.items = [];
+          state.activeItems = [];
+          renderMeta();
+          el.questionCard.classList.add('hidden');
+          updateSummary();
+          updateButtonStates(false);
+          showResultLines([
+            payload.lockMessage,
+            `현재 상태: ${payload.status}`,
+            `attempt_id: ${payload.attemptId}`
+          ], 'warning');
+          return;
+        }
+
         setStateFromStartPayload(payload);
         renderMeta();
         renderQuestions();
         updateSummary();
+        updateButtonStates(false);
 
         if (state.currentRound === 2) {
           showResultLines([
@@ -602,8 +677,7 @@
         console.error(error);
         logDebug('start_attempt 오류', { message: error.message, details: error });
         showResultLines(['시험 시작에 실패했습니다.', error.message || '알 수 없는 오류'], 'danger');
-      } finally {
-        el.btnStart.disabled = false;
+        updateButtonStates(false);
       }
     }
 
@@ -618,9 +692,13 @@
       try {
         if (!state.supabase) createSupabaseClient();
         if (!state.attemptId) throw new Error('attempt_id가 없습니다. 먼저 시험을 시작해 주세요.');
-        if (!confirmSubmission(round)) return;
 
-        setSubmitting(round, true);
+        updateButtonStates(true);
+        if (!confirmSubmission(round)) {
+          updateButtonStates(false);
+          return;
+        }
+
         const payload = buildPayload(round);
         logDebug(`submit_round${round} 호출`, {
           p_attempt_id: state.attemptId,
@@ -628,7 +706,9 @@
         });
 
         const rpcName = round === 2 ? 'submit_round2' : 'submit_round1';
-        const { data, error } = await state.supabase.rpc(rpcName, {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc(rpcName, {
           p_attempt_id: state.attemptId,
           p_responses: payload
         });
@@ -640,7 +720,7 @@
         console.error(error);
         logDebug(`submit_round${round} 오류`, { message: error.message, details: error });
         showResultLines(['제출에 실패했습니다.', error.message || '알 수 없는 오류'], 'danger');
-        setSubmitting(round, false);
+        updateButtonStates(false);
       }
     }
 
@@ -656,6 +736,7 @@
       renderMeta();
       renderQuestions();
       updateSummary();
+      updateButtonStates(false);
 
       if (round === 1 && state.status === 'awaiting_retry') {
         showResultLines([
@@ -673,7 +754,6 @@
           `정답: ${result.correct_count} / ${result.total_items}`,
           `점수: ${result.first_score_percent}%`
         ], 'success');
-        disableSubmissionButtons();
         return;
       }
 
@@ -686,7 +766,6 @@
           `최종 점수: ${result.final_score_percent}%`,
           `남은 문항: ${remaining || '없음'}`
         ], state.status === 'completed' ? 'success' : 'warning');
-        disableSubmissionButtons();
       }
     }
 
