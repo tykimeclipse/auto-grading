@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>student-answer-omr</title>
+  <style>
+    :root{
+      --bg:#f5f6f8;
+      --panel:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:#d1d5db;
+      --brand:#1f3a8a;
+      --brand-soft:#e8edff;
+      --warn-bg:#fff8e6;
+      --warn-line:#f0d28a;
+      --danger:#b42318;
+      --ok:#18794e;
+      --shadow:0 1px 2px rgba(0,0,0,0.04);
+      --footer-h:84px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+
+    body{
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.4;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .page{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 12px 12px calc(var(--footer-h) + 18px);
+    }
+
+    .hidden{ display:none !important; }
+
+    .topbar{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-bottom:12px;
+    }
+
+    .title-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+
+    .title-wrap{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+
+    .test-title{
+      margin:0;
+      font-size:18px;
+      font-weight:800;
+      word-break:keep-all;
+    }
+
+    .subline{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .round-badge{
+      border:1px solid #c6d2ff;
+      background:var(--brand-soft);
+      color:#16327f;
+      padding:5px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      white-space:nowrap;
+      box-shadow:var(--shadow);
+    }
+
+    .stats-row{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:8px;
+    }
+
+    .stat-card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:8px 10px;
+      box-shadow:var(--shadow);
+      min-height:58px;
+    }
+
+    .stat-label{
+      font-size:11px;
+      color:var(--muted);
+      margin-bottom:3px;
+    }
+
+    .stat-value{
+      font-size:16px;
+      font-weight:800;
+    }
+
+    .result-summary{
+      margin:0 0 12px 0;
+      background:var(--warn-bg);
+      border:1px solid var(--warn-line);
+      border-radius:12px;
+      padding:10px 12px;
+      box-shadow:var(--shadow);
+      outline:none;
+    }
+
+    .result-summary:focus{
+      outline:none;
+    }
+
+    .result-summary:focus-visible{
+      outline:2px solid var(--brand);
+      outline-offset:2px;
+    }
+
+    .result-title{
+      font-size:14px;
+      font-weight:800;
+      margin-bottom:4px;
+    }
+
+    .result-line{
+      font-size:13px;
+      margin-top:2px;
+    }
+
+    .result-line.negative{ color:var(--danger); }
+    .result-line.positive{ color:var(--ok); }
+
+    .error-box{
+      background:#fff0f0;
+      border:1px solid #f0b7b7;
+      color:#8b1e1e;
+      border-radius:12px;
+      padding:14px 12px;
+      font-size:14px;
+      box-shadow:var(--shadow);
+    }
+
+    .omr-layout{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:12px;
+    }
+
+    .omr-layout.two-col{
+      grid-template-columns:1fr 1fr;
+      gap:20px;
+    }
+
+    .omr-column{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+
+    .omr-row{
+      display:grid;
+      grid-template-columns:30px 1fr;
+      align-items:center;
+      gap:8px;
+      min-height:38px;
+      padding:2px 0;
+    }
+
+    .omr-no{
+      text-align:right;
+      font-size:14px;
+      font-weight:700;
+      color:#374151;
+      padding-right:2px;
+      user-select:none;
+    }
+
+    .omr-choices{
+      display:grid;
+      grid-auto-flow:column;
+      grid-auto-columns:minmax(32px, 36px);
+      gap:4px;
+      justify-content:start;
+      min-width:0;
+    }
+
+    .omr-choice{
+      min-width:32px;
+      min-height:32px;
+      padding:0;
+      border:1px solid #b8bcc6;
+      border-radius:6px;
+      background:#fff;
+      color:#111827;
+      font-size:14px;
+      font-weight:700;
+      cursor:pointer;
+      touch-action:manipulation;
+      box-shadow:var(--shadow);
+    }
+
+    .omr-choice.selected{
+      border-color:var(--brand);
+      background:var(--brand);
+      color:#fff;
+    }
+
+    .omr-choice:disabled{
+      opacity:0.55;
+      cursor:not-allowed;
+    }
+
+    .footer-actions{
+      position:sticky;
+      bottom:0;
+      margin-top:14px;
+      padding-top:12px;
+      padding-bottom:12px;
+      background:linear-gradient(to top, var(--bg) 75%, rgba(245,246,248,0));
+    }
+
+    .submit-btn{
+      width:100%;
+      min-height:48px;
+      border:none;
+      border-radius:12px;
+      background:#111827;
+      color:#fff;
+      font-size:16px;
+      font-weight:800;
+      box-shadow:var(--shadow);
+      cursor:pointer;
+    }
+
+    .submit-btn[disabled]{
+      background:#9ca3af;
+      cursor:not-allowed;
+    }
+
+    .tiny-note{
+      text-align:center;
+      color:var(--muted);
+      font-size:11px;
+      margin-top:6px;
+    }
+
+    .debug-panel{
+      margin-top:18px;
+      background:#111;
+      color:#ddd;
+      border-radius:12px;
+      padding:12px;
+      overflow:auto;
+      box-shadow:var(--shadow);
+    }
+
+    .debug-title{
+      font-size:13px;
+      font-weight:800;
+      margin-bottom:8px;
+      color:#fff;
+    }
+
+    .debug-log{
+      margin:0;
+      white-space:pre-wrap;
+      word-break:break-word;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    @media (max-width: 420px){
+      .page{ padding-left:10px; padding-right:10px; }
+      .stats-row{ gap:6px; }
+      .stat-card{ padding:8px; }
+      .omr-row{ gap:6px; }
+      .omr-choices{ gap:3px; grid-auto-columns:minmax(31px, 34px); }
+      .omr-choice{ min-width:31px; min-height:31px; font-size:13px; }
+    }
+
+    @media (min-width: 820px){
+      .page{ padding-left:16px; padding-right:16px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="page">
+    <header class="topbar">
+      <div class="title-row">
+        <div class="title-wrap">
+          <h1 id="testTitle" class="test-title">OMR 입력</h1>
+          <div id="subline" class="subline">문제지는 종이로 보고, 이 화면에는 답만 입력합니다.</div>
+        </div>
+        <div id="roundBadge" class="round-badge" aria-label="현재 상태: 1차 입력">1차 입력</div>
+      </div>
+
+      <div id="studentStats" class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">총 문제 수</div>
+          <div id="statTotalSolved" class="stat-value">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">1차 정답률</div>
+          <div id="statRound1Accuracy" class="stat-value">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">최종 정답률</div>
+          <div id="statFinalAccuracy" class="stat-value">-</div>
+        </div>
+      </div>
+    </header>
+
+    <section id="resultSummary" class="result-summary hidden" aria-live="polite"></section>
+
+    <main id="omrRoot" class="omr-layout" aria-label="OMR 답안 입력 영역"></main>
+
+    <footer id="footerActions" class="footer-actions">
+      <button id="submitBtn" class="submit-btn" type="button">제출</button>
+      <div class="tiny-note">같은 칸을 다시 누르면 선택이 해제됩니다.</div>
+    </footer>
+
+    <section id="debugPanel" class="debug-panel hidden">
+      <div class="debug-title">Debug</div>
+      <pre id="debugLog" class="debug-log"></pre>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    /*
+      주의:
+      - SUPABASE_URL / SUPABASE_ANON_KEY를 이 파일에 직접 넣고 git에 올리는 것은 권장하지 않습니다.
+      - 테스트 중에는 로컬호스트에서 ?mock=1로만 mock를 켜고, 배포 환경에서는 기본 비활성화를 유지하는 편이 안전합니다.
+    */
+    const isLocalhost = ['localhost', '127.0.0.1'].includes(location.hostname);
+    const forceMock = new URLSearchParams(location.search).get('mock') === '1';
+
+    const CONFIG = {
+      SUPABASE_URL: '',
+      SUPABASE_ANON_KEY: '',
+      USE_MOCK: isLocalhost && forceMock,
+    };
+
+    if (CONFIG.USE_MOCK) {
+      console.warn('[AUTO-GRADING] Mock mode is ON. Do not deploy in this state.');
+    }
+
+    const state = {
+      assignmentId: null,
+      studentCode: '',
+      attemptId: null,
+      testTitle: 'OMR 입력',
+      currentRound: 1,
+      status: 'in_progress',
+      totalItems: 0,
+      retryItemNos: [],
+      items: [],
+      activeItems: [],
+      answers: {}, // always string keys: { "1": "3", "2": "5" }
+      resultSummary: null,
+      studentStats: {
+        totalSolved: null,
+        round1Accuracy: null,
+        finalAccuracy: null
+      },
+      debug: false,
+      submitting: false
+    };
+
+    let supabase = null;
+    let currentWideMq = null;
+
+    function initSupabase() {
+      if (!CONFIG.USE_MOCK && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+        supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+      }
+    }
+
+    function readQueryParams() {
+      const params = new URLSearchParams(location.search);
+      state.assignmentId = params.get('assignment_id') || 'demo-assignment';
+      state.studentCode = params.get('student_code') || 'demo-student';
+      state.debug = params.get('debug') === '1';
+      document.getElementById('debugPanel').classList.toggle('hidden', !state.debug);
+    }
+
+    function getStorageKey() {
+      return `ag_v1_answer_${String(state.assignmentId)}`;
+    }
+
+    function logDebug(title, data) {
+      if (!state.debug) return;
+      const el = document.getElementById('debugLog');
+      const block = `[${new Date().toLocaleTimeString()}] ${title}\n${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}\n\n`;
+      el.textContent += block;
+    }
+
+    function formatCount(v) {
+      return v == null ? '-' : String(v);
+    }
+
+    function formatPercent(v) {
+      if (v == null || Number.isNaN(v)) return '-';
+      return `${Math.round(Number(v))}%`;
+    }
+
+    function getRoundBadgeText() {
+      if (state.status === 'completed') return '제출 완료';
+      if (state.status === 'needs_review') return '검토 필요';
+      if (state.currentRound === 2) return '수정 입력';
+      return '1차 입력';
+    }
+
+    function renderHeader() {
+      document.getElementById('testTitle').textContent = state.testTitle || 'OMR 입력';
+      const badge = document.getElementById('roundBadge');
+      const badgeText = getRoundBadgeText();
+      badge.textContent = badgeText;
+      badge.setAttribute('aria-label', `현재 상태: ${badgeText}`);
+
+      document.getElementById('statTotalSolved').textContent = formatCount(state.studentStats.totalSolved);
+      document.getElementById('statRound1Accuracy').textContent = formatPercent(state.studentStats.round1Accuracy);
+      document.getElementById('statFinalAccuracy').textContent = formatPercent(state.studentStats.finalAccuracy);
+    }
+
+    function setSummaryHidden() {
+      const el = document.getElementById('resultSummary');
+      el.classList.add('hidden');
+      el.replaceChildren();
+      el.removeAttribute('tabindex');
+    }
+
+    function appendSummaryLine(container, text, cls = '') {
+      const div = document.createElement('div');
+      div.className = cls ? `result-line ${cls}` : 'result-line';
+      div.textContent = text;
+      container.appendChild(div);
+    }
+
+    function focusResultSummary() {
+      const el = document.getElementById('resultSummary');
+      if (!el || el.classList.contains('hidden')) return;
+      el.setAttribute('tabindex', '-1');
+      el.focus();
+    }
+
+    function renderResultSummary() {
+      const el = document.getElementById('resultSummary');
+      const s = state.resultSummary;
+
+      if (!s) {
+        setSummaryHidden();
+        return;
+      }
+
+      el.classList.remove('hidden');
+      el.replaceChildren();
+
+      const title = document.createElement('div');
+      title.className = 'result-title';
+
+      if (s.type === 'round1') {
+        title.textContent = `1차 결과: ${s.totalItems}문항 중 ${s.correctCount}문항 정답 (${s.scorePercent}%)`;
+        el.appendChild(title);
+
+        if (Array.isArray(s.retryItemNos) && s.retryItemNos.length) {
+          appendSummaryLine(el, `다시 풀 문제: ${s.retryItemNos.join(', ')}`, 'negative');
+        } else {
+          appendSummaryLine(el, '모든 문항이 정답 처리되었습니다.', 'positive');
+        }
+        return;
+      }
+
+      title.textContent = `최종 결과: ${s.totalItems}문항 중 ${s.finalCorrectCount}문항 정답 (${s.finalScorePercent}%)`;
+      el.appendChild(title);
+      appendSummaryLine(el, `1차 정답 ${s.round1CorrectCount}문항, 수정 정답 ${s.round2CorrectCount}문항`);
+
+      if (Array.isArray(s.remainingItemNos) && s.remainingItemNos.length) {
+        appendSummaryLine(el, `남은 문항: ${s.remainingItemNos.join(', ')}`, 'negative');
+      } else {
+        appendSummaryLine(el, '모든 문항의 처리가 끝났습니다.', 'positive');
+      }
+    }
+
+    function renderFooter() {
+      const btn = document.getElementById('submitBtn');
+
+      if (state.submitting) {
+        btn.disabled = true;
+        btn.textContent = '제출 중...';
+        return;
+      }
+
+      if (state.status === 'completed' || state.status === 'needs_review') {
+        btn.disabled = true;
+        btn.textContent = state.status === 'completed' ? '제출 완료' : '검토 필요';
+        return;
+      }
+
+      btn.disabled = false;
+      btn.textContent = state.currentRound === 2 ? '수정 제출' : '제출';
+    }
+
+    function showLoadError(message) {
+      const root = document.getElementById('omrRoot');
+      root.className = 'omr-layout';
+      root.replaceChildren();
+
+      const box = document.createElement('div');
+      box.className = 'error-box';
+      box.textContent = message;
+      root.appendChild(box);
+
+      const footer = document.getElementById('footerActions');
+      if (footer) {
+        footer.classList.add('hidden');
+      }
+    }
+
+    function getChoiceLabels(item) {
+      if (Number(item.choice_count) === 2) {
+        return [
+          { value: '1', label: 'O' },
+          { value: '2', label: 'X' }
+        ];
+      }
+
+      return Array.from({ length: Number(item.choice_count) }, (_, i) => {
+        const n = String(i + 1);
+        return { value: n, label: n };
+      });
+    }
+
+    function isChoiceSelected(item, value) {
+      const key = String(item.item_no);
+      const current = state.answers[key] || '';
+
+      if (!current) return false;
+      if (item.allows_multiple) return current.split('|').includes(String(value));
+      return current === String(value);
+    }
+
+    function getVisibleItems() {
+      if (state.currentRound === 2 && Array.isArray(state.retryItemNos) && state.retryItemNos.length) {
+        const retrySet = new Set(state.retryItemNos.map(n => String(n)));
+        return state.items.filter(item => retrySet.has(String(item.item_no)));
+      }
+      return [...state.items];
+    }
+
+    function saveLocalAnswers() {
+      localStorage.setItem(getStorageKey(), JSON.stringify(state.answers));
+    }
+
+    function clearLocalAnswers() {
+      localStorage.removeItem(getStorageKey());
+    }
+
+    function restoreLocalAnswers() {
+      if (!state.activeItems.length) return;
+
+      const raw = localStorage.getItem(getStorageKey());
+      if (!raw) return;
+
+      try {
+        const saved = JSON.parse(raw);
+        if (!saved || typeof saved !== 'object') return;
+
+        const visibleNos = new Set(state.activeItems.map(item => String(item.item_no)));
+
+        Object.entries(saved).forEach(([itemNo, value]) => {
+          const key = String(itemNo);
+          if (visibleNos.has(key)) {
+            state.answers[key] = String(value);
+          }
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderItemRow(item) {
+      const row = document.createElement('div');
+      row.className = 'omr-row';
+      row.dataset.itemNo = String(item.item_no);
+
+      const no = document.createElement('div');
+      no.className = 'omr-no';
+      no.textContent = String(item.item_no);
+
+      const choices = document.createElement('div');
+      choices.className = 'omr-choices';
+
+      const labels = getChoiceLabels(item);
+
+      labels.forEach(choice => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'omr-choice';
+        btn.textContent = choice.label;
+        btn.dataset.value = choice.value;
+        btn.setAttribute('aria-pressed', isChoiceSelected(item, choice.value) ? 'true' : 'false');
+
+        if (isChoiceSelected(item, choice.value)) {
+          btn.classList.add('selected');
+        }
+
+        if (state.status === 'completed' || state.status === 'needs_review' || state.submitting) {
+          btn.disabled = true;
+        }
+
+        btn.addEventListener('click', () => toggleAnswer(item, choice.value));
+        choices.appendChild(btn);
+      });
+
+      row.appendChild(no);
+      row.appendChild(choices);
+
+      return row;
+    }
+
+    function updateItemUI(itemNo) {
+      const key = String(itemNo);
+      const row = document.querySelector(`[data-item-no="${key}"]`);
+      const item = state.activeItems.find(i => String(i.item_no) === key);
+
+      if (!row || !item) return;
+
+      const labels = getChoiceLabels(item);
+      const buttons = row.querySelectorAll('.omr-choice');
+
+      buttons.forEach((btn, index) => {
+        const val = labels[index].value;
+        const selected = isChoiceSelected(item, val);
+        btn.classList.toggle('selected', selected);
+        btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      });
+    }
+
+    function renderOMRGrid() {
+      const root = document.getElementById('omrRoot');
+      root.replaceChildren();
+
+      const isWide = currentWideMq ? currentWideMq.matches : window.matchMedia('(min-width: 820px)').matches;
+      root.className = isWide ? 'omr-layout two-col' : 'omr-layout';
+
+      if (!isWide) {
+        const col = document.createElement('div');
+        col.className = 'omr-column';
+        state.activeItems.forEach(item => col.appendChild(renderItemRow(item)));
+        root.appendChild(col);
+        return;
+      }
+
+      const mid = Math.ceil(state.activeItems.length / 2);
+      const leftItems = state.activeItems.slice(0, mid);
+      const rightItems = state.activeItems.slice(mid);
+
+      const left = document.createElement('div');
+      left.className = 'omr-column';
+
+      const right = document.createElement('div');
+      right.className = 'omr-column';
+
+      leftItems.forEach(item => left.appendChild(renderItemRow(item)));
+      rightItems.forEach(item => right.appendChild(renderItemRow(item)));
+
+      root.appendChild(left);
+      root.appendChild(right);
+    }
+
+    function renderPage() {
+      renderHeader();
+      renderResultSummary();
+      renderOMRGrid();
+      renderFooter();
+    }
+
+    function toggleAnswer(item, clickedValue) {
+      if (state.status === 'completed' || state.status === 'needs_review' || state.submitting) return;
+
+      const key = String(item.item_no);
+      const current = state.answers[key] || '';
+      const clicked = String(clickedValue);
+
+      if (item.allows_multiple) {
+        const currentSet = new Set(current ? current.split('|') : []);
+
+        if (currentSet.has(clicked)) currentSet.delete(clicked);
+        else currentSet.add(clicked);
+
+        const next = [...currentSet].sort((a, b) => Number(a) - Number(b)).join('|');
+
+        if (next) state.answers[key] = next;
+        else delete state.answers[key];
+      } else {
+        if (current === clicked) delete state.answers[key];
+        else state.answers[key] = clicked;
+      }
+
+      saveLocalAnswers();
+      updateItemUI(key);
+    }
+
+    function buildSubmissionPayload() {
+      // 의도된 동작:
+      // round2에서는 retry 문항만 다시 제출해야 하므로 activeItems 기준으로 payload를 만듭니다.
+      return state.activeItems.map(item => ({
+        item_no: String(item.item_no),
+        answer: state.answers[String(item.item_no)] || ''
+      }));
+    }
+
+    async function rpcStartAttempt(params) {
+      if (CONFIG.USE_MOCK) return mockStartAttempt(params);
+
+      const { data, error } = await supabase.rpc('start_attempt', params);
+      if (error) throw error;
+      return data;
+    }
+
+    async function rpcSubmitRound1(params) {
+      if (CONFIG.USE_MOCK) return mockSubmitRound1(params);
+
+      const { data, error } = await supabase.rpc('submit_round1', params);
+      if (error) throw error;
+      return data;
+    }
+
+    async function rpcSubmitRound2(params) {
+      if (CONFIG.USE_MOCK) return mockSubmitRound2(params);
+
+      const { data, error } = await supabase.rpc('submit_round2', params);
+      if (error) throw error;
+      return data;
+    }
+
+    async function loadStudentStats() {
+      if (CONFIG.USE_MOCK) {
+        state.studentStats = {
+          totalSolved: 412,
+          round1Accuracy: 63.4,
+          finalAccuracy: 91.0
+        };
+        return;
+      }
+
+      // 정책:
+      // 통계 로딩 실패가 채점/제출 흐름 전체를 막아서는 안 됩니다.
+      // 실제 RPC 연결 시에도 실패하면 null 상태로 두고 화면만 계속 진행하도록 유지합니다.
+      state.studentStats = {
+        totalSolved: null,
+        round1Accuracy: null,
+        finalAccuracy: null
+      };
+    }
+
+    function applyRound1Result(result) {
+      state.status = result.status;
+      state.currentRound = result.status === 'awaiting_retry' ? 2 : 1;
+      state.retryItemNos = (result.retry_item_nos || []).map(n => String(n));
+
+      state.resultSummary = {
+        type: 'round1',
+        correctCount: Number(result.correct_count || 0),
+        wrongCount: Number(result.wrong_count || 0),
+        totalItems: Number(state.totalItems || 0),
+        scorePercent: Number(result.first_score_percent || 0),
+        retryItemNos: (result.retry_item_nos || []).map(n => String(n))
+      };
+
+      // round 전환 후 이전 선택값을 보여주지 않기 위해 answers/localStorage를 비웁니다.
+      // restoreLocalAnswers()는 초기 로드 시에만 호출됩니다.
+      state.activeItems = getVisibleItems();
+      state.answers = {};
+      clearLocalAnswers();
+    }
+
+    function applyRound2Result(result) {
+      state.status = result.status;
+
+      state.resultSummary = {
+        type: 'round2',
+        finalCorrectCount: Number(result.final_correct_count || 0),
+        totalItems: Number(result.total_items || state.totalItems || 0),
+        finalScorePercent: Number(result.final_score_percent || 0),
+        round1CorrectCount: Number(result.round1_correct_count || 0),
+        round2CorrectCount: Number(result.round2_correct_count || 0),
+        remainingItemNos: (result.remaining_item_nos || []).map(n => String(n))
+      };
+
+      // round2 제출 이후에도 학생 화면에는 이전 선택을 남기지 않습니다.
+      state.activeItems = getVisibleItems();
+      state.answers = {};
+      clearLocalAnswers();
+    }
+
+    async function startAttempt() {
+      const result = await rpcStartAttempt({
+        p_assignment_id: String(state.assignmentId),
+        p_student_code: String(state.studentCode)
+      });
+
+      state.attemptId = result.attempt_id;
+      state.status = result.status;
+      state.currentRound = Number(result.current_round || 1);
+      state.totalItems = Number(result.total_items || 0);
+      state.retryItemNos = (result.retry_item_nos || []).map(n => String(n));
+      state.items = Array.isArray(result.items) ? result.items.map(item => ({
+        item_no: Number(item.item_no),
+        choice_count: Number(item.choice_count),
+        allows_multiple: Boolean(item.allows_multiple),
+        selected_answer: item.selected_answer == null ? '' : String(item.selected_answer)
+      })) : [];
+      state.testTitle = result.title || result.test_title || 'OMR 입력';
+
+      state.answers = {};
+      state.items.forEach(item => {
+        const selected = item.selected_answer || '';
+        if (selected) {
+          state.answers[String(item.item_no)] = String(selected);
+        }
+      });
+
+      state.activeItems = getVisibleItems();
+      logDebug('start_attempt result', result);
+    }
+
+    async function onSubmit() {
+      if (state.submitting) return;
+      if (state.status === 'completed' || state.status === 'needs_review') return;
+
+      const ok = window.confirm(state.currentRound === 2 ? '수정 답안을 제출하시겠습니까?' : '답안을 제출하시겠습니까?');
+      if (!ok) return;
+
+      state.submitting = true;
+      renderFooter();
+
+      let success = false;
+      let result = null;
+
+      try {
+        const payload = buildSubmissionPayload();
+
+        if (state.currentRound === 2) {
+          result = await rpcSubmitRound2({
+            p_attempt_id: state.attemptId,
+            p_responses: payload
+          });
+          applyRound2Result(result);
+        } else {
+          result = await rpcSubmitRound1({
+            p_attempt_id: state.attemptId,
+            p_responses: payload
+          });
+          applyRound1Result(result);
+        }
+
+        await loadStudentStats();
+        success = true;
+        logDebug('submit result', result);
+      } catch (err) {
+        console.error(err);
+        alert(`제출 중 오류가 발생했습니다.\n${err?.message || ''}`);
+      } finally {
+        state.submitting = false;
+      }
+
+      if (success) {
+        renderPage(); // resultSummary hidden 해제 포함
+        focusResultSummary(); // renderPage 이후에 호출해야 함
+      } else {
+        renderFooter();
+      }
+    }
+
+    function bindStaticEvents() {
+      document.getElementById('submitBtn').addEventListener('click', onSubmit);
+
+      currentWideMq = window.matchMedia('(min-width: 820px)');
+
+      if (typeof currentWideMq.addEventListener === 'function') {
+        currentWideMq.addEventListener('change', renderOMRGrid);
+      } else if (typeof currentWideMq.addListener === 'function') {
+        // 구형 Safari / Android WebView 대응용 fallback
+        currentWideMq.addListener(renderOMRGrid);
+      }
+    }
+
+    async function initPage() {
+      readQueryParams();
+      initSupabase();
+      bindStaticEvents();
+
+      try {
+        await startAttempt();
+        restoreLocalAnswers();
+      } catch (err) {
+        console.error(err);
+        showLoadError('시험을 불러오는 데 실패했습니다. 페이지를 새로 고침해 주세요.');
+        return;
+      }
+
+      await loadStudentStats();
+      renderPage();
+    }
+
+    /* ---------------- MOCK ---------------- */
+
+    function buildMockItems() {
+      const items = [];
+      for (let i = 1; i <= 25; i += 1) {
+        items.push({
+          item_no: i,
+          choice_count: i === 12 ? 2 : 5,
+          allows_multiple: false,
+          selected_answer: ''
+        });
+      }
+      return items;
+    }
+
+    async function mockStartAttempt() {
+      const items = buildMockItems();
+
+      return {
+        attempt_id: 'mock-attempt-001',
+        status: 'in_progress',
+        current_round: 1,
+        total_items: items.length,
+        retry_item_nos: [],
+        title: '중3 과학 OMR 입력 테스트',
+        items
+      };
+    }
+
+    function mockCorrectAnswerFor(itemNo) {
+      if (String(itemNo) === '12') return '1';
+      return String(((Number(itemNo) + 1) % 5) + 1);
+    }
+
+    async function mockSubmitRound1(params) {
+      const answers = Array.isArray(params.p_responses) ? params.p_responses : [];
+      const wrong = [];
+      let correct = 0;
+
+      answers.forEach(row => {
+        const itemNo = String(row.item_no);
+        const given = String(row.answer || '');
+        const expected = mockCorrectAnswerFor(itemNo);
+
+        if (given && given === expected) correct += 1;
+        else wrong.push(itemNo);
+      });
+
+      const total = answers.length;
+      const wrongCount = wrong.length;
+      const scorePercent = total ? Math.round((correct / total) * 100) : 0;
+
+      if (wrongCount === 0) {
+        return {
+          status: 'completed',
+          correct_count: correct,
+          wrong_count: 0,
+          retry_item_nos: [],
+          first_score_percent: scorePercent
+        };
+      }
+
+      return {
+        status: 'awaiting_retry',
+        correct_count: correct,
+        wrong_count: wrongCount,
+        retry_item_nos: wrong,
+        first_score_percent: scorePercent
+      };
+    }
+
+    async function mockSubmitRound2(params) {
+      const answers = Array.isArray(params.p_responses) ? params.p_responses : [];
+      const remaining = [];
+      let round2Correct = 0;
+
+      answers.forEach(row => {
+        const itemNo = String(row.item_no);
+        const given = String(row.answer || '');
+        const expected = mockCorrectAnswerFor(itemNo);
+
+        if (given && given === expected) round2Correct += 1;
+        else remaining.push(itemNo);
+      });
+
+      const originalTotal = 25;
+
+      // mock 단순화:
+      // round1 정답 수 = 전체 - retry 문항 수로 추정
+      // 실제 RPC는 DB의 round1 responses에서 집계함
+      const round1Correct = Math.max(0, originalTotal - answers.length);
+
+      const finalCorrect = round1Correct + round2Correct;
+      const finalPercent = Math.round((finalCorrect / originalTotal) * 100);
+
+      if (remaining.length === 0) {
+        return {
+          status: 'completed',
+          total_items: originalTotal,
+          final_correct_count: finalCorrect,
+          final_score_percent: finalPercent,
+          round1_correct_count: round1Correct,
+          round2_correct_count: round2Correct,
+          remaining_item_nos: []
+        };
+      }
+
+      return {
+        status: 'needs_review',
+        total_items: originalTotal,
+        final_correct_count: finalCorrect,
+        final_score_percent: finalPercent,
+        round1_correct_count: round1Correct,
+        round2_correct_count: round2Correct,
+        remaining_item_nos: remaining
+      };
+    }
+
+    initPage();
+  </script>
+</body>
+</html>
