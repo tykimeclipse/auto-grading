@@ -16,6 +16,11 @@
       --warn-bg:#fff8e6;
       --warn-line:#f0d28a;
       --danger:#b42318;
+      --danger-soft:#fff3f3;
+      --danger-line:#e7b4b4;
+      --danger-deep:#8f2d2d;
+      --danger-selected:#e3a6a6;
+      --danger-selected-line:#be5d5d;
       --ok:#18794e;
       --shadow:0 1px 2px rgba(0,0,0,0.04);
       --footer-h:84px;
@@ -35,7 +40,7 @@
     .page{
       max-width: 980px;
       margin: 0 auto;
-      padding: 12px 12px calc(var(--footer-h) + 18px);
+      padding: 12px;
     }
 
     .hidden{ display:none !important; }
@@ -144,6 +149,18 @@
     .result-line.negative{ color:var(--danger); }
     .result-line.positive{ color:var(--ok); }
 
+    .review-notice{
+      margin:0 0 12px 0;
+      background:var(--danger-soft);
+      border:1px solid var(--danger-line);
+      border-radius:12px;
+      padding:12px;
+      color:var(--danger-deep);
+      font-size:14px;
+      font-weight:700;
+      box-shadow:var(--shadow);
+    }
+
     .error-box{
       background:#fff0f0;
       border:1px solid #f0b7b7;
@@ -157,6 +174,7 @@
     .omr-layout{
       display:grid;
       grid-template-columns:1fr;
+      justify-items:center;
       gap:12px;
     }
 
@@ -165,16 +183,38 @@
       gap:20px;
     }
 
+    .omr-layout.review-locked .omr-choice{
+      background:var(--danger-soft);
+      border-color:var(--danger-line);
+      color:var(--danger-deep);
+      opacity:1;
+    }
+
+    .omr-layout.review-locked .omr-choice.selected{
+      background:var(--danger-selected);
+      border-color:var(--danger-selected-line);
+      color:#6c1c1c;
+      box-shadow:inset 0 0 0 1px rgba(108,28,28,0.22), var(--shadow);
+    }
+
+    .omr-layout.review-locked .omr-choice:disabled{
+      opacity:1;
+      cursor:not-allowed;
+    }
+
     .omr-column{
       display:flex;
       flex-direction:column;
       gap:6px;
+      width:320px;
+      max-width:100%;
       min-width:0;
     }
 
     .omr-row{
       display:grid;
-      grid-template-columns:30px 1fr;
+      grid-template-columns:30px auto;
+      justify-content:center;
       align-items:center;
       gap:8px;
       min-height:38px;
@@ -226,8 +266,6 @@
     }
 
     .footer-actions{
-      position:sticky;
-      bottom:0;
       margin-top:14px;
       padding-top:12px;
       padding-bottom:12px;
@@ -250,6 +288,11 @@
     .submit-btn[disabled]{
       background:#9ca3af;
       cursor:not-allowed;
+    }
+
+    .submit-btn.deadline{
+      background:#6a2f2f;
+      color:#fff;
     }
 
     .tiny-note{
@@ -293,6 +336,17 @@
       .omr-choice{ min-width:31px; min-height:31px; font-size:13px; }
     }
 
+    @media (max-width: 819px){
+      .omr-choices{
+        gap:6px;
+      }
+
+      .omr-choice{
+        min-width:32px;
+        min-height:32px;
+      }
+    }
+
     @media (min-width: 820px){
       .page{ padding-left:16px; padding-right:16px; }
     }
@@ -326,6 +380,7 @@
     </header>
 
     <section id="resultSummary" class="result-summary hidden" aria-live="polite"></section>
+    <section id="reviewNotice" class="review-notice hidden">제출이 마감되었습니다. 문제를 다시 풀어 본 뒤 선생님께 문의하세요.</section>
 
     <main id="omrRoot" class="omr-layout" aria-label="OMR 답안 입력 영역"></main>
 
@@ -371,7 +426,7 @@
       retryItemNos: [],
       items: [],
       activeItems: [],
-      answers: {}, // always string keys: { "1": "3", "2": "5" }
+      answers: {},
       resultSummary: null,
       studentStats: {
         totalSolved: null,
@@ -382,12 +437,12 @@
       submitting: false
     };
 
-    let supabase = null;
+    let sbClient = null;
     let currentWideMq = null;
 
     function initSupabase() {
       if (!CONFIG.USE_MOCK && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-        supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        sbClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
       }
     }
 
@@ -497,8 +552,18 @@
       }
     }
 
+    function renderReviewNotice() {
+      const el = document.getElementById('reviewNotice');
+      if (state.status === 'needs_review') {
+        el.classList.remove('hidden');
+      } else {
+        el.classList.add('hidden');
+      }
+    }
+
     function renderFooter() {
       const btn = document.getElementById('submitBtn');
+      btn.classList.remove('deadline');
 
       if (state.submitting) {
         btn.disabled = true;
@@ -506,9 +571,16 @@
         return;
       }
 
-      if (state.status === 'completed' || state.status === 'needs_review') {
+      if (state.status === 'completed') {
         btn.disabled = true;
-        btn.textContent = state.status === 'completed' ? '제출 완료' : '검토 필요';
+        btn.textContent = '제출 완료';
+        return;
+      }
+
+      if (state.status === 'needs_review') {
+        btn.disabled = true;
+        btn.textContent = '제출 마감';
+        btn.classList.add('deadline');
         return;
       }
 
@@ -561,6 +633,19 @@
         return state.items.filter(item => retrySet.has(String(item.item_no)));
       }
       return [...state.items];
+    }
+
+    function getMissingItems() {
+      const missing = [];
+
+      state.activeItems.forEach(item => {
+        const key = String(item.item_no);
+        if (!state.answers[key]) {
+          missing.push(item.item_no);
+        }
+      });
+
+      return missing;
     }
 
     function saveLocalAnswers() {
@@ -659,6 +744,10 @@
       const isWide = currentWideMq ? currentWideMq.matches : window.matchMedia('(min-width: 820px)').matches;
       root.className = isWide ? 'omr-layout two-col' : 'omr-layout';
 
+      if (state.status === 'needs_review') {
+        root.classList.add('review-locked');
+      }
+
       if (!isWide) {
         const col = document.createElement('div');
         col.className = 'omr-column';
@@ -687,6 +776,7 @@
     function renderPage() {
       renderHeader();
       renderResultSummary();
+      renderReviewNotice();
       renderOMRGrid();
       renderFooter();
     }
@@ -718,8 +808,6 @@
     }
 
     function buildSubmissionPayload() {
-      // 의도된 동작:
-      // round2에서는 retry 문항만 다시 제출해야 하므로 activeItems 기준으로 payload를 만듭니다.
       return state.activeItems.map(item => ({
         item_no: String(item.item_no),
         answer: state.answers[String(item.item_no)] || ''
@@ -728,24 +816,21 @@
 
     async function rpcStartAttempt(params) {
       if (CONFIG.USE_MOCK) return mockStartAttempt(params);
-
-      const { data, error } = await supabase.rpc('start_attempt', params);
+      const { data, error } = await sbClient.rpc('start_attempt', params);
       if (error) throw error;
       return data;
     }
 
     async function rpcSubmitRound1(params) {
       if (CONFIG.USE_MOCK) return mockSubmitRound1(params);
-
-      const { data, error } = await supabase.rpc('submit_round1', params);
+      const { data, error } = await sbClient.rpc('submit_round1', params);
       if (error) throw error;
       return data;
     }
 
     async function rpcSubmitRound2(params) {
       if (CONFIG.USE_MOCK) return mockSubmitRound2(params);
-
-      const { data, error } = await supabase.rpc('submit_round2', params);
+      const { data, error } = await sbClient.rpc('submit_round2', params);
       if (error) throw error;
       return data;
     }
@@ -760,9 +845,6 @@
         return;
       }
 
-      // 정책:
-      // 통계 로딩 실패가 채점/제출 흐름 전체를 막아서는 안 됩니다.
-      // 실제 RPC 연결 시에도 실패하면 null 상태로 두고 화면만 계속 진행하도록 유지합니다.
       state.studentStats = {
         totalSolved: null,
         round1Accuracy: null,
@@ -784,8 +866,6 @@
         retryItemNos: (result.retry_item_nos || []).map(n => String(n))
       };
 
-      // round 전환 후 이전 선택값을 보여주지 않기 위해 answers/localStorage를 비웁니다.
-      // restoreLocalAnswers()는 초기 로드 시에만 호출됩니다.
       state.activeItems = getVisibleItems();
       state.answers = {};
       clearLocalAnswers();
@@ -804,7 +884,6 @@
         remainingItemNos: (result.remaining_item_nos || []).map(n => String(n))
       };
 
-      // round2 제출 이후에도 학생 화면에는 이전 선택을 남기지 않습니다.
       state.activeItems = getVisibleItems();
       state.answers = {};
       clearLocalAnswers();
@@ -845,7 +924,18 @@
       if (state.submitting) return;
       if (state.status === 'completed' || state.status === 'needs_review') return;
 
-      const ok = window.confirm(state.currentRound === 2 ? '수정 답안을 제출하시겠습니까?' : '답안을 제출하시겠습니까?');
+      let message = state.currentRound === 2
+        ? '수정 답안을 제출하시겠습니까?'
+        : '답안을 제출하시겠습니까?';
+
+      if (state.currentRound === 1) {
+        const missing = getMissingItems();
+        if (missing.length > 0) {
+          message = `입력되지 않은 문항: ${missing.join(', ')}\n\n그래도 제출하시겠습니까?`;
+        }
+      }
+
+      const ok = window.confirm(message);
       if (!ok) return;
 
       state.submitting = true;
@@ -882,8 +972,8 @@
       }
 
       if (success) {
-        renderPage(); // resultSummary hidden 해제 포함
-        focusResultSummary(); // renderPage 이후에 호출해야 함
+        renderPage();
+        focusResultSummary();
       } else {
         renderFooter();
       }
@@ -897,7 +987,6 @@
       if (typeof currentWideMq.addEventListener === 'function') {
         currentWideMq.addEventListener('change', renderOMRGrid);
       } else if (typeof currentWideMq.addListener === 'function') {
-        // 구형 Safari / Android WebView 대응용 fallback
         currentWideMq.addListener(renderOMRGrid);
       }
     }
@@ -1006,12 +1095,7 @@
       });
 
       const originalTotal = 25;
-
-      // mock 단순화:
-      // round1 정답 수 = 전체 - retry 문항 수로 추정
-      // 실제 RPC는 DB의 round1 responses에서 집계함
       const round1Correct = Math.max(0, originalTotal - answers.length);
-
       const finalCorrect = round1Correct + round2Correct;
       const finalPercent = Math.round((finalCorrect / originalTotal) * 100);
 
