@@ -1,30 +1,38 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>student-answer-omr</title>
   <style>
-    :root{
-      --bg:#f5f6f8;
-      --panel:#ffffff;
-      --text:#111827;
-      --muted:#6b7280;
-      --line:#d1d5db;
-      --brand:#1f3a8a;
-      --brand-soft:#e8edff;
-      --warn-bg:#fff8e6;
-      --warn-line:#f0d28a;
-      --danger:#b42318;
-      --ok:#18794e;
-      --shadow:0 1px 2px rgba(0,0,0,0.04);
-      --footer-h:84px;
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --brand: #1f3a8a;
+      --brand-soft: #e8edff;
+      --warn-bg: #fff8e6;
+      --warn-line: #f0d28a;
+      --danger: #b42318;
+      --ok: #18794e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      --footer-h: 84px;
     }
 
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+    }
 
-    body{
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
       background: var(--bg);
       color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
@@ -32,272 +40,304 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    .page{
+    .page {
       max-width: 980px;
       margin: 0 auto;
       padding: 12px 12px calc(var(--footer-h) + 18px);
     }
 
-    .hidden{ display:none !important; }
-
-    .topbar{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      margin-bottom:12px;
+    .hidden {
+      display: none !important;
     }
 
-    .title-row{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:8px;
+    .topbar {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 12px;
     }
 
-    .title-wrap{
-      min-width:0;
-      display:flex;
-      flex-direction:column;
-      gap:4px;
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
 
-    .test-title{
-      margin:0;
-      font-size:18px;
-      font-weight:800;
-      word-break:keep-all;
+    .title-wrap {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
-    .subline{
-      color:var(--muted);
-      font-size:12px;
+    .test-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      word-break: keep-all;
     }
 
-    .round-badge{
-      border:1px solid #c6d2ff;
-      background:var(--brand-soft);
-      color:#16327f;
-      padding:5px 10px;
-      border-radius:999px;
-      font-size:12px;
-      font-weight:700;
-      white-space:nowrap;
-      box-shadow:var(--shadow);
+    .subline {
+      color: var(--muted);
+      font-size: 12px;
     }
 
-    .stats-row{
-      display:grid;
-      grid-template-columns:repeat(3, 1fr);
-      gap:8px;
+    .round-badge {
+      border: 1px solid #c6d2ff;
+      background: var(--brand-soft);
+      color: #16327f;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: var(--shadow);
     }
 
-    .stat-card{
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:12px;
-      padding:8px 10px;
-      box-shadow:var(--shadow);
-      min-height:58px;
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
     }
 
-    .stat-label{
-      font-size:11px;
-      color:var(--muted);
-      margin-bottom:3px;
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 10px;
+      box-shadow: var(--shadow);
+      min-height: 58px;
     }
 
-    .stat-value{
-      font-size:16px;
-      font-weight:800;
+    .stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 3px;
     }
 
-    .result-summary{
-      margin:0 0 12px 0;
-      background:var(--warn-bg);
-      border:1px solid var(--warn-line);
-      border-radius:12px;
-      padding:10px 12px;
-      box-shadow:var(--shadow);
-      outline:none;
+    .stat-value {
+      font-size: 16px;
+      font-weight: 800;
     }
 
-    .result-summary:focus{
-      outline:none;
+    .result-summary {
+      margin: 0 0 12px 0;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow);
+      outline: none;
     }
 
-    .result-summary:focus-visible{
-      outline:2px solid var(--brand);
-      outline-offset:2px;
+    .result-summary:focus {
+      outline: none;
     }
 
-    .result-title{
-      font-size:14px;
-      font-weight:800;
-      margin-bottom:4px;
+    .result-summary:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 2px;
     }
 
-    .result-line{
-      font-size:13px;
-      margin-top:2px;
+    .result-title {
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 4px;
     }
 
-    .result-line.negative{ color:var(--danger); }
-    .result-line.positive{ color:var(--ok); }
-
-    .error-box{
-      background:#fff0f0;
-      border:1px solid #f0b7b7;
-      color:#8b1e1e;
-      border-radius:12px;
-      padding:14px 12px;
-      font-size:14px;
-      box-shadow:var(--shadow);
+    .result-line {
+      font-size: 13px;
+      margin-top: 2px;
     }
 
-    .omr-layout{
-      display:grid;
-      grid-template-columns:1fr;
-      gap:12px;
+    .result-line.negative {
+      color: var(--danger);
     }
 
-    .omr-layout.two-col{
-      grid-template-columns:1fr 1fr;
-      gap:20px;
+    .result-line.positive {
+      color: var(--ok);
     }
 
-    .omr-column{
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-      min-width:0;
+    .error-box {
+      background: #fff0f0;
+      border: 1px solid #f0b7b7;
+      color: #8b1e1e;
+      border-radius: 12px;
+      padding: 14px 12px;
+      font-size: 14px;
+      box-shadow: var(--shadow);
     }
 
-    .omr-row{
-      display:grid;
-      grid-template-columns:30px 1fr;
-      align-items:center;
-      gap:8px;
-      min-height:38px;
-      padding:2px 0;
+    .omr-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
     }
 
-    .omr-no{
-      text-align:right;
-      font-size:14px;
-      font-weight:700;
-      color:#374151;
-      padding-right:2px;
-      user-select:none;
+    .omr-layout.two-col {
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
     }
 
-    .omr-choices{
-      display:grid;
-      grid-auto-flow:column;
-      grid-auto-columns:minmax(32px, 36px);
-      gap:4px;
-      justify-content:start;
-      min-width:0;
+    .omr-column {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
     }
 
-    .omr-choice{
-      min-width:32px;
-      min-height:32px;
-      padding:0;
-      border:1px solid #b8bcc6;
-      border-radius:6px;
-      background:#fff;
-      color:#111827;
-      font-size:14px;
-      font-weight:700;
-      cursor:pointer;
-      touch-action:manipulation;
-      box-shadow:var(--shadow);
+    .omr-row {
+      display: grid;
+      grid-template-columns: 30px 1fr;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 2px 0;
     }
 
-    .omr-choice.selected{
-      border-color:var(--brand);
-      background:var(--brand);
-      color:#fff;
+    .omr-no {
+      text-align: right;
+      font-size: 14px;
+      font-weight: 700;
+      color: #374151;
+      padding-right: 2px;
+      user-select: none;
     }
 
-    .omr-choice:disabled{
-      opacity:0.55;
-      cursor:not-allowed;
+    .omr-choices {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(32px, 36px);
+      gap: 4px;
+      justify-content: start;
+      min-width: 0;
     }
 
-    .footer-actions{
-      position:sticky;
-      bottom:0;
-      margin-top:14px;
-      padding-top:12px;
-      padding-bottom:12px;
-      background:linear-gradient(to top, var(--bg) 75%, rgba(245,246,248,0));
+    .omr-choice {
+      min-width: 32px;
+      min-height: 32px;
+      padding: 0;
+      border: 1px solid #b8bcc6;
+      border-radius: 6px;
+      background: #fff;
+      color: #111827;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+      box-shadow: var(--shadow);
     }
 
-    .submit-btn{
-      width:100%;
-      min-height:48px;
-      border:none;
-      border-radius:12px;
-      background:#111827;
-      color:#fff;
-      font-size:16px;
-      font-weight:800;
-      box-shadow:var(--shadow);
-      cursor:pointer;
+    .omr-choice.selected {
+      border-color: var(--brand);
+      background: var(--brand);
+      color: #fff;
     }
 
-    .submit-btn[disabled]{
-      background:#9ca3af;
-      cursor:not-allowed;
+    .omr-choice:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
 
-    .tiny-note{
-      text-align:center;
-      color:var(--muted);
-      font-size:11px;
-      margin-top:6px;
+    .footer-actions {
+      position: sticky;
+      bottom: 0;
+      margin-top: 14px;
+      padding-top: 12px;
+      padding-bottom: 12px;
+      background: linear-gradient(to top, var(--bg) 75%, rgba(245, 246, 248, 0));
     }
 
-    .debug-panel{
-      margin-top:18px;
-      background:#111;
-      color:#ddd;
-      border-radius:12px;
-      padding:12px;
-      overflow:auto;
-      box-shadow:var(--shadow);
+    .submit-btn {
+      width: 100%;
+      min-height: 48px;
+      border: none;
+      border-radius: 12px;
+      background: #111827;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      box-shadow: var(--shadow);
+      cursor: pointer;
     }
 
-    .debug-title{
-      font-size:13px;
-      font-weight:800;
-      margin-bottom:8px;
-      color:#fff;
+    .submit-btn[disabled] {
+      background: #9ca3af;
+      cursor: not-allowed;
     }
 
-    .debug-log{
-      margin:0;
-      white-space:pre-wrap;
-      word-break:break-word;
-      font-size:12px;
-      line-height:1.45;
+    .tiny-note {
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 6px;
     }
 
-    @media (max-width: 420px){
-      .page{ padding-left:10px; padding-right:10px; }
-      .stats-row{ gap:6px; }
-      .stat-card{ padding:8px; }
-      .omr-row{ gap:6px; }
-      .omr-choices{ gap:3px; grid-auto-columns:minmax(31px, 34px); }
-      .omr-choice{ min-width:31px; min-height:31px; font-size:13px; }
+    .debug-panel {
+      margin-top: 18px;
+      background: #111;
+      color: #ddd;
+      border-radius: 12px;
+      padding: 12px;
+      overflow: auto;
+      box-shadow: var(--shadow);
     }
 
-    @media (min-width: 820px){
-      .page{ padding-left:16px; padding-right:16px; }
+    .debug-title {
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .debug-log {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 420px) {
+      .page {
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      .stats-row {
+        gap: 6px;
+      }
+
+      .stat-card {
+        padding: 8px;
+      }
+
+      .omr-row {
+        gap: 6px;
+      }
+
+      .omr-choices {
+        gap: 3px;
+        grid-auto-columns: minmax(31px, 34px);
+      }
+
+      .omr-choice {
+        min-width: 31px;
+        min-height: 31px;
+        font-size: 13px;
+      }
+    }
+
+    @media (min-width: 820px) {
+      .page {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
     }
   </style>
 </head>
+
 <body>
   <div id="app" class="page">
     <header class="topbar">
@@ -351,8 +391,8 @@
     const forceMock = new URLSearchParams(location.search).get('mock') === '1';
 
     const CONFIG = {
-      SUPABASE_URL: '',
-      SUPABASE_ANON_KEY: '',
+      SUPABASE_URL: 'https://gspsquuyqkydqphbcuel.supabase.co',
+      SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzcHNxdXV5cWt5ZHFwaGJjdWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTg5NDgsImV4cCI6MjA4ODA3NDk0OH0.9oqcUTNQpL9oFQ13hUkM5MN7KA2kW79RC3CPI4WZP7I',
       USE_MOCK: isLocalhost && forceMock,
     };
 
@@ -382,13 +422,24 @@
       submitting: false
     };
 
-    let supabase = null;
+    let sbClient = null;
     let currentWideMq = null;
 
     function initSupabase() {
-      if (!CONFIG.USE_MOCK && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
-        supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+      if (CONFIG.USE_MOCK) {
+        logDebug('initSupabase', 'mock mode');
+        return;
       }
+
+      if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
+        throw new Error('SUPABASE_URL 또는 SUPABASE_ANON_KEY가 비어 있습니다.');
+      }
+
+      sbClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+      logDebug('initSupabase', {
+        url: CONFIG.SUPABASE_URL,
+        useMock: CONFIG.USE_MOCK
+      });
     }
 
     function readQueryParams() {
@@ -406,6 +457,7 @@
     function logDebug(title, data) {
       if (!state.debug) return;
       const el = document.getElementById('debugLog');
+      if (!el) return;
       const block = `[${new Date().toLocaleTimeString()}] ${title}\n${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}\n\n`;
       el.textContent += block;
     }
@@ -433,7 +485,7 @@
       badge.textContent = badgeText;
       badge.setAttribute('aria-label', `현재 상태: ${badgeText}`);
 
-      document.getElementById('statTotalSolved').textContent = formatCount(state.studentStats.totalSolved);
+      document.getElementById('statTotalSolved').textContent = formatCount(state.totalItems);
       document.getElementById('statRound1Accuracy').textContent = formatPercent(state.studentStats.round1Accuracy);
       document.getElementById('statFinalAccuracy').textContent = formatPercent(state.studentStats.finalAccuracy);
     }
@@ -726,28 +778,84 @@
       }));
     }
 
+    function unwrapRpcData(data, fnName) {
+      if (data == null) return data;
+
+      if (Array.isArray(data)) {
+        if (data.length === 1 && data[0] && typeof data[0] === 'object') {
+          if (data[0][fnName] != null) {
+            return data[0][fnName];
+          }
+          return data[0];
+        }
+        return data;
+      }
+
+      if (typeof data === 'object' && data[fnName] != null) {
+        return data[fnName];
+      }
+
+      return data;
+    }
+
     async function rpcStartAttempt(params) {
       if (CONFIG.USE_MOCK) return mockStartAttempt(params);
 
-      const { data, error } = await supabase.rpc('start_attempt', params);
-      if (error) throw error;
-      return data;
+      logDebug('rpc start_attempt request', params);
+
+      const { data, error } = await sbClient.rpc('start_attempt', params);
+
+      if (error) {
+        logDebug('rpc start_attempt error', error);
+        throw error;
+      }
+
+      logDebug('rpc start_attempt raw response', data);
+
+      const unwrapped = unwrapRpcData(data, 'start_attempt');
+      logDebug('rpc start_attempt normalized response', unwrapped);
+
+      return unwrapped;
     }
 
     async function rpcSubmitRound1(params) {
       if (CONFIG.USE_MOCK) return mockSubmitRound1(params);
 
-      const { data, error } = await supabase.rpc('submit_round1', params);
-      if (error) throw error;
-      return data;
+      logDebug('rpc submit_round1 request', params);
+
+      const { data, error } = await sbClient.rpc('submit_round1', params);
+
+      if (error) {
+        logDebug('rpc submit_round1 error', error);
+        throw error;
+      }
+
+      logDebug('rpc submit_round1 raw response', data);
+
+      const unwrapped = unwrapRpcData(data, 'submit_round1');
+      logDebug('rpc submit_round1 normalized response', unwrapped);
+
+      return unwrapped;
     }
 
     async function rpcSubmitRound2(params) {
       if (CONFIG.USE_MOCK) return mockSubmitRound2(params);
 
-      const { data, error } = await supabase.rpc('submit_round2', params);
-      if (error) throw error;
-      return data;
+      logDebug('rpc submit_round2 request', params);
+
+      const { data, error } = await sbClient.rpc('submit_round2', params);
+
+      if (error) {
+        logDebug('rpc submit_round2 error', error);
+        throw error;
+      }
+
+      logDebug('rpc submit_round2 raw response', data);
+
+      const unwrapped = unwrapRpcData(data, 'submit_round2');
+      logDebug('rpc submit_round2 normalized response', unwrapped);
+
+      return unwrapped;
     }
 
     async function loadStudentStats() {
@@ -811,10 +919,18 @@
     }
 
     async function startAttempt() {
-      const result = await rpcStartAttempt({
+      const req = {
         p_assignment_id: String(state.assignmentId),
         p_student_code: String(state.studentCode)
-      });
+      };
+
+      logDebug('startAttempt begin', req);
+
+      const result = await rpcStartAttempt(req);
+
+      if (!result) {
+        throw new Error('start_attempt 응답이 비어 있습니다.');
+      }
 
       state.attemptId = result.attempt_id;
       state.status = result.status;
@@ -823,8 +939,8 @@
       state.retryItemNos = (result.retry_item_nos || []).map(n => String(n));
       state.items = Array.isArray(result.items) ? result.items.map(item => ({
         item_no: Number(item.item_no),
-        choice_count: Number(item.choice_count),
-        allows_multiple: Boolean(item.allows_multiple),
+        choice_count: Number(item.choice_count || (item.answer_type === 'ox' ? 2 : 5) || 5),
+        allows_multiple: Boolean(item.allows_multiple || false),
         selected_answer: item.selected_answer == null ? '' : String(item.selected_answer)
       })) : [];
       state.testTitle = result.title || result.test_title || 'OMR 입력';
@@ -838,14 +954,41 @@
       });
 
       state.activeItems = getVisibleItems();
-      logDebug('start_attempt result', result);
+
+      logDebug('startAttempt parsed state', {
+        attemptId: state.attemptId,
+        status: state.status,
+        currentRound: state.currentRound,
+        totalItems: state.totalItems,
+        retryItemNos: state.retryItemNos,
+        items: state.items
+      });
     }
+    function getMissingItemNos() {
+        return state.activeItems
+          .map(item => String(item.item_no))
+          .filter(itemNo => {
+            const v = state.answers[itemNo];
+            return !v || String(v).trim() === '';
+          });
+      }
+
+     function confirmBeforeSubmit() {
+       const missing = getMissingItemNos();
+       if (!missing.length) {
+         return window.confirm(state.currentRound === 2 ? '수정 답안을 제출하시겠습니까?' : '답안을 제출하시겠습니까?');
+       }
+
+       return window.confirm(
+         `입력되지 않은 문항: ${missing.join(', ')}\n그래도 제출하시겠습니까?`
+       );
+     }
 
     async function onSubmit() {
       if (state.submitting) return;
       if (state.status === 'completed' || state.status === 'needs_review') return;
 
-      const ok = window.confirm(state.currentRound === 2 ? '수정 답안을 제출하시겠습니까?' : '답안을 제출하시겠습니까?');
+      const ok = confirmBeforeSubmit();
       if (!ok) return;
 
       state.submitting = true;
@@ -1041,4 +1184,5 @@
     initPage();
   </script>
 </body>
+
 </html>
