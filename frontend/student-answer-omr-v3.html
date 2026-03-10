@@ -1046,6 +1046,39 @@
                 round1Accuracy: null,
                 finalAccuracy: null
             };
+
+            if (!state.studentCode) {
+                return;
+            }
+
+            logDebug('rpc get_student_stats_by_code request', {
+                p_student_code: state.studentCode
+            });
+
+            const { data, error } = await sbClient.rpc('get_student_stats_by_code', {
+                p_student_code: state.studentCode
+            });
+
+            if (error) {
+                logDebug('rpc get_student_stats_by_code error', error);
+
+                if (error.message === 'STUDENT_NOT_FOUND') {
+                    throw error;
+                }
+
+                return;
+            }
+
+            logDebug('rpc get_student_stats_by_code raw response', data);
+
+            const unwrapped = unwrapRpcData(data, 'get_student_stats_by_code');
+            logDebug('rpc get_student_stats_by_code normalized response', unwrapped);
+
+            state.studentStats = {
+                totalSolved: unwrapped?.total_solved ?? 0,
+                round1Accuracy: unwrapped?.round1_accuracy ?? null,
+                finalAccuracy: unwrapped?.final_accuracy ?? null
+            };
         }
 
         function applyRound1Result(result) {

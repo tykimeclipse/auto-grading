@@ -221,6 +221,9 @@ begin
          status              = v_next_status
    where a.id = p_attempt_id;
 
+  -- attempt 요약 갱신
+  perform auto_grading.refresh_attempt_summary(p_attempt_id);
+
   return jsonb_build_object(
     'attempt_id', p_attempt_id,
     'status', v_next_status,
