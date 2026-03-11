@@ -1,4 +1,4 @@
-item_no,choice_count,answer_key,topic_tag,note
+﻿item_no,choice_count,answer_key,topic_tag,note
 1,,3,전류,예시문항
 2,,2|4,전압,복수정답 예시
 3,7,6,저항,7지선다 예시

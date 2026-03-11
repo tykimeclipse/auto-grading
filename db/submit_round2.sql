@@ -1,4 +1,4 @@
-create or replace function auto_grading.submit_round2(
+﻿create or replace function auto_grading.submit_round2(
   p_attempt_id uuid,
   p_responses jsonb
 )

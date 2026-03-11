@@ -1,4 +1,4 @@
-create or replace function auto_grading.start_attempt(
+﻿create or replace function auto_grading.start_attempt(
   p_assignment_id uuid,
   p_student_code text
 )

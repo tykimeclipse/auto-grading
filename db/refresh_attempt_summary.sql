@@ -1,4 +1,4 @@
-create or replace function auto_grading.refresh_attempt_summary(
+﻿create or replace function auto_grading.refresh_attempt_summary(
   p_attempt_id uuid
 )
 returns void
