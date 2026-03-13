@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>학생 성취도</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      background: #f5f7fb;
+      color: #1f2937;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+    }
+    .header {
+      margin-bottom: 18px;
+    }
+    .title {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 0 6px;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #6b7280;
+      margin: 0;
+    }
+    .search-box {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      margin-bottom: 18px;
+    }
+    .search-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .search-row label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      min-width: 72px;
+    }
+    .search-row input {
+      flex: 1;
+      min-width: 180px;
+      height: 42px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 0 12px;
+      font-size: 15px;
+      background: #fff;
+    }
+    .search-row button {
+      height: 42px;
+      padding: 0 18px;
+      border: none;
+      border-radius: 10px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .search-row button:disabled {
+      background: #93c5fd;
+      cursor: not-allowed;
+    }
+    .student-box {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 18px 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      margin-bottom: 18px;
+    }
+    .student-name {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 6px;
+    }
+    .student-meta {
+      font-size: 14px;
+      color: #6b7280;
+      margin: 0;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 18px 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    .card-label {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+    .card-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111827;
+    }
+    .table-box {
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+    .table-header {
+      padding: 16px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .table-wrap {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+    thead {
+      background: #f9fafb;
+    }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: center;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    th {
+      font-weight: 700;
+      color: #374151;
+    }
+    td.title-cell {
+      text-align: left;
+      min-width: 220px;
+    }
+    .empty-box, .error-box, .loading-box {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 24px 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      font-size: 15px;
+      color: #4b5563;
+      text-align: center;
+    }
+    .error-box {
+      color: #b91c1c;
+    }
+    .muted {
+      color: #9ca3af;
+    }
+    @media (max-width: 720px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
+      .student-name {
+        font-size: 20px;
+      }
+      .card-value {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1 class="title">학생 성취도</h1>
+      <p class="subtitle">시험 기록과 누적 성취도를 확인할 수 있습니다.</p>
+    </div>
+
+    <div class="search-box">
+      <div class="search-row">
+        <label for="studentCode">학생 코드</label>
+        <input id="studentCode" type="text" placeholder="예: 101" />
+        <button id="searchBtn">조회</button>
+      </div>
+    </div>
+
+    <div id="messageArea"></div>
+
+    <div id="contentArea" style="display:none;">
+      <div class="student-box">
+        <h2 id="studentName" class="student-name">-</h2>
+        <p id="studentMeta" class="student-meta">-</p>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-label">총 풀이 문항수</div>
+          <div id="totalSolved" class="card-value">-</div>
+        </div>
+        <div class="card">
+          <div class="card-label">누적 1차 성취도</div>
+          <div id="avgRound1" class="card-value">-</div>
+        </div>
+        <div class="card">
+          <div class="card-label">누적 2차 성취도</div>
+          <div id="avgRound2" class="card-value">-</div>
+        </div>
+      </div>
+
+      <div class="table-box">
+        <div class="table-header">시험 기록</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>응시일</th>
+                <th>시험명</th>
+                <th>문항수</th>
+                <th>1차 성취도</th>
+                <th>2차 성취도</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const SUPABASE_URL = 'https://gspsquuyqkydqphbcuel.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzcHNxdXV5cWt5ZHFwaGJjdWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTg5NDgsImV4cCI6MjA4ODA3NDk0OH0.9oqcUTNQpL9oFQ13hUkM5MN7KA2kW79RC3CPI4WZP7I';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const studentCodeInput = document.getElementById('studentCode');
+    const searchBtn = document.getElementById('searchBtn');
+    const messageArea = document.getElementById('messageArea');
+    const contentArea = document.getElementById('contentArea');
+
+    const studentNameEl = document.getElementById('studentName');
+    const studentMetaEl = document.getElementById('studentMeta');
+    const totalSolvedEl = document.getElementById('totalSolved');
+    const avgRound1El = document.getElementById('avgRound1');
+    const avgRound2El = document.getElementById('avgRound2');
+    const historyBody = document.getElementById('historyBody');
+
+    function showMessage(type, text) {
+      contentArea.style.display = 'none';
+      if (type === 'loading') {
+        messageArea.innerHTML = `<div class="loading-box">${text}</div>`;
+      } else if (type === 'error') {
+        messageArea.innerHTML = `<div class="error-box">${text}</div>`;
+      } else {
+        messageArea.innerHTML = `<div class="empty-box">${text}</div>`;
+      }
+    }
+
+    function clearMessage() {
+      messageArea.innerHTML = '';
+    }
+
+    function formatPercent(value) {
+      if (value === null || value === undefined) return '';
+      return `${Number(value).toFixed(1)}%`;
+    }
+
+    function formatDate(value) {
+      if (!value) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function formatGradeLevel(value) {
+      if (!value) return '-';
+      const map = {
+        middle_1: '중1',
+        middle_2: '중2',
+        middle_3: '중3',
+        high_1: '고1',
+        high_2: '고2',
+        high_3: '고3'
+      };
+      return map[value] || value;
+    }
+
+    async function fetchStudentInfo(studentCode) {
+      const { data, error } = await supabase
+        .schema('auto_grading')
+        .from('students')
+        .select('name, grade_level, student_code')
+        .eq('student_code', studentCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    }
+
+    async function fetchStats(studentCode) {
+      const { data, error } = await supabase
+        .schema('auto_grading')
+        .rpc('get_student_stats_by_code', {
+        p_student_code: studentCode
+      });
+
+       console.log('fetchStats data:', data, 'error:', error);
+
+      if (error) throw error;
+      return data ?? null;
+    }
+
+    async function fetchHistory(studentCode) {
+      const { data, error } = await supabase
+        .schema('auto_grading')
+        .rpc('get_student_assignment_history_by_code', {
+        p_student_code: studentCode,
+        p_limit: 200
+      });
+      if (error) throw error;
+      return data || [];
+    }
+
+    function renderHistory(rows) {
+      historyBody.innerHTML = '';
+
+      if (!rows || rows.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.className = 'muted';
+        td.textContent = '배정된 시험 기록이 없습니다.';
+        tr.appendChild(td);
+        historyBody.appendChild(tr);
+        return;
+      }
+
+      for (const row of rows) {
+        const tr = document.createElement('tr');
+
+        const tdDate = document.createElement('td');
+        tdDate.textContent = formatDate(row.event_date);
+
+        const tdTitle = document.createElement('td');
+        tdTitle.className = 'title-cell';
+        tdTitle.textContent = row.test_title ?? '-';
+
+        const tdItems = document.createElement('td');
+        tdItems.textContent = row.total_items != null ? String(row.total_items) : '';
+
+        const tdR1 = document.createElement('td');
+        tdR1.textContent = formatPercent(row.round1_score_percent);
+
+        const tdR2 = document.createElement('td');
+        tdR2.textContent = formatPercent(row.round2_score_percent);
+
+        tr.append(tdDate, tdTitle, tdItems, tdR1, tdR2);
+        historyBody.appendChild(tr);
+      }
+    }
+
+    function normalizeErrorMessage(err) {
+      const msg = err?.message || '';
+      if (msg.includes('등록되지 않은 학생 코드')) {
+        return '등록된 학생 정보를 찾을 수 없습니다.';
+      }
+      return '조회 중 오류가 발생했습니다.';
+    }
+
+    async function loadPage() {
+      const studentCode = studentCodeInput.value.trim();
+
+      if (!studentCode) {
+        showMessage('empty', '학생 코드를 입력해 주세요.');
+        return;
+      }
+
+      searchBtn.disabled = true;
+      showMessage('loading', '조회 중입니다...');
+
+      try {
+        const studentInfo = await fetchStudentInfo(studentCode);
+
+        if (!studentInfo) {
+          showMessage('error', '등록된 학생 정보를 찾을 수 없습니다.');
+          return;
+        }
+
+        const [stats, history] = await Promise.all([
+          fetchStats(studentCode),
+          fetchHistory(studentCode)
+        ]);
+
+        studentNameEl.textContent = studentInfo.name || '이름 없음';
+        studentMetaEl.textContent = `학생코드 ${studentInfo.student_code || '-'} · ${formatGradeLevel(studentInfo.grade_level)}`;
+
+        totalSolvedEl.textContent = stats?.total_solved != null
+          ? String(stats.total_solved)
+          : '-';
+
+        avgRound1El.textContent = stats?.round1_accuracy != null
+          ? `${Number(stats.round1_accuracy).toFixed(1)}%`
+          : '-';
+
+        avgRound2El.textContent = stats?.final_accuracy != null
+          ? `${Number(stats.final_accuracy).toFixed(1)}%`
+          : '-';
+
+        renderHistory(history);
+
+        clearMessage();
+        contentArea.style.display = 'block';
+      } catch (err) {
+        console.error(err);
+        showMessage('error', normalizeErrorMessage(err));
+      } finally {
+        searchBtn.disabled = false;
+      }
+    }
+
+    searchBtn.addEventListener('click', loadPage);
+
+    studentCodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        loadPage();
+      }
+    });
+
+    showMessage('empty', '학생 코드를 입력하면 성취도 페이지가 표시됩니다.');
+  </script>
+</body>
+</html>
