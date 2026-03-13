@@ -219,14 +219,24 @@
         }
 
         .result-title {
-            font-size: 14px;
+            font-size: 17px;
             font-weight: 800;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
 
         .result-line {
-            font-size: 13px;
-            margin-top: 2px;
+            font-size: 14px;
+            margin-top: 4px;
+            line-height: 1.5;
+        }
+
+        .result-score-line {
+            font-size: 15px;
+        }
+
+        .result-line strong {
+            font-weight: 800;
+            color: inherit;
         }
 
         .result-line.negative {
@@ -392,6 +402,18 @@
             .page {
                 padding-left: 10px;
                 padding-right: 10px;
+            }
+
+            .result-title {
+                font-size: 16px;
+            }
+
+            .result-line {
+                font-size: 14px;
+            }
+
+            .result-score-line {
+                font-size: 15px;
             }
 
             .stats-row {
@@ -584,6 +606,34 @@
             return `${Math.round(Number(v))}%`;
         }
 
+        function buildFinishedResultSummaryFromAttempt(result) {
+            const totalItems = Number(result?.total_items || 0);
+            const firstScorePercent = Number(result?.first_score_percent || 0);
+            const finalScorePercent = Number(result?.final_score_percent || 0);
+
+            const round1CorrectCount = totalItems > 0
+                ? Math.round((firstScorePercent / 100) * totalItems)
+                : 0;
+
+            const finalCorrectCount = totalItems > 0
+                ? Math.round((finalScorePercent / 100) * totalItems)
+                : 0;
+
+            const round2CorrectCount = Math.max(0, finalCorrectCount - round1CorrectCount);
+
+            return {
+                type: 'round2',
+                finalCorrectCount,
+                totalItems,
+                finalScorePercent,
+                round1CorrectCount,
+                round2CorrectCount,
+                remainingItemNos: Array.isArray(result?.retry_item_nos)
+                    ? result.retry_item_nos.map(n => String(n))
+                    : []
+            };
+        }
+
         function getRoundBadgeText() {
             if (state.status === 'completed') return '제출 완료';
             if (state.status === 'needs_review') return '검토 필요';
@@ -675,6 +725,21 @@
             container.appendChild(div);
         }
 
+        function appendSummaryScoreLine(container, label, correctCount, totalItems, percent, cls = '') {
+            const div = document.createElement('div');
+            div.className = cls ? `result-line result-score-line ${cls}` : 'result-line result-score-line';
+
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = `${label}: `;
+
+            const valueStrong = document.createElement('strong');
+            valueStrong.textContent = `${correctCount} / ${totalItems} (${percent}%)`;
+
+            div.appendChild(labelSpan);
+            div.appendChild(valueStrong);
+            container.appendChild(div);
+        }
+
         function focusResultSummary() {
             const el = document.getElementById('resultSummary');
             if (!el || el.classList.contains('hidden')) return;
@@ -704,37 +769,55 @@
                 if (Array.isArray(s.retryItemNos) && s.retryItemNos.length) {
                     appendSummaryLine(el, `다시 풀 문제: ${s.retryItemNos.join(', ')}`, 'negative');
                 } else {
-                    appendSummaryLine(el, '모든 문항이 정답 처리되었습니다.', 'positive');
+                    appendSummaryLine(el, '모든 문항이 정답 처리되었습니다.');
                 }
                 return;
             }
 
             title.textContent = `최종 결과: ${s.totalItems}문항 중 ${s.finalCorrectCount}문항 정답 (${s.finalScorePercent}%)`;
             el.appendChild(title);
-            appendSummaryLine(el, `1차 정답 ${s.round1CorrectCount}문항, 수정 정답 ${s.round2CorrectCount}문항`);
+
+            const round1Percent = s.totalItems
+                ? Math.round((s.round1CorrectCount / s.totalItems) * 100)
+                : 0;
+
+            const finalPercent = s.totalItems
+                ? Math.round((s.finalCorrectCount / s.totalItems) * 100)
+                : 0;
+
+            appendSummaryScoreLine(el, '1차 정답', s.round1CorrectCount, s.totalItems, round1Percent);
+            appendSummaryScoreLine(el, '2차 정답', s.finalCorrectCount, s.totalItems, finalPercent);
 
             if (Array.isArray(s.remainingItemNos) && s.remainingItemNos.length) {
                 appendSummaryLine(el, `남은 문항: ${s.remainingItemNos.join(', ')}`, 'negative');
             } else {
-                appendSummaryLine(el, '모든 문항의 처리가 끝났습니다.', 'positive');
+                appendSummaryLine(el, '모든 문항의 처리가 끝났습니다.');
             }
         }
 
         function renderFooter() {
+            const footer = document.getElementById('footerActions');
             const btn = document.getElementById('submitBtn');
+            const note = footer.querySelector('.tiny-note');
 
             if (state.submitting) {
+                footer.classList.remove('hidden');
+                if (note) note.classList.remove('hidden');
                 btn.disabled = true;
                 btn.textContent = '제출 중...';
                 return;
             }
 
             if (state.status === 'completed' || state.status === 'needs_review') {
+                footer.classList.remove('hidden');
+                if (note) note.classList.add('hidden');
                 btn.disabled = true;
                 btn.textContent = state.status === 'completed' ? '제출 완료' : '검토 필요';
                 return;
             }
 
+            footer.classList.remove('hidden');
+            if (note) note.classList.remove('hidden');
             btn.disabled = false;
             btn.textContent = state.currentRound === 2 ? '수정 제출' : '제출';
         }
@@ -878,6 +961,14 @@
         function renderOMRGrid() {
             const root = document.getElementById('omrRoot');
             root.replaceChildren();
+
+            if (!state.activeItems.length) {
+                root.className = 'omr-layout';
+                root.classList.add('hidden');
+                return;
+            }
+
+            root.classList.remove('hidden');
 
             const isWide = currentWideMq ? currentWideMq.matches : window.matchMedia('(min-width: 820px)').matches;
             root.className = isWide ? 'omr-layout two-col' : 'omr-layout';
@@ -1167,13 +1258,20 @@
 
             state.activeItems = getVisibleItems();
 
+            if (state.status === 'completed' || state.status === 'needs_review') {
+                state.resultSummary = buildFinishedResultSummaryFromAttempt(result);
+            } else {
+                state.resultSummary = null;
+            }
+
             logDebug('startAttempt parsed state', {
                 attemptId: state.attemptId,
                 status: state.status,
                 currentRound: state.currentRound,
                 totalItems: state.totalItems,
                 retryItemNos: state.retryItemNos,
-                items: state.items
+                items: state.items,
+                resultSummary: state.resultSummary
             });
         }
 
