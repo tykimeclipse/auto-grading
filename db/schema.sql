@@ -6,7 +6,7 @@ create schema if not exists auto_grading;
 set search_path = auto_grading;
 
 create extension if not exists pgcrypto;
-
+ 
 -- =========================================================
 -- 1. updated_at trigger function
 -- =========================================================
