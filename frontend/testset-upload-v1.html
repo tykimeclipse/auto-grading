@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>문제지 등록 페이지 v2</title>
+    <style>
+      :root {
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --line: #d9deea;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --accent: #2563eb;
+        --accent-soft: #dbeafe;
+        --danger: #b91c1c;
+        --ok: #0f766e;
+        --warn: #92400e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Arial, "Noto Sans KR", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .sub {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .badge {
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 999px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 16px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+      }
+      .panel h2 {
+        margin: 0 0 14px;
+        font-size: 18px;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .form-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .field label {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 14px;
+        background: #fff;
+      }
+      .wide {
+        grid-column: 1/-1;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+        line-height: 1.45;
+      }
+      .code-box {
+        border: 1px dashed #93c5fd;
+        background: #eff6ff;
+        border-radius: 12px;
+        padding: 12px;
+        font-size: 14px;
+        color: #1e3a8a;
+        line-height: 1.55;
+      }
+      .csv-drop {
+        border: 2px dashed #bfd3ff;
+        background: #f8fbff;
+        border-radius: 14px;
+        padding: 24px 18px;
+        text-align: center;
+        color: var(--muted);
+      }
+      .csv-drop strong {
+        display: block;
+        color: var(--text);
+        margin-bottom: 6px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      button {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 700;
+      }
+      .soft {
+        background: var(--accent-soft);
+        border-color: #bfdbfe;
+        color: #1d4ed8;
+      }
+      .summary-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 4px;
+      }
+      .summary-item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+      }
+      .summary-item .k {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .summary-item .v {
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.45;
+        word-break: break-word;
+      }
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+        justify-content: center;
+      }
+      .pill {
+        padding: 6px 10px;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 999px;
+        font-size: 12px;
+        color: #374151;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.5;
+        display: none;
+        white-space: pre-line;
+      }
+      .status.ok {
+        display: block;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: var(--ok);
+      }
+      .status.error {
+        display: block;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: var(--danger);
+      }
+      .status.info {
+        display: block;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1d4ed8;
+      }
+      .mini {
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      details {
+        margin-bottom: 16px;
+      }
+      details summary {
+        cursor: pointer;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+      .result-box {
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 12px;
+        font-size: 12px;
+        overflow: auto;
+        white-space: pre-wrap;
+        display: none;
+      }
+      @media (max-width: 920px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .form-grid,
+        .form-grid-3 {
+          grid-template-columns: 1fr;
+        }
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <div>
+          <h1>문제지 등록 페이지 v2</h1>
+          <p class="sub">
+            실제 등록용 버전입니다. 현재 DB 구조에 맞춰 등록하며,
+            교육과정/단원코드/소스 정보는 제목과 기본 메타값에도 반영되도록
+            구성했습니다.
+          </p>
+        </div>
+        <div class="badge">실작동 버전</div>
+      </div>
+      <details>
+        <summary>Supabase 연결 설정</summary>
+        <div class="panel">
+          <div class="form-grid">
+            <div class="field wide">
+              <label for="supabaseUrl">Supabase URL</label
+              ><input
+                id="supabaseUrl"
+                type="text"
+                placeholder="https://xxxxx.supabase.co"
+              />
+            </div>
+            <div class="field wide">
+              <label for="supabaseAnonKey">Supabase Anon Key</label
+              ><textarea
+                id="supabaseAnonKey"
+                rows="3"
+                placeholder="eyJ..."
+              ></textarea>
+            </div>
+          </div>
+          <div class="toolbar">
+            <button id="saveConfigBtn" type="button">연결정보 저장</button>
+          </div>
+          <div class="mini">
+            브라우저 localStorage에 저장됩니다. 현재 페이지는 auto_grading
+            스키마의 create_test_set_from_json RPC를 호출합니다.
+          </div>
+        </div>
+      </details>
+      <div class="grid">
+        <div class="panel">
+          <h2>문제지 기본 정보</h2>
+          <div class="form-grid">
+            <div class="field wide">
+              <label for="title">문제지 제목</label
+              ><input id="title" type="text" placeholder="예: 족보 빈출 1회" />
+            </div>
+            <div class="field">
+              <label for="curriculumVersion">교육과정</label
+              ><select id="curriculumVersion">
+                <option value="2015">2015</option>
+                <option value="2022" selected>2022</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="gradeLevel">학년 코드</label
+              ><select id="gradeLevel">
+                <option value="M1">M1</option>
+                <option value="M2">M2</option>
+                <option value="M3" selected>M3</option>
+                <option value="H1">H1</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="subject">과목</label
+              ><select id="subject">
+                <option value="중1 과학">중1 과학</option>
+                <option value="중2 과학">중2 과학</option>
+                <option value="중3 과학" selected>중3 과학</option>
+                <option value="고1 통합과학">고1 통합과학</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="unitCode">단원 코드 (3자리)</label
+              ><input
+                id="unitCode"
+                type="text"
+                inputmode="numeric"
+                maxlength="3"
+                placeholder="예: 112"
+                value="112"
+              />
+              <div class="hint">
+                학년 코드는 위에서 선택하고, 여기에는 3자리 숫자만 입력합니다.
+              </div>
+            </div>
+          </div>
+          <div style="height: 14px"></div>
+          <h2>단원 정보</h2>
+          <div class="form-grid-3">
+            <div class="field">
+              <label for="majorUnit">대단원</label
+              ><select id="majorUnit"></select>
+            </div>
+            <div class="field">
+              <label for="middleUnit">중단원</label
+              ><select id="middleUnit"></select>
+            </div>
+            <div class="field">
+              <label for="nanoUnit">소단원</label
+              ><select id="nanoUnit"></select>
+            </div>
+            <div class="field wide">
+              <label for="sourceType">소스</label
+              ><select id="sourceType">
+                <option value="족보(기본)">족보(기본)</option>
+                <option value="족보(빈출)" selected>족보(빈출)</option>
+                <option value="족보(오답)">족보(오답)</option>
+                <option value="족보(발전)">족보(발전)</option>
+                <option value="오투">오투</option>
+                <option value="수동입력">수동입력</option>
+              </select>
+            </div>
+            <div class="field wide">
+              <label>단원 안내</label>
+              <div class="code-box">
+                1) 단원코드 3자리(예: 112)를 직접 입력하면 아래
+                대단원/중단원/소단원이 맞춰집니다. 2) 반대로 아래 대단원 →
+                중단원 → 소단원을 선택하면 위 단원코드가 자동으로 채워집니다.
+                현재는 범용 숫자 체계로 동작하며, 소단원명은 일부 샘플 매핑만
+                포함되어 있습니다.
+              </div>
+            </div>
+          </div>
+          <div style="height: 14px"></div>
+          <h2>문항 CSV 업로드</h2>
+          <div class="csv-drop">
+            <strong>CSV 파일 업로드</strong>선택한 CSV를 파싱한 뒤
+            create_test_set_from_json RPC로 실제 등록합니다.
+            <div class="pill-row">
+              <div class="pill">필수 컬럼: item_no</div>
+              <div class="pill">필수 컬럼: answer_key</div>
+              <div class="pill">선택 컬럼: choice_count</div>
+              <div class="pill">선택 컬럼: topic_tag</div>
+              <div class="pill">선택 컬럼: note</div>
+            </div>
+            <div style="margin-top: 14px">
+              <input id="csvFile" type="file" accept=".csv,text/csv" />
+            </div>
+          </div>
+          <div class="toolbar">
+            <button id="resetBtn" class="soft" type="button">초기화</button
+            ><button id="uploadBtn" class="primary" type="button">
+              문제지 등록
+            </button>
+          </div>
+          <div id="statusBox" class="status info"></div>
+          <pre id="resultBox" class="result-box"></pre>
+        </div>
+        <div class="panel">
+          <h2>등록 요약</h2>
+          <div class="summary-list">
+            <div class="summary-item">
+              <div class="k">문제지 제목</div>
+              <div id="summaryTitle" class="v">-</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">교육과정 / 학년 / 과목</div>
+              <div id="summaryMeta" class="v">2022 / M3 / 중3 과학</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">대단원 / 중단원</div>
+              <div id="summaryMajorMinor" class="v">1 / 1</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">단원 코드 / 소단원명</div>
+              <div id="summaryUnitNano" class="v">112 / (소단원명 미지정)</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">소스</div>
+              <div id="summarySource" class="v">족보(빈출)</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">예상 저장 제목</div>
+              <div id="summarySubmittedTitle" class="v">
+                [2022][M3][112][족보(빈출)] 족보 빈출 1회
+              </div>
+            </div>
+            <div class="summary-item">
+              <div class="k">CSV 상태</div>
+              <div id="summaryCsv" class="v">파일 미선택</div>
+            </div>
+          </div>
+          <div style="height: 14px"></div>
+          <h2>운영 메모</h2>
+          <div class="code-box">
+            현재 DB의 create_test_set_from_json RPC는 curriculum_version,
+            nano_unit 전용 컬럼을 아직 직접 받지 않습니다. 그래서 이 페이지는
+            교육과정/단원코드/소스 정보를 제목에도 함께 반영해 당장 운영에
+            필요한 식별성을 유지하도록 구성했습니다. 이후 DB 컬럼이 추가되면
+            해당 부분만 분리 저장하면 됩니다.
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script>
+      const LS_URL = "ag_testset_supabase_url",
+        LS_KEY = "ag_testset_supabase_anon_key";
+      const UNIT_NAME_MAP = {
+        M3: {
+          111: "전기 회로의 기초",
+          112: "전기와 자기의 이용",
+          113: "자기장과 전자기 유도",
+        },
+        H1: { 111: "물질의 규칙성과 결합", 112: "자연의 구성 물질" },
+      };
+      const $ = (id) => document.getElementById(id);
+      function setStatus(message, type = "info") {
+        const box = $("statusBox");
+        if (!message) {
+          box.className = "status info";
+          box.style.display = "none";
+          box.textContent = "";
+          return;
+        }
+        box.style.display = "block";
+        box.className = `status ${type}`;
+        box.textContent = message;
+      }
+      function loadConfig() {
+        $("supabaseUrl").value = localStorage.getItem(LS_URL) || "";
+        $("supabaseAnonKey").value = localStorage.getItem(LS_KEY) || "";
+      }
+      function saveConfig() {
+        localStorage.setItem(LS_URL, $("supabaseUrl").value.trim());
+        localStorage.setItem(LS_KEY, $("supabaseAnonKey").value.trim());
+        setStatus("연결정보를 저장했습니다.", "ok");
+      }
+      function fillSelect(el, max, selectedValue) {
+        el.innerHTML = "";
+        for (let i = 1; i <= max; i += 1) {
+          const opt = document.createElement("option");
+          opt.value = String(i);
+          opt.textContent = String(i);
+          if (String(i) === String(selectedValue || "1")) opt.selected = true;
+          el.appendChild(opt);
+        }
+      }
+      function normalizeUnitCode(value) {
+        return String(value || "")
+          .replace(/\D/g, "")
+          .slice(0, 3);
+      }
+      function syncSelectsFromCode() {
+        const code = normalizeUnitCode($("unitCode").value);
+        $("unitCode").value = code;
+        $("majorUnit").value = code[0] || "1";
+        $("middleUnit").value = code[1] || "1";
+        $("nanoUnit").value = code[2] || "1";
+        updateSummary();
+      }
+      function syncCodeFromSelects() {
+        $("unitCode").value =
+          `${$("majorUnit").value}${$("middleUnit").value}${$("nanoUnit").value}`;
+        updateSummary();
+      }
+      function getNanoUnitName() {
+        const grade = $("gradeLevel").value,
+          code = normalizeUnitCode($("unitCode").value);
+        return (
+          (UNIT_NAME_MAP[grade] && UNIT_NAME_MAP[grade][code]) ||
+          "(소단원명 미지정)"
+        );
+      }
+      function buildSubmittedTitle() {
+        const title = $("title").value.trim() || "무제 문제지";
+        const curriculum = $("curriculumVersion").value;
+        const grade = $("gradeLevel").value;
+        const unitCode = normalizeUnitCode($("unitCode").value) || "000";
+        const source = $("sourceType").value;
+        return `[${curriculum}][${grade}][${unitCode}][${source}] ${title}`;
+      }
+      function updateSummary() {
+        $("summaryTitle").textContent = $("title").value.trim() || "-";
+        $("summaryMeta").textContent =
+          `${$("curriculumVersion").value} / ${$("gradeLevel").value} / ${$("subject").value}`;
+        $("summaryMajorMinor").textContent =
+          `${$("majorUnit").value} / ${$("middleUnit").value}`;
+        $("summaryUnitNano").textContent =
+          `${normalizeUnitCode($("unitCode").value) || "-"} / ${getNanoUnitName()}`;
+        $("summarySource").textContent = $("sourceType").value;
+        $("summarySubmittedTitle").textContent = buildSubmittedTitle();
+        const file = $("csvFile").files[0];
+        $("summaryCsv").textContent = file ? file.name : "파일 미선택";
+      }
+      async function parseCsvFile() {
+        const file = $("csvFile").files[0];
+        if (!file) throw new Error("CSV 파일을 선택해 주세요.");
+        return new Promise((resolve, reject) => {
+          Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+              const rows = results.data || [];
+              if (!rows.length) {
+                reject(new Error("CSV에 데이터가 없습니다."));
+                return;
+              }
+              const firstKeys = Object.keys(rows[0]).map((k) => k.trim());
+              if (
+                !firstKeys.includes("item_no") ||
+                !firstKeys.includes("answer_key")
+              ) {
+                reject(new Error("필수 컬럼(item_no, answer_key)이 없습니다."));
+                return;
+              }
+              const normalized = rows.map((row) => ({
+                item_no: String(row.item_no ?? "").trim(),
+                choice_count: String(row.choice_count ?? "").trim(),
+                answer_key: String(row.answer_key ?? "").trim(),
+                topic_tag: String(row.topic_tag ?? "").trim(),
+                note: String(row.note ?? "").trim(),
+              }));
+              const errors = [];
+              const seen = new Set();
+              normalized.forEach((row, idx) => {
+                const lineNo = idx + 2;
+                if (!row.item_no) errors.push(`${lineNo}행: item_no 비어 있음`);
+                if (row.item_no && !/^\d+$/.test(row.item_no))
+                  errors.push(`${lineNo}행: item_no는 숫자만 가능`);
+                if (row.item_no && seen.has(row.item_no))
+                  errors.push(`${lineNo}행: item_no 중복 (${row.item_no})`);
+                if (row.item_no) seen.add(row.item_no);
+                if (!row.answer_key)
+                  errors.push(`${lineNo}행: answer_key 비어 있음`);
+                if (row.choice_count && !/^\d+$/.test(row.choice_count))
+                  errors.push(`${lineNo}행: choice_count는 숫자만 가능`);
+              });
+              if (errors.length) {
+                reject(new Error(errors.join("\n")));
+                return;
+              }
+              resolve(normalized);
+            },
+            error: (err) => reject(err),
+          });
+        });
+      }
+      function inferDefaultChoiceCount(rows) {
+        const nums = rows
+          .map((r) => Number(r.choice_count))
+          .filter((n) => Number.isInteger(n) && n >= 2 && n <= 20);
+        if (!nums.length) return 5;
+        const counts = new Map();
+        nums.forEach((n) => counts.set(n, (counts.get(n) || 0) + 1));
+        let best = 5,
+          bestCount = -1;
+        for (const [num, count] of counts.entries()) {
+          if (count > bestCount) {
+            best = num;
+            bestCount = count;
+          }
+        }
+        return best;
+      }
+      async function uploadTestSet() {
+        const supabaseUrl = $("supabaseUrl").value.trim(),
+          supabaseAnonKey = $("supabaseAnonKey").value.trim();
+        if (!supabaseUrl || !supabaseAnonKey)
+          throw new Error("Supabase URL과 Anon Key를 입력해 주세요.");
+        const unitCode = normalizeUnitCode($("unitCode").value);
+        if (unitCode.length !== 3)
+          throw new Error("단원 코드는 3자리 숫자로 입력해 주세요.");
+        const rows = await parseCsvFile();
+        const file = $("csvFile").files[0];
+        const submittedTitle = buildSubmittedTitle();
+        const source = $("sourceType").value;
+        const defaultChoiceCount = inferDefaultChoiceCount(rows);
+        const supabase = window.supabase.createClient(
+          supabaseUrl,
+          supabaseAnonKey,
+          { db: { schema: "auto_grading" } },
+        );
+        const { data, error } = await supabase.rpc(
+          "create_test_set_from_json",
+          {
+            p_title: submittedTitle,
+            p_original_filename: file ? file.name : null,
+            p_items: rows,
+            p_source_type: source,
+            p_source_name: source,
+            p_subject: $("subject").value,
+            p_grade_level: $("gradeLevel").value,
+            p_major_unit: $("majorUnit").value,
+            p_minor_unit: unitCode,
+            p_default_choice_count: defaultChoiceCount,
+          },
+        );
+        if (error) throw error;
+        return { data, rows, defaultChoiceCount };
+      }
+      function resetForm() {
+        $("title").value = "";
+        $("curriculumVersion").value = "2022";
+        $("gradeLevel").value = "M3";
+        $("subject").value = "중3 과학";
+        $("unitCode").value = "112";
+        $("sourceType").value = "족보(빈출)";
+        $("csvFile").value = "";
+        fillSelect($("majorUnit"), 6, "1");
+        fillSelect($("middleUnit"), 9, "1");
+        fillSelect($("nanoUnit"), 9, "2");
+        syncSelectsFromCode();
+        $("resultBox").style.display = "none";
+        $("resultBox").textContent = "";
+        setStatus("", "info");
+        updateSummary();
+      }
+      function init() {
+        loadConfig();
+        fillSelect($("majorUnit"), 6, "1");
+        fillSelect($("middleUnit"), 9, "1");
+        fillSelect($("nanoUnit"), 9, "2");
+        syncSelectsFromCode();
+        updateSummary();
+        [
+          "title",
+          "curriculumVersion",
+          "gradeLevel",
+          "subject",
+          "sourceType",
+        ].forEach((id) => {
+          $(id).addEventListener("input", updateSummary);
+          $(id).addEventListener("change", updateSummary);
+        });
+        $("unitCode").addEventListener("input", syncSelectsFromCode);
+        $("majorUnit").addEventListener("change", syncCodeFromSelects);
+        $("middleUnit").addEventListener("change", syncCodeFromSelects);
+        $("nanoUnit").addEventListener("change", syncCodeFromSelects);
+        $("csvFile").addEventListener("change", updateSummary);
+        $("saveConfigBtn").addEventListener("click", saveConfig);
+        $("resetBtn").addEventListener("click", resetForm);
+        $("uploadBtn").addEventListener("click", async () => {
+          const btn = $("uploadBtn");
+          const prev = btn.textContent;
+          try {
+            btn.disabled = true;
+            btn.textContent = "등록 중...";
+            setStatus("CSV 검증 및 문제지 등록을 진행 중입니다.", "info");
+            const result = await uploadTestSet();
+            setStatus(
+              `문제지 등록 완료\n문항 수: ${result.rows.length}문항\n기본 선택지 수: ${result.defaultChoiceCount}`,
+              "ok",
+            );
+            $("resultBox").style.display = "block";
+            $("resultBox").textContent = JSON.stringify(result.data, null, 2);
+          } catch (err) {
+            console.error(err);
+            setStatus(err.message || "문제지 등록 실패", "error");
+          } finally {
+            btn.disabled = false;
+            btn.textContent = prev;
+          }
+        });
+      }
+      init();
+    </script>
+  </body>
+</html>

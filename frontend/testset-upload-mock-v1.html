@@ -232,12 +232,10 @@
           </div>
 
           <div class="field">
-            <label>과목</label>
+            <label>교육과정</label>
             <select>
-              <option>중1 과학</option>
-              <option>중2 과학</option>
-              <option selected>중3 과학</option>
-              <option>고1 통합과학</option>
+              <option>2015</option>
+              <option selected>2022</option>
             </select>
           </div>
 
@@ -252,25 +250,55 @@
           </div>
 
           <div class="field">
-            <label>교육과정</label>
+            <label>과목</label>
             <select>
-              <option selected>2015</option>
-              <option>2022</option>
+              <option>중1 과학</option>
+              <option>중2 과학</option>
+              <option selected>중3 과학</option>
+              <option>고1 통합과학</option>
             </select>
           </div>
 
           <div class="field">
-            <label>기본 선택지 수</label>
+            <label>단원 코드 (3자리)</label>
+            <input type="text" value="112" />
+            <div class="hint">학년 코드는 위에서 선택하고, 여기에는 3자리 숫자만 입력. 예: 112</div>
+          </div>
+        </div>
+
+        <div style="height:14px"></div>
+        <h2>단원 정보</h2>
+        <div class="form-grid-3">
+          <div class="field">
+            <label>대단원</label>
             <select>
-              <option selected>5</option>
+              <option selected>1</option>
+              <option>2</option>
+              <option>3</option>
               <option>4</option>
-              <option>7</option>
-              <option>9</option>
             </select>
           </div>
-
           <div class="field">
-            <label>소스 구분</label>
+            <label>중단원</label>
+            <select>
+              <option>1</option>
+              <option selected>2</option>
+              <option>3</option>
+              <option>4</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>소단원</label>
+            <select>
+              <option>1</option>
+              <option selected>2</option>
+              <option>3</option>
+              <option>4</option>
+              <option>5</option>
+            </select>
+          </div>
+          <div class="field wide">
+            <label>소스</label>
             <select>
               <option>족보(기본)</option>
               <option selected>족보(빈출)</option>
@@ -280,41 +308,9 @@
               <option>수동입력</option>
             </select>
           </div>
-
-          <div class="field">
-            <label>출처명</label>
-            <input type="text" value="족보닷컴" />
-          </div>
-
-          <div class="field wide">
-            <label>원본 파일명</label>
-            <input type="text" value="sample_test.csv" readonly />
-          </div>
-        </div>
-
-        <div style="height:14px"></div>
-        <h2>단원 정보</h2>
-        <div class="form-grid-3">
-          <div class="field">
-            <label>단원 코드</label>
-            <input type="text" value="M3-112" />
-            <div class="hint">학년코드 + 소단원 3자리. 예: M3-112</div>
-          </div>
-          <div class="field">
-            <label>대단원</label>
-            <input type="text" value="1" readonly />
-          </div>
-          <div class="field">
-            <label>중단원</label>
-            <input type="text" value="1" readonly />
-          </div>
-          <div class="field">
-            <label>소단원</label>
-            <input type="text" value="2" readonly />
-          </div>
           <div class="field wide">
             <label>단원 안내</label>
-            <div class="code-box">현재 구상: 학년 드롭다운과 단원코드(M3-112)를 기준으로 대단원/중단원/소단원 칸이 자동으로 채워져 보이는 구조. 실제 DB 연결 전이라 지금은 예시값만 고정 표시합니다.</div>
+            <div class="code-box">현재 구상: 두 가지 방식 모두 지원합니다. 1) 위 단원코드 칸에 3자리 숫자(예: 112)를 직접 입력하면 아래 대단원/중단원/소단원이 자동으로 맞춰집니다. 2) 반대로 아래 대단원 → 중단원 → 소단원을 드롭다운으로 선택하면 위 단원코드가 자동으로 3자리 숫자로 채워집니다. 실제 DB 연결 전이라 지금은 예시값만 고정 표시합니다.</div>
           </div>
         </div>
 
@@ -322,7 +318,7 @@
         <h2>문항 CSV 업로드</h2>
         <div class="csv-drop">
           <strong>CSV 파일 업로드 영역</strong>
-          현재는 화면 목업입니다. 나중에 여기에 파일 선택 버튼과 파싱 결과 미리보기가 연결됩니다.
+          현재는 화면 목업입니다. 실제 버전에서는 파일 선택 후 바로 문제지 등록을 진행하는 구조로 연결됩니다.
           <div class="pill-row">
             <div class="pill">필수 컬럼: item_no</div>
             <div class="pill">필수 컬럼: answer_key</div>
@@ -332,44 +328,8 @@
           </div>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 70px;">문항</th>
-              <th style="width: 90px;">선택지 수</th>
-              <th style="width: 120px;">정답</th>
-              <th style="width: 180px;">topic_tag</th>
-              <th>note</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>1</td>
-              <td>5</td>
-              <td>3</td>
-              <td>전기와 자기</td>
-              <td>기본 개념 확인</td>
-            </tr>
-            <tr>
-              <td>2</td>
-              <td>5</td>
-              <td>2|4</td>
-              <td>전기와 자기</td>
-              <td>복수정답 예시</td>
-            </tr>
-            <tr>
-              <td>3</td>
-              <td>7</td>
-              <td>6</td>
-              <td>자기장</td>
-              <td>7지선다 예시</td>
-            </tr>
-          </tbody>
-        </table>
-
         <div class="toolbar">
-          <button class="soft">CSV 다시 선택</button>
-          <button>미리보기 갱신</button>
+          <button class="soft">CSV 선택</button>
           <button class="primary">문제지 등록</button>
         </div>
       </div>
@@ -379,27 +339,27 @@
         <div class="summary-list">
           <div class="summary-item">
             <div class="k">문제지 제목</div>
-            <div class="v">중3 과학 M3-112 족보 빈출 1회</div>
+            <div class="v">중3 과학 112 족보 빈출 1회</div>
           </div>
           <div class="summary-item">
-            <div class="k">교육과정 / 학년</div>
-            <div class="v">2015 / M3</div>
+            <div class="k">교육과정 / 학년 / 과목</div>
+            <div class="v">2022 / M3 / 중3 과학</div>
           </div>
           <div class="summary-item">
-            <div class="k">단원 코드</div>
-            <div class="v">M3-112</div>
+            <div class="k">대단원 / 중단원</div>
+            <div class="v">1 / 2</div>
           </div>
           <div class="summary-item">
-            <div class="k">대단원 / 중단원 / 소단원</div>
-            <div class="v">1 / 1 / 2</div>
+            <div class="k">단원 코드 / 소단원명</div>
+            <div class="v">112 / 전기와 자기의 이용</div>
           </div>
           <div class="summary-item">
             <div class="k">소스</div>
-            <div class="v">족보(빈출) / 족보닷컴</div>
+            <div class="v">족보(빈출)</div>
           </div>
           <div class="summary-item">
-            <div class="k">문항 수 / 기본 선택지 수</div>
-            <div class="v">3문항 / 5지선다</div>
+            <div class="k">문항 수</div>
+            <div class="v">3문항</div>
           </div>
         </div>
 
@@ -409,7 +369,7 @@
           1. 학년과 단원코드는 별도 축이지만, 실제로는 M3-112처럼 함께 관리됩니다.<br />
           2. 같은 단원코드라도 출처가 다르면 다른 문제지가 될 수 있습니다.<br />
           3. 교육과정(2015/2022)은 중등에서 반드시 분리 관리해야 합니다.<br />
-          4. 다음 버전에서는 단원코드 선택 시 대/중/소단원이 자동 표시되도록 연결합니다.
+          4. 다음 버전에서는 단원코드 입력과 대/중/소단원 선택이 서로 자동 동기화되도록 연결합니다.
         </div>
 
         <div class="toolbar">
