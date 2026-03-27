@@ -2,13 +2,22 @@ begin;
 
 create extension if not exists pgcrypto;
 
--- 1) test_sets에 기준 식별용 컬럼만 추가
+do $$
+begin
+  if to_regnamespace('auto_grading') is null then
+    raise exception 'schema auto_grading does not exist. run schema.sql first';
+  end if;
+
+  if to_regclass('auto_grading.test_sets') is null then
+    raise exception 'table auto_grading.test_sets does not exist. run schema.sql first';
+  end if;
+end $$;
+
 alter table auto_grading.test_sets
   add column if not exists curriculum_version text,
   add column if not exists unit_code text,
   add column if not exists source_category text;
 
--- 2) curriculum_units 기준 테이블 생성
 create table if not exists auto_grading.curriculum_units (
   id uuid primary key default gen_random_uuid(),
 
@@ -35,7 +44,6 @@ create table if not exists auto_grading.curriculum_units (
     unique (grade_level, curriculum_version, subject, unit_code)
 );
 
--- 3) check constraint 추가
 do $$
 begin
   if not exists (
@@ -83,7 +91,6 @@ begin
   end if;
 end $$;
 
--- 4) updated_at 자동 갱신 함수
 create or replace function auto_grading.set_updated_at()
 returns trigger
 language plpgsql
@@ -94,7 +101,6 @@ begin
 end;
 $function$;
 
--- 5) curriculum_units updated_at 트리거
 drop trigger if exists trg_curriculum_units_set_updated_at
 on auto_grading.curriculum_units;
 
@@ -103,15 +109,10 @@ before update on auto_grading.curriculum_units
 for each row
 execute function auto_grading.set_updated_at();
 
--- 6) curriculum_units 조회용 인덱스
-create index if not exists idx_curriculum_units_lookup
-  on auto_grading.curriculum_units (grade_level, curriculum_version, subject, unit_code);
-
 create index if not exists idx_curriculum_units_active_lookup
   on auto_grading.curriculum_units (grade_level, curriculum_version, subject, unit_code)
   where is_active = true;
 
--- 7) test_sets 쪽도 최소 정합성 check 추가
 do $$
 begin
   if not exists (
@@ -124,9 +125,33 @@ begin
       add constraint test_sets_unit_code_format_chk
       check (unit_code is null or unit_code ~ '^\d{3}$');
   end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'test_sets_curriculum_ref_all_or_none_chk'
+      and conrelid = 'auto_grading.test_sets'::regclass
+  ) then
+    alter table auto_grading.test_sets
+      add constraint test_sets_curriculum_ref_all_or_none_chk
+      check (
+        (
+          grade_level is null
+          and curriculum_version is null
+          and subject is null
+          and unit_code is null
+        )
+        or
+        (
+          grade_level is not null
+          and curriculum_version is not null
+          and subject is not null
+          and unit_code is not null
+        )
+      );
+  end if;
 end $$;
 
--- 8) test_sets -> curriculum_units 복합 FK
 do $$
 begin
   if not exists (

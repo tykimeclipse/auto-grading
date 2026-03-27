@@ -207,7 +207,6 @@ is '최신 attempt 기준 assignment 자동 닫힘 규칙. 수동으로 닫힌 a
 
 
 
-``` 기존 데이터 백필용: ``` sql
 with
   latest as (
     select
@@ -289,7 +288,6 @@ where
   );
 
 
-``` 확인용 조회: ``` sql
 select
   a.id as assignment_id,
   a.closed_at,
