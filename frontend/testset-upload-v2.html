@@ -377,14 +377,14 @@
               ><select id="nanoUnit"></select>
             </div>
             <div class="field wide">
-              <label for="sourceType">소스</label
+              <label for="sourceType">출처 분류</label
               ><select id="sourceType">
-                <option value="족보(기본)">족보(기본)</option>
-                <option value="족보(빈출)" selected>족보(빈출)</option>
-                <option value="족보(오답)">족보(오답)</option>
-                <option value="족보(발전)">족보(발전)</option>
-                <option value="오투">오투</option>
-                <option value="수동입력">수동입력</option>
+                <option value="problem_bank|족보(기본)">족보(기본)</option>
+                <option value="problem_bank|족보(빈출)" selected>족보(빈출)</option>
+                <option value="problem_bank|족보(오답)">족보(오답)</option>
+                <option value="problem_bank|족보(발전)">족보(발전)</option>
+                <option value="published_book|오투">오투</option>
+                
               </select>
             </div>
             <div class="field wide">
@@ -459,8 +459,8 @@
           <div class="code-box">
             현재 페이지는 subject 값을 curriculum_units.subject와 정확히
             일치시키고, 단원명은 curriculum_units 원본에서 조회해 사용합니다.
-            등록 호출에서는 p_curriculum_version, p_unit_code,
-            p_source_type은 내부 고정값(csv), source_category는 사용자가 고른 소스 라벨을 넘기도록 맞췄습니다.
+            등록 호출에서는 source_type(내부 enum)과
+            source_category(화면 라벨)를 분리해서 전송합니다.
           </div>
         </div>
       </div>
@@ -518,6 +518,19 @@
         if (!selectEl) return "";
         const opt = selectEl.options[selectEl.selectedIndex];
         return opt ? opt.textContent : "";
+      }
+
+      function getSourceParts() {
+        const raw = $("sourceType").value || "problem_bank|족보(빈출)";
+        const [sourceType, sourceCategory] = raw.split("|");
+        return {
+          sourceType: sourceType || "problem_bank",
+          sourceCategory: sourceCategory || "족보(빈출)",
+        };
+      }
+
+      function getSourceLabel() {
+        return getSourceParts().sourceCategory;
       }
 
       function formatSubjectLabel(value) {
@@ -774,7 +787,7 @@
         const title = $("title").value.trim() || "(제목 없음)";
         const curriculumVersion = $("curriculumVersion").value || "-";
         const unitCode = normalizeUnitCode($("unitCode").value) || "-";
-        const sourceCategory = $("sourceType").value || "-";
+        const sourceCategory = getSourceLabel() || "-";
         return `${title} / ${curriculumVersion} / ${unitCode} / ${sourceCategory}`;
       }
 
@@ -789,7 +802,7 @@
         $("summaryUnitNano").textContent = selectedUnit
           ? `${String(selectedUnit.unit_code).padStart(3, "0")} / ${selectedUnit.nano_unit_name}`
           : `${normalizeUnitCode($("unitCode").value) || "-"} / -`;
-        $("summarySource").textContent = $("sourceType").value || "-";
+        $("summarySource").textContent = getSourceLabel() || "-";
         $("summarySubmittedTitle").textContent = buildSummaryRegistrationKey();
         const file = $("csvFile").files[0];
         $("summaryCsv").textContent = file ? `${file.name} (${state.csvRows.length || "검증 전"}문항)` : "파일 미선택";
@@ -859,7 +872,7 @@
         const gradeLevel = $("gradeLevel").value;
         const subject = $("subject").value;
         const unitCode = normalizeUnitCode($("unitCode").value);
-        const sourceCategory = $("sourceType").value;
+        const { sourceType, sourceCategory } = getSourceParts();
 
         if (!title) throw new Error("문제지 제목을 입력해 주세요.");
         if (!/^\d{3}$/.test(unitCode)) throw new Error("단원 코드는 3자리 숫자로 입력해 주세요.");
@@ -868,7 +881,7 @@
 
         return {
           p_title: title,
-          p_source_type: "csv",
+          p_source_type: sourceType,
           p_source_name: state.csvFileName || sourceCategory,
           p_original_filename: state.csvFileName || null,
           p_subject: subject,
@@ -930,7 +943,7 @@
           $("subject").value = "중3과학";
         }
         $("unitCode").value = "112";
-        $("sourceType").value = "족보(빈출)";
+        $("sourceType").value = "problem_bank|족보(빈출)";
         $("csvFile").value = "";
         state.csvRows = [];
         state.csvFileName = "";
@@ -993,7 +1006,6 @@
       }
 
       init();
-    </script>
     </script>
   </body>
 </html>
