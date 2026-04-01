@@ -95,7 +95,8 @@ begin
 
   if p_course_id is null then
     update pg_temp.tmp_teacher_issue_input
-       set in_course = student_exists;
+       set in_course = student_exists
+     where student_id is not null;
   else
     update pg_temp.tmp_teacher_issue_input i
        set in_course = true

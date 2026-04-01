@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>교사용 시험 발행 페이지 v1</title>
+  <title>교사용 시험 발행 페이지 v2 linked</title>
   <style>
     :root {
       --bg: #f6f7fb;
@@ -52,7 +52,7 @@
     .btn-primary { background:var(--primary); color:white; }
     .btn-secondary { background:#eef2f7; color:var(--text); border:1px solid var(--line); }
     .btn-ghost { background:white; color:var(--text); border:1px solid var(--line); }
-    .subgrid { display:grid; grid-template-columns:1.2fr 0.8fr; gap:16px; margin-top:18px; }
+    .subgrid { display:grid; grid-template-columns:1.05fr 0.95fr; gap:16px; margin-top:18px; }
     .inner-box { border:1px solid var(--line); border-radius:16px; padding:16px; background:#fcfdff; }
     .inner-box h3 { margin:0 0 12px; font-size:16px; }
     .meta-list { display:grid; gap:10px; }
@@ -60,6 +60,14 @@
     .meta-item:last-child { border-bottom:0; padding-bottom:0; }
     .meta-item .k { color:var(--muted); }
     .meta-item .v { font-weight:700; text-align:right; }
+    .stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .stat-tile { border:1px solid var(--line); border-radius:14px; background:#fff; padding:12px; }
+    .stat-tile .label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    .stat-tile .value { font-size:18px; font-weight:700; }
+    .question-stat { display:grid; gap:8px; margin-top:14px; }
+    .question-row { display:grid; grid-template-columns:52px 1fr 92px; align-items:center; gap:10px; font-size:13px; }
+    .bar { height:10px; background:#e8edf7; border-radius:999px; overflow:hidden; }
+    .bar > span { display:block; height:100%; background:linear-gradient(90deg,#f08a24,#d45353); }
     .student-toolbar,.posting-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
     .table-wrap { border:1px solid var(--line); border-radius:16px; overflow:hidden; background:white; }
     table { width:100%; border-collapse:collapse; }
@@ -99,7 +107,7 @@
     }
     @media (max-width:980px) {
       .page-header { flex-direction:column; }
-      .top-summary,.search-grid,.search-grid.three { grid-template-columns:1fr; }
+      .top-summary,.search-grid,.search-grid.three,.stat-grid { grid-template-columns:1fr; }
       .table-wrap,.list-card { overflow-x:auto; }
       .list-head,.list-row { min-width:980px; }
       table { min-width:1080px; }
@@ -135,11 +143,11 @@
     <div class="page-header">
       <div class="title-wrap">
         <h1>교사용 시험 발행 페이지</h1>
-        <p>등록된 문제지를 선택하고 학생을 골라 assignment를 발행하는 실제 연결 버전입니다.</p>
+        <p>prototype v2 흐름을 반영해 시험 검색, 시험 요약, 학생 선택, assignment 발행/운영을 실제 RPC와 연결한 버전입니다.</p>
       </div>
       <div class="top-summary">
+        <div class="summary-card"><span class="label">검색된 시험</span><div id="sumTestSets" class="value">0건</div></div>
         <div class="summary-card"><span class="label">현재 선택 학생</span><div id="sumSelectedStudents" class="value">0명</div></div>
-        <div class="summary-card"><span class="label">검색된 학생</span><div id="sumStudents" class="value">0명</div></div>
         <div class="summary-card"><span class="label">표시 중 assignment</span><div id="sumAssignments" class="value">0건</div></div>
         <div class="summary-card"><span class="label">열림 assignment</span><div id="sumOpenAssignments" class="value">0건</div></div>
       </div>
@@ -150,7 +158,7 @@
         <section class="panel">
           <div class="panel-header">
             <h2>시험 선택 영역</h2>
-            <p>등록된 test_sets를 검색한 뒤 하나를 선택합니다.</p>
+            <p>시험 검색 결과를 먼저 보고 선택한 뒤, 선택된 시험의 종합 지표와 발행 현황을 이어서 확인합니다.</p>
           </div>
           <div class="panel-body">
             <div class="search-grid three">
@@ -169,18 +177,30 @@
                 <input id="testTitleFilter" type="text" placeholder="예: 질량보존" />
               </div>
               <div class="field">
-                <label for="testSourceFilter">출처 분류</label>
+                <label for="testSourceFilter">출처</label>
                 <select id="testSourceFilter">
                   <option value="">전체</option>
                 </select>
               </div>
             </div>
-            <div class="check-row">
-              <label class="chip"><input id="purposeHomeworkChip" type="checkbox" checked disabled /> 기본 용도: 숙제</label>
+            <div class="search-grid">
+              <div class="field">
+                <label for="testPurposeFilter">용도</label>
+                <select id="testPurposeFilter">
+                  <option value="">전체</option>
+                  <option value="숙제">숙제</option>
+                  <option value="클리닉">클리닉</option>
+                  <option value="보충">보충</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="testActiveOnly">시험 상태</label>
+                <label class="chip"><input id="testActiveOnly" type="checkbox" checked /> 활성 시험만 보기</label>
+              </div>
             </div>
             <div class="actions">
               <button id="searchTestsBtn" class="btn-primary" type="button">시험 검색</button>
-              <button id="resetTestSearchBtn" class="btn-secondary" type="button">검색 초기화</button>
+              <button id="resetTestSearchBtn" class="btn-secondary" type="button">검색/선택 초기화</button>
             </div>
             <div class="inner-box" style="margin-top:18px;">
               <h3>시험 검색 결과</h3>
@@ -192,8 +212,9 @@
                       <th>학년</th>
                       <th>시험 제목</th>
                       <th>출처</th>
+                      <th>용도</th>
                       <th>문항수</th>
-                      <th>등록일</th>
+                      <th>응시자수</th>
                     </tr>
                   </thead>
                   <tbody id="testSetTableBody"></tbody>
@@ -205,15 +226,28 @@
                 <h3>선택된 시험 기본 정보</h3>
                 <div class="meta-list">
                   <div class="meta-item"><span class="k">시험 제목</span><span id="metaTestTitle" class="v">-</span></div>
-                  <div class="meta-item"><span class="k">학년 / 과목</span><span id="metaTestGradeSubject" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">학년 / 과목</span><span id="metaTestGrade" class="v">-</span></div>
                   <div class="meta-item"><span class="k">출처</span><span id="metaTestSource" class="v">-</span></div>
                   <div class="meta-item"><span class="k">문항수</span><span id="metaTestItems" class="v">-</span></div>
-                  <div class="meta-item"><span class="k">교육과정 / 단원코드</span><span id="metaTestCurriculum" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">소단원코드</span><span id="metaTestUnitCode" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">최근 사용</span><span id="metaTestLastUsed" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">정답 입력 상태</span><span id="metaAnswerReady" class="v">-</span></div>
                 </div>
               </div>
               <div class="inner-box">
-                <h3>선택 시험 안내</h3>
-                <div id="selectedTestGuide" class="code-box">시험을 먼저 선택하면 학생 조회와 발행상황이 해당 시험 기준으로 갱신됩니다.</div>
+                <h3>시험 종합 정보</h3>
+                <div class="stat-grid">
+                  <div class="stat-tile"><span class="label">누적 발행</span><div id="ovAssignmentCount" class="value">0건</div></div>
+                  <div class="stat-tile"><span class="label">열림</span><div id="ovOpenAssignmentCount" class="value">0건</div></div>
+                  <div class="stat-tile"><span class="label">시작됨</span><div id="ovStartedCount" class="value">0건</div></div>
+                  <div class="stat-tile"><span class="label">완료/검토</span><div id="ovEndedCount" class="value">0건</div></div>
+                  <div class="stat-tile"><span class="label">평균 1차</span><div id="ovAvgRound1" class="value">-</div></div>
+                  <div class="stat-tile"><span class="label">평균 최종</span><div id="ovAvgFinal" class="value">-</div></div>
+                </div>
+                <div class="question-stat">
+                  <div class="question-row"><span>주요 오답</span><div class="bar"><span style="width:0%"></span></div><span id="wrongQuestionHint">문항별 오답률 연동 준비중</span></div>
+                </div>
+                <div id="selectedTestGuide" class="code-box" style="margin-top:14px;">시험을 먼저 선택하면 학생 조회와 발행상황이 해당 시험 기준으로 갱신됩니다.</div>
               </div>
             </div>
           </div>
@@ -270,8 +304,12 @@
                 <select id="studentGradeFilter"><option value="">전체</option></select>
               </div>
               <div class="field">
-                <label for="studentSearch">학생 이름/번호</label>
-                <input id="studentSearch" type="text" placeholder="예: 홍길동 또는 101" />
+                <label for="studentNameSearch">학생 이름</label>
+                <input id="studentNameSearch" type="text" placeholder="예: 홍길동" />
+              </div>
+              <div class="field">
+                <label for="studentCodeSearch">학생 번호</label>
+                <input id="studentCodeSearch" type="text" placeholder="예: 101" />
               </div>
               <div class="field">
                 <label for="serviceTypeFilter">수강형태</label>
@@ -325,6 +363,8 @@
               <div class="meta-item"><span class="k">수강과정</span><span id="issueCourseName" class="v">전체</span></div>
             </div>
             <div class="check-row" style="margin-top:16px;">
+              <label class="chip"><input type="checkbox" checked disabled /> 발행 시 자동으로 열림 시작</label>
+              <label class="chip"><input type="checkbox" checked disabled /> 동일 시험 중복 발행 방지</label>
               <label class="chip"><input id="reopenExisting" type="checkbox" /> 닫힌 기존 assignment 재오픈 허용</label>
             </div>
             <div id="issueWarningBox" class="inner-box" style="margin-top:10px; background:#fff8ef; border-color:#f0d8b0;">
@@ -358,13 +398,15 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const STORAGE_KEY = 'ag_assignment_supabase_config_v1';
+    const STORAGE_KEY = 'ag_assignment_supabase_config_v2';
     const $ = (id) => document.getElementById(id);
     const state = {
       supabase: null,
       testSets: [],
       selectedTestSetId: null,
       selectedTestSet: null,
+      selectedTestDetail: null,
+      testOverview: null,
       students: [],
       selectedStudentIds: new Set(),
       assignments: [],
@@ -423,8 +465,19 @@
       return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     }
 
+    function fmtDateTime(v) {
+      if (!v) return '-';
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return v;
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+
     function fmtPercent(v) {
       return v == null ? '-' : `${Number(v).toFixed(0)}%`;
+    }
+
+    function fmtCount(v, suffix='건') {
+      return `${Number(v || 0)}${suffix}`;
     }
 
     function escapeHtml(v) {
@@ -438,6 +491,17 @@
     function currentCourseName() {
       const opt = $('courseSelect').options[$('courseSelect').selectedIndex];
       return opt ? opt.textContent : '전체';
+    }
+
+    function currentPurposeFilter() {
+      return $('testPurposeFilter').value || null;
+    }
+
+    function mapServiceType(v) {
+      if (!v) return '-';
+      if (v === 'academy') return '학원';
+      if (v === 'tutoring') return '과외';
+      return String(v);
     }
 
     async function connectAndBootstrap() {
@@ -455,25 +519,37 @@
     async function loadCourses() {
       const { data, error } = await state.supabase
         .schema('auto_grading')
-        .from('courses')
-        .select('id,name')
-        .order('name', { ascending: true });
+        .rpc('teacher_list_courses', {
+          p_search: null,
+          p_only_active: true,
+          p_limit: 200,
+          p_offset: 0
+        });
       if (error) throw error;
       state.courses = Array.isArray(data) ? data : [];
       const cur = $('courseSelect').value;
-      $('courseSelect').innerHTML = '<option value="">전체</option>' + state.courses.map(c => `<option value="${c.id}">${escapeHtml(c.name || c.id)}</option>`).join('');
-      if (cur && state.courses.some(c => c.id === cur)) $('courseSelect').value = cur;
+      $('courseSelect').innerHTML = '<option value="">전체</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
+      if (cur && state.courses.some(c => c.course_id === cur)) $('courseSelect').value = cur;
       updateFooter();
     }
 
     async function loadStudentFilterOptions() {
       const { data, error } = await state.supabase
         .schema('auto_grading')
-        .from('students')
-        .select('grade')
-        .not('grade', 'is', null);
+        .rpc('teacher_list_students_for_assignment', {
+          p_course_id: null,
+          p_test_set_id: null,
+          p_search: null,
+          p_grade: null,
+          p_service_type: null,
+          p_enrollment_type: null,
+          p_only_active: false,
+          p_only_not_assigned: false,
+          p_limit: 500,
+          p_offset: 0
+        });
       if (error) throw error;
-      state.studentGrades = [...new Set((data || []).map(r => r.grade).filter(Boolean))].sort();
+      state.studentGrades = [...new Set((data || []).map(r => r.student_grade).filter(Boolean))].sort();
       const gradeCur = $('studentGradeFilter').value;
       $('studentGradeFilter').innerHTML = '<option value="">전체</option>' + state.studentGrades.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
       if (gradeCur && state.studentGrades.includes(gradeCur)) $('studentGradeFilter').value = gradeCur;
@@ -486,7 +562,7 @@
       if (scError) throw scError;
       state.serviceTypes = [...new Set((scData || []).map(r => r.service_type).filter(Boolean))].sort();
       const cur = $('serviceTypeFilter').value;
-      $('serviceTypeFilter').innerHTML = '<option value="">전체</option>' + state.serviceTypes.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+      $('serviceTypeFilter').innerHTML = '<option value="">전체</option>' + state.serviceTypes.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(mapServiceType(v))}</option>`).join('');
       if (cur && state.serviceTypes.includes(cur)) $('serviceTypeFilter').value = cur;
     }
 
@@ -494,27 +570,30 @@
       try {
         if (!state.supabase) state.supabase = createClientOrThrow();
         setStatus('assignmentStatus', '시험 목록을 불러오는 중입니다.', 'info');
-        const grade = $('testGradeFilter').value;
-        const title = $('testTitleFilter').value.trim();
-        const sourceCategory = $('testSourceFilter').value;
-        let query = state.supabase
+        const { data, error } = await state.supabase
           .schema('auto_grading')
-          .from('test_sets')
-          .select('id,title,grade_level,subject,source_type,source_name,source_category,total_items,curriculum_version,unit_code,created_at', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .limit(100);
-        if (grade) query = query.eq('grade_level', grade);
-        if (title) query = query.ilike('title', `%${title}%`);
-        if (sourceCategory) query = query.eq('source_category', sourceCategory);
-        const { data, error } = await query;
+          .rpc('teacher_search_test_sets', {
+            p_search: $('testTitleFilter').value.trim() || null,
+            p_grade_level: $('testGradeFilter').value || null,
+            p_source: $('testSourceFilter').value || null,
+            p_purpose: currentPurposeFilter(),
+            p_only_active: $('testActiveOnly').checked,
+            p_limit: 100,
+            p_offset: 0
+          });
         if (error) throw error;
         state.testSets = Array.isArray(data) ? data : [];
         renderTestSourceOptions();
         renderTestSetTable();
+        updateSummaryCards();
         setStatus('assignmentStatus', `시험 목록 ${state.testSets.length}건을 불러왔습니다.`, 'ok');
         if (state.selectedTestSetId) {
-          const found = state.testSets.find(t => t.id === state.selectedTestSetId) || state.selectedTestSet;
-          if (found) selectTestSet(found.id, false);
+          const found = state.testSets.find(t => t.test_set_id === state.selectedTestSetId);
+          if (found) {
+            await selectTestSet(found.test_set_id, false);
+          } else {
+            clearSelectedTest();
+          }
         }
       } catch (err) {
         setStatus('assignmentStatus', normalizeError(err), 'error');
@@ -523,7 +602,7 @@
 
     function renderTestSourceOptions() {
       const current = $('testSourceFilter').value;
-      const categories = [...new Set(state.testSets.map(t => t.source_category).filter(Boolean))].sort();
+      const categories = [...new Set(state.testSets.map(t => t.test_source).filter(Boolean))].sort();
       $('testSourceFilter').innerHTML = '<option value="">전체</option>' + categories.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
       if (current && categories.includes(current)) $('testSourceFilter').value = current;
     }
@@ -531,17 +610,18 @@
     function renderTestSetTable() {
       const body = $('testSetTableBody');
       if (!state.testSets.length) {
-        body.innerHTML = '<tr><td colspan="6" class="muted">검색 결과가 없습니다.</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" class="muted">검색 결과가 없습니다.</td></tr>';
         return;
       }
       body.innerHTML = state.testSets.map(ts => `
         <tr>
-          <td><input type="radio" name="testset" ${state.selectedTestSetId === ts.id ? 'checked' : ''} data-test-id="${ts.id}" /></td>
+          <td><input type="radio" name="testset" ${state.selectedTestSetId === ts.test_set_id ? 'checked' : ''} data-test-id="${ts.test_set_id}" /></td>
           <td>${escapeHtml(ts.grade_level || '-')}</td>
-          <td><strong>${escapeHtml(ts.title || '-')}</strong><div class="muted">${escapeHtml(ts.subject || '-')}</div></td>
-          <td>${escapeHtml(ts.source_category || ts.source_name || ts.source_type || '-')}</td>
+          <td><strong>${escapeHtml(ts.test_title || '-')}</strong><div class="muted">평균 최종 ${escapeHtml(fmtPercent(ts.avg_final_score))}</div></td>
+          <td>${escapeHtml(ts.test_source || '-')}</td>
+          <td>${escapeHtml(currentPurposeFilter() || '전체')}</td>
           <td>${escapeHtml(ts.total_items ?? '-')}</td>
-          <td>${escapeHtml(fmtDate(ts.created_at))}</td>
+          <td>${escapeHtml(ts.started_assignment_count ?? ts.assignment_count ?? 0)}명</td>
         </tr>
       `).join('');
       body.querySelectorAll('input[name="testset"]').forEach(el => {
@@ -551,16 +631,9 @@
 
     async function selectTestSet(testSetId, refreshDownstream = true) {
       state.selectedTestSetId = testSetId;
-      state.selectedTestSet = state.testSets.find(t => t.id === testSetId) || state.selectedTestSet;
-      const ts = state.selectedTestSet;
-      $('metaTestTitle').textContent = ts?.title || '-';
-      $('metaTestGradeSubject').textContent = ts ? `${ts.grade_level || '-'} / ${ts.subject || '-'}` : '-';
-      $('metaTestSource').textContent = ts ? (ts.source_category || ts.source_name || ts.source_type || '-') : '-';
-      $('metaTestItems').textContent = ts ? `${ts.total_items ?? '-'}문항` : '-';
-      $('metaTestCurriculum').textContent = ts ? `${ts.curriculum_version || '-'} / ${ts.unit_code || '-'}` : '-';
-      $('selectedTestGuide').innerHTML = ts ? `선택 시험 ID: ${escapeHtml(ts.id)}<br>선택 후 학생 조회와 발행상황 조회에 이 test_set_id가 사용됩니다.` : '시험을 먼저 선택해 주세요.';
-      $('issueTestTitle').textContent = ts?.title || '-';
-      $('footerTestTitle').textContent = ts?.title || '-';
+      state.selectedTestSet = state.testSets.find(t => t.test_set_id === testSetId) || null;
+      await Promise.all([loadTestOverview(testSetId), loadTestDetail(testSetId)]);
+      renderSelectedTest();
       renderTestSetTable();
       updateFooter();
       if (refreshDownstream) {
@@ -568,13 +641,78 @@
       }
     }
 
+    async function loadTestOverview(testSetId) {
+      if (!testSetId) {
+        state.testOverview = null;
+        return;
+      }
+      const { data, error } = await state.supabase
+        .schema('auto_grading')
+        .rpc('teacher_get_test_set_overview', {
+          p_test_set_id: testSetId,
+          p_purpose: $('purposeSelect').value || null
+        });
+      if (error) throw error;
+      state.testOverview = Array.isArray(data) ? (data[0] || null) : data;
+    }
+
+    async function loadTestDetail(testSetId) {
+      if (!testSetId) {
+        state.selectedTestDetail = null;
+        return;
+      }
+      const { data, error } = await state.supabase
+        .schema('auto_grading')
+        .from('test_sets')
+        .select('id,subject,unit_code,source_category,source_name,source_type,total_items,updated_at,created_at')
+        .eq('id', testSetId)
+        .maybeSingle();
+      if (error) throw error;
+      state.selectedTestDetail = data || null;
+    }
+
+    function renderSelectedTest() {
+      const ts = state.selectedTestSet;
+      const td = state.selectedTestDetail;
+      const ov = state.testOverview;
+      $('metaTestTitle').textContent = ts?.test_title || '-';
+      $('metaTestGrade').textContent = ts ? `${ts.grade_level || '-'} / ${td?.subject || '-'}` : '-';
+      $('metaTestSource').textContent = td?.source_category || ts?.test_source || td?.source_name || td?.source_type || '-';
+      $('metaTestItems').textContent = `${td?.total_items ?? ts?.total_items ?? '-'}문항`;
+      $('metaTestUnitCode').textContent = td?.unit_code || '-';
+      $('metaTestLastUsed').textContent = ts?.last_used_at ? fmtDateTime(ts.last_used_at) : '-';
+      $('metaAnswerReady').textContent = td?.total_items ? '확인 필요' : '-';
+      $('ovAssignmentCount').textContent = fmtCount(ov?.assignment_count);
+      $('ovOpenAssignmentCount').textContent = fmtCount(ov?.open_assignment_count);
+      $('ovStartedCount').textContent = fmtCount(ov?.started_assignment_count);
+      $('ovEndedCount').textContent = fmtCount(ov?.ended_assignment_count);
+      $('ovAvgRound1').textContent = fmtPercent(ov?.avg_round1_score);
+      $('ovAvgFinal').textContent = fmtPercent(ov?.avg_final_score);
+      $('selectedTestGuide').innerHTML = ts
+        ? `선택 시험 ID: ${escapeHtml(ts.test_set_id)}<br>누적 발행 ${escapeHtml(ov?.assignment_count ?? 0)}건, 열림 ${escapeHtml(ov?.open_assignment_count ?? 0)}건, 최근 사용 ${escapeHtml(fmtDateTime(ts.last_used_at))}`
+        : '시험을 먼저 선택해 주세요.';
+      $('issueTestTitle').textContent = ts?.test_title || '-';
+      $('footerTestTitle').textContent = ts?.test_title || '-';
+    }
+
+    function clearSelectedTest() {
+      state.selectedTestSetId = null;
+      state.selectedTestSet = null;
+      state.selectedTestDetail = null;
+      state.testOverview = null;
+      renderSelectedTest();
+      renderTestSetTable();
+    }
+
     async function loadStudents() {
       try {
         if (!state.supabase) state.supabase = createClientOrThrow();
+        const nameSearch = $('studentNameSearch').value.trim();
+        const codeSearch = $('studentCodeSearch').value.trim();
         const params = {
           p_course_id: currentCourseId(),
           p_test_set_id: state.selectedTestSetId,
-          p_search: $('studentSearch').value.trim() || null,
+          p_search: [nameSearch, codeSearch].filter(Boolean).join(' ') || null,
           p_grade: $('studentGradeFilter').value || null,
           p_service_type: $('serviceTypeFilter').value || null,
           p_enrollment_type: null,
@@ -609,9 +747,9 @@
 
     function serviceBadge(v) {
       if (!v) return '<span class="tag gray">-</span>';
-      if (String(v).includes('과외')) return `<span class="tag green">${escapeHtml(v)}</span>`;
-      if (String(v).includes('내신')) return `<span class="tag green">${escapeHtml(v)}</span>`;
-      return `<span class="tag">${escapeHtml(v)}</span>`;
+      if (v === 'tutoring') return '<span class="tag green">과외</span>';
+      if (v === 'academy') return '<span class="tag">학원</span>';
+      return `<span class="tag">${escapeHtml(mapServiceType(v))}</span>`;
     }
 
     function renderStudentTable() {
@@ -653,7 +791,7 @@
           p_test_set_id: $('filterCurrentTestOnly').checked ? state.selectedTestSetId : null,
           p_student_id: null,
           p_is_open: $('filterOpenOnly').checked ? true : null,
-          p_purpose: null,
+          p_purpose: $('purposeSelect').value || null,
           p_status: null,
           p_search: null,
           p_limit: 100,
@@ -680,7 +818,7 @@
       body.innerHTML = state.assignments.map(row => `
         <div class="list-row">
           <div>${escapeHtml(row.student_grade || '-')}</div>
-          <div><strong>${escapeHtml(row.test_title || '-')}</strong><div class="muted">${escapeHtml(row.test_source || '-')} · ${escapeHtml(row.total_items ?? '-')}문항</div></div>
+          <div><strong>${escapeHtml(row.test_title || '-')}</strong><div class="muted">${escapeHtml(row.test_source || '-')} · ${escapeHtml(row.total_items ?? '-')}문항 · ${escapeHtml(row.purpose || '-')}</div></div>
           <div>${escapeHtml(fmtDate(row.assigned_at))}</div>
           <div>${escapeHtml(row.student_name || '-')}</div>
           <div class="score ${row.round1_score_percent == null ? 'blank' : ''}">${escapeHtml(fmtPercent(row.round1_score_percent))}</div>
@@ -725,7 +863,6 @@
       $('issueSelectedCount').textContent = `${selectedCount}명`;
       $('footerSelectedCount').textContent = `${selectedCount}명`;
       $('sumSelectedStudents').textContent = `${selectedCount}명`;
-      $('sumStudents').textContent = `${state.students.length}명`;
       updateIssueWarning();
       updateFooter();
     }
@@ -742,6 +879,7 @@
     }
 
     function updateSummaryCards() {
+      $('sumTestSets').textContent = `${state.testSets.length}건`;
       $('sumAssignments').textContent = `${state.assignments.length}건`;
       $('sumOpenAssignments').textContent = `${state.assignments.filter(a => a.is_open).length}건`;
     }
@@ -770,7 +908,8 @@
         setStatus('issueStatus', `발행 처리 완료\ncreated: ${data?.created_count ?? 0}\nreopened: ${data?.reopened_count ?? 0}\nskipped_existing_open: ${data?.skipped_existing_open_count ?? 0}\nskipped_existing_closed: ${data?.skipped_existing_closed_count ?? 0}`, 'ok');
         $('issueResultBox').style.display = 'block';
         $('issueResultBox').textContent = JSON.stringify({ payload, response: data }, null, 2);
-        await Promise.all([loadStudents(), loadAssignments()]);
+        await Promise.all([loadStudents(), loadAssignments(), loadTestOverview(state.selectedTestSetId)]);
+        renderSelectedTest();
       } catch (err) {
         setStatus('issueStatus', normalizeError(err), 'error');
         $('issueResultBox').style.display = 'block';
@@ -788,6 +927,9 @@
       $('testGradeFilter').value = '';
       $('testTitleFilter').value = '';
       $('testSourceFilter').value = '';
+      $('testPurposeFilter').value = '';
+      $('testActiveOnly').checked = true;
+      clearSelectedTest();
       loadTestSets();
     }
 
@@ -805,6 +947,13 @@
       $('issueAssignmentsBtn').addEventListener('click', issueAssignments);
       $('footerIssueBtn').addEventListener('click', issueAssignments);
       $('clearSelectedStudentsBtn').addEventListener('click', clearSelectedStudents);
+      $('purposeSelect').addEventListener('change', async () => {
+        if (state.selectedTestSetId) {
+          await loadTestOverview(state.selectedTestSetId);
+          renderSelectedTest();
+        }
+        await loadAssignments();
+      });
       $('selectAllStudents').addEventListener('change', (e) => {
         if (e.target.checked) state.students.forEach(s => state.selectedStudentIds.add(s.student_id));
         else state.selectedStudentIds.clear();
@@ -816,7 +965,8 @@
       });
       $('filterOpenOnly').addEventListener('change', loadAssignments);
       $('filterCurrentTestOnly').addEventListener('change', loadAssignments);
-      $('studentSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadStudents(); });
+      $('studentNameSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadStudents(); });
+      $('studentCodeSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadStudents(); });
       $('testTitleFilter').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadTestSets(); });
     }
 
@@ -826,8 +976,7 @@
       updateSelectionUi();
       updateSummaryCards();
       updateFooter();
-      $('issueTestTitle').textContent = '-';
-      $('footerTestTitle').textContent = '-';
+      renderSelectedTest();
     }
 
     init();
