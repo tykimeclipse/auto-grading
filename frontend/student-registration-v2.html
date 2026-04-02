@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>학생 등록 v3</title>
+  <title>학생 등록 v4</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
@@ -225,13 +225,9 @@
             <div class="help">학생 등록 직후 활성 수강과정으로 연결할 강좌를 선택합니다.</div>
           </div>
           <div class="field">
-            <label for="enrollmentType">상태</label>
-            <select id="enrollmentType">
-              <option value="정규">정규</option>
-              <option value="내신">내신</option>
-              <option value="과외">과외</option>
-            </select>
-            <div class="help">student_courses.enrollment_type 값으로 저장됩니다.</div>
+            <label for="courseTypeDisplay">과정 구분</label>
+            <input id="courseTypeDisplay" type="text" readonly placeholder="강좌 선택 시 자동 표시" />
+            <div class="help">선택한 강좌의 <code>course_type</code>을 표시합니다. 별도 입력하지 않습니다.</div>
           </div>
         </div>
 
@@ -244,7 +240,7 @@
         <div id="formStatus" class="status"></div>
 
         <div class="disabled-box">
-          학생 기본정보는 <code>students</code>에 저장하고, 선택한 강좌/상태는 <code>student_courses</code>에 활성 수강과정으로 함께 연결합니다.
+          학생 기본정보는 <code>students</code>에 저장하고, 선택한 강좌는 <code>student_courses</code>에 활성 수강과정으로 함께 연결합니다. 과정 구분은 강좌의 <code>course_type</code>을 기준으로 표시합니다.
         </div>
       </section>
 
@@ -386,7 +382,18 @@
 
     function courseLabel(course) {
       if (!course) return '-';
-      return course.course_name || course.course_code || '-';
+      const base = course.course_name || course.course_code || '-';
+      return course.course_type ? `${base} (${course.course_type})` : base;
+    }
+
+    function getCourseById(courseId) {
+      return state.courses.find(c => c.course_id === courseId) || null;
+    }
+
+    function updateCourseTypeDisplay() {
+      const courseId = $('courseId').value;
+      const course = getCourseById(courseId);
+      $('courseTypeDisplay').value = course?.course_type || '';
     }
 
     function populateCourseOptions() {
@@ -415,7 +422,7 @@
           <td>${escapeHtml(s.student_code || '')}</td>
           <td>${escapeHtml(s.name || '')}</td>
           <td>${escapeHtml(s.grade_level || '')}</td>
-          <td>${escapeHtml(s.course_names || '-')}<div class="muted">${escapeHtml(s.enrollment_types || '-')}</div></td>
+          <td>${escapeHtml(s.course_names || '-')}<div class="muted">${escapeHtml(s.course_types || '-')}</div></td>
           <td>${s.is_active === false ? '<span class="badge" style="background:#fef2f2;color:#991b1b;">비활성</span>' : '<span class="badge">활성</span>'}</td>
           <td>${escapeHtml(formatDate(s.created_at))}</td>
         </tr>
@@ -469,7 +476,7 @@
       const { data: links, error: linksError } = await client
         .schema('auto_grading')
         .from('student_courses')
-        .select('student_id, course_id, enrollment_type, is_active, courses(course_name, course_code)')
+        .select('student_id, course_id, is_active, courses(course_name, course_code, course_type)')
         .eq('is_active', true);
 
       if (linksError) throw linksError;
@@ -487,7 +494,7 @@
           ...student,
           active_course_ids: activeLinks.map(link => link.course_id).filter(Boolean),
           course_names: activeLinks.map(link => courseLabel(link.courses)).filter(Boolean).join(', '),
-          enrollment_types: [...new Set(activeLinks.map(link => link.enrollment_type).filter(Boolean))].join(', ')
+          course_types: [...new Set(activeLinks.map(link => link.courses?.course_type).filter(Boolean))].join(', ')
         };
       });
       state.nextCode = calcNextCode(state.students);
@@ -536,7 +543,6 @@ ${names.join('\n')}`);
       const name = $('studentName').value.trim();
       const grade_level = $('gradeLevel').value;
       const course_id = $('courseId').value || null;
-      const enrollment_type = $('enrollmentType').value || '정규';
 
       if (!/^\d{3}$/.test(student_code) || Number(student_code) < 101) {
         throw new Error('student_code는 101 이상 3자리 숫자여야 합니다.');
@@ -587,7 +593,6 @@ ${names.join('\n')}`);
             .insert({
               student_id: data.id,
               course_id,
-              enrollment_type,
               is_active: true
             });
 
@@ -601,7 +606,7 @@ ${names.join('\n')}`);
       $('studentName').value = '';
       $('gradeLevel').value = '';
       $('courseId').value = '';
-      $('enrollmentType').value = '정규';
+      $('courseTypeDisplay').value = '';
       await Promise.all([loadCourses(), loadStudents()]);
 
       showStatus(
@@ -624,7 +629,7 @@ ${names.join('\n')}`);
       $('studentName').value = '';
       $('gradeLevel').value = '';
       $('courseId').value = '';
-      $('enrollmentType').value = '정규';
+      $('courseTypeDisplay').value = '';
       clearStatus($('formStatus'));
       $('studentName').focus();
     }
@@ -668,6 +673,7 @@ ${names.join('\n')}`);
       });
     });
 
+    $('courseId').addEventListener('change', updateCourseTypeDisplay);
     $('clearBtn').addEventListener('click', clearForm);
     $('searchInput').addEventListener('input', applyFilters);
     $('gradeFilter').addEventListener('change', applyFilters);
