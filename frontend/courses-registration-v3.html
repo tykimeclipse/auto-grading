@@ -308,16 +308,6 @@
             <label for="endDate">종료일</label>
             <input id="endDate" type="date" />
           </div>
-          <div class="field">
-            <label for="courseType">수강형태</label>
-            <select id="courseType">
-              <option value="">선택</option>
-              <option value="과외">과외</option>
-              <option value="학원">학원</option>
-              <option value="내신">내신</option>
-              <option value="특강">특강</option>
-            </select>
-          </div>
           <div class="field wide">
             <label for="note">기타</label>
             <textarea id="note" placeholder="과정 소개, 필요 참고서, 운영 메모 등을 적습니다."></textarea>
@@ -345,10 +335,6 @@
           <div class="summary-item">
             <div class="k">기간</div>
             <div id="summaryDates" class="v">-</div>
-          </div>
-          <div class="summary-item">
-            <div class="k">수강형태</div>
-            <div id="summaryType" class="v">-</div>
           </div>
           <div class="summary-item">
             <div class="k">기타</div>
@@ -394,13 +380,12 @@
               <th>제목</th>
               <th>개설년도</th>
               <th>기간</th>
-              <th>수강형태</th>
               <th>활성</th>
               <th>기타</th>
             </tr>
           </thead>
           <tbody id="courseTableBody">
-            <tr><td colspan="9" class="muted">아직 조회된 데이터가 없습니다.</td></tr>
+            <tr><td colspan="8" class="muted">아직 조회된 데이터가 없습니다.</td></tr>
           </tbody>
         </table>
       </div>
@@ -487,13 +472,11 @@
       const noPreview = $("courseNoPreview").value.trim() || "저장 후 확정";
       const startDate = $("startDate").value || "-";
       const endDate = $("endDate").value || "-";
-      const courseType = $("courseType").value || "-";
       const note = $("note").value.trim() || "-";
 
       $("summaryName").textContent = courseName;
       $("summaryYearNo").textContent = `${openYear} / ${noPreview}`;
       $("summaryDates").textContent = `${startDate} ~ ${endDate}`;
-      $("summaryType").textContent = courseType;
       $("summaryNote").textContent = note;
     }
 
@@ -540,7 +523,6 @@
       const openYear = $("openYear").value.trim();
       const startDate = $("startDate").value || null;
       const endDate = $("endDate").value || null;
-      const courseType = $("courseType").value || null;
       const note = $("note").value.trim() || null;
 
       if (!courseName) throw new Error("제목을 입력해 주세요.");
@@ -551,7 +533,7 @@
         p_open_year: Number(openYear),
         p_start_date: startDate,
         p_end_date: endDate,
-        p_course_type: courseType,
+        p_course_type: null,
         p_note: note
       };
     }
@@ -635,7 +617,7 @@
     function renderCourseTable() {
       const body = $("courseTableBody");
       if (!state.courses.length) {
-        body.innerHTML = '<tr><td colspan="9" class="muted">조회 결과가 없습니다.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="muted">조회 결과가 없습니다.</td></tr>';
         return;
       }
 
@@ -647,7 +629,6 @@
           <td><strong>${escapeHtml(row.course_name ?? "-")}</strong></td>
           <td>${escapeHtml(row.open_year ?? "-")}</td>
           <td>${escapeHtml(row.start_date ?? "-")} ~ ${escapeHtml(row.end_date ?? "-")}</td>
-          <td>${escapeHtml(row.course_type ?? "-")}</td>
           <td>${row.is_active ? "Y" : "N"}</td>
           <td>${escapeHtml(row.note ?? "-")}</td>
         </tr>
@@ -709,7 +690,6 @@
       $("openYear").value = "2026";
       $("startDate").value = "";
       $("endDate").value = "";
-      $("courseType").value = "";
       $("note").value = "";
       if (clearStatus) {
         setStatus("formStatus", "", "info");
@@ -742,7 +722,7 @@
         } catch (_) {}
       });
 
-      ["courseName", "openYear", "startDate", "endDate", "courseType", "note"].forEach((id) => {
+      ["courseName", "openYear", "startDate", "endDate", "note"].forEach((id) => {
         $(id).addEventListener("input", updateSummary);
         $(id).addEventListener("change", updateSummary);
       });

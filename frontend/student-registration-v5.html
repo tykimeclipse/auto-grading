@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>학생 등록 v7</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --line: #d9deea;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-weak: #dbeafe;
+      --danger: #dc2626;
+      --ok: #059669;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header { margin-bottom: 16px; }
+    .header h1 { margin: 0 0 6px; font-size: 28px; }
+    .header p { margin: 0; color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    .section-note {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 15px;
+      background: #fff;
+    }
+    .field input[readonly] {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .help {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-secondary { background: #eef2ff; color: #3730a3; }
+    .btn-ghost { background: #f3f4f6; color: #374151; }
+    .btn-danger { background: var(--danger); color: white; }
+    .checkbox-cell { width: 42px; text-align: center; }
+    .select-all-wrap { display:flex; align-items:center; gap:8px; }
+    .status {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      display: none;
+      white-space: pre-wrap;
+    }
+    .status.show { display: block; }
+    .status.ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .status.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .status.info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .chip {
+      background: var(--primary-weak);
+      color: #1d4ed8;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    th, td {
+      border-bottom: 1px solid #edf0f6;
+      padding: 10px 8px;
+      text-align: left;
+      vertical-align: middle;
+    }
+    th { color: var(--muted); font-size: 13px; }
+    .muted { color: var(--muted); }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #ecfeff;
+      color: #155e75;
+    }
+    .disabled-box {
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px dashed #cbd5e1;
+      background: #f8fafc;
+      border-radius: 12px;
+      color: #475569;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    @media (max-width: 860px) {
+      .grid, .row { grid-template-columns: 1fr; }
+      .wrap { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>학생 등록</h1>
+      <p>현재 DB 구조에 맞춘 최소 등록 페이지입니다. 학생코드는 101부터 순차 자동 제안됩니다.</p>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>등록</h2>
+        <p class="section-note">필수 입력은 학생이름, 학년뿐입니다. 학생코드는 목록 기준으로 다음 번호가 자동 제안됩니다.</p>
+
+        <div class="field">
+          <label for="supabaseUrl">Supabase URL</label>
+          <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
+        </div>
+        <div class="field">
+          <label for="supabaseKey">Supabase Anon Key</label>
+          <input id="supabaseKey" type="password" placeholder="eyJ..." />
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="studentCode">student_code</label>
+            <input id="studentCode" type="text" readonly />
+            <div class="help">자동 발급. 101부터 시작하는 3자리 숫자 문자열 규칙.</div>
+          </div>
+          <div class="field">
+            <label for="gradeLevel">학년</label>
+            <select id="gradeLevel">
+              <option value="">선택</option>
+              <option value="E1">초1</option>
+              <option value="E2">초2</option>
+              <option value="E3">초3</option>
+              <option value="E4">초4</option>
+              <option value="E5">초5</option>
+              <option value="E6">초6</option>
+              <option value="M1">중1</option>
+              <option value="M2">중2</option>
+              <option value="M3">중3</option>
+              <option value="H1">고1</option>
+              <option value="H2">고2</option>
+              <option value="H3">고3</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="studentName">학생 이름</label>
+          <input id="studentName" type="text" placeholder="예: 김도윤" />
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="courseId">강좌</label>
+            <select id="courseId">
+              <option value="">선택 안 함</option>
+            </select>
+            <div class="help">학생 등록 직후 활성 수강과정으로 연결할 강좌를 선택합니다.</div>
+          </div>
+          <div class="field">
+            <label for="studentCourseType">수강 형태</label>
+            <select id="studentCourseType" disabled>
+              <option value="학원">학원</option>
+              <option value="과외">과외</option>
+              <option value="내신">내신</option>
+              <option value="특강">특강</option>
+            </select>
+            <div class="help">강좌를 선택하면 활성화됩니다. <code>student_courses.student_course_type</code> 값으로 저장되며, 강좌 자체 속성이 아니라 학생-수강과정 관계 변수입니다.</div>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <button id="connectBtn" class="btn-secondary">연결 및 목록 불러오기</button>
+          <button id="createBtn" class="btn-primary">학생 등록</button>
+          <button id="clearBtn" class="btn-ghost">입력 초기화</button>
+        </div>
+
+        <div id="formStatus" class="status"></div>
+
+        <div class="disabled-box">
+          학생 기본정보는 <code>students</code>에 저장하고, 선택한 강좌와 수강 형태는 <code>student_courses</code>에 활성 수강과정으로 함께 연결합니다. 수강 형태는 강좌 자체 속성이 아니라 학생-수강과정 관계 속성입니다.
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>학생 목록</h2>
+        <div class="chips">
+          <div class="chip">다음 student_code: <span id="nextCodeChip">101</span></div>
+          <div class="chip">총 학생수: <span id="totalCountChip">0</span></div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="searchInput">검색</label>
+            <input id="searchInput" type="text" placeholder="학생코드 또는 이름" />
+          </div>
+          <div class="field">
+            <label for="gradeFilter">학년 필터</label>
+            <select id="gradeFilter">
+              <option value="">전체</option>
+              <option value="E1">초1</option>
+              <option value="E2">초2</option>
+              <option value="E3">초3</option>
+              <option value="E4">초4</option>
+              <option value="E5">초5</option>
+              <option value="E6">초6</option>
+              <option value="M1">중1</option>
+              <option value="M2">중2</option>
+              <option value="M3">중3</option>
+              <option value="H1">고1</option>
+              <option value="H2">고2</option>
+              <option value="H3">고3</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="courseFilter">강좌 필터</label>
+          <select id="courseFilter">
+            <option value="">전체</option>
+          </select>
+          <div class="help">현재 활성 수강과정 기준으로 필터링합니다.</div>
+        </div>
+
+        <div class="toolbar">
+          <button id="refreshBtn" class="btn-secondary">목록 새로고침</button>
+          <button id="deleteBtn" class="btn-danger">선택 삭제</button>
+        </div>
+
+        <div id="listStatus" class="status"></div>
+
+        <table>
+          <thead>
+            <tr>
+              <th class="checkbox-cell"><span class="select-all-wrap"><input id="selectAll" type="checkbox" /></span></th>
+              <th>학생코드</th>
+              <th>이름</th>
+              <th>학년</th>
+              <th>강좌</th>
+              <th>과정구분</th>
+              <th>활성</th>
+            </tr>
+          </thead>
+          <tbody id="studentTableBody">
+            <tr><td colspan="7" class="muted">연결 후 목록을 불러오세요.</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'ag_student_registration_v5_config';
+    const state = {
+      supabase: null,
+      students: [],
+      filtered: [],
+      nextCode: '101',
+      courses: []
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function saveConfig() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        url: $('supabaseUrl').value.trim(),
+        key: $('supabaseKey').value.trim()
+      }));
+    }
+
+    function loadConfig() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const cfg = JSON.parse(raw);
+        $('supabaseUrl').value = cfg.url || '';
+        $('supabaseKey').value = cfg.key || '';
+      } catch (e) {}
+    }
+
+    function showStatus(el, type, message) {
+      el.className = `status show ${type}`;
+      el.textContent = message;
+    }
+
+    function clearStatus(el) {
+      el.className = 'status';
+      el.textContent = '';
+    }
+
+    function makeClient() {
+      const url = $('supabaseUrl').value.trim();
+      const key = $('supabaseKey').value.trim();
+      if (!url || !key) {
+        throw new Error('Supabase URL과 Anon Key를 입력해 주세요.');
+      }
+      saveConfig();
+      state.supabase = window.supabase.createClient(url, key);
+      return state.supabase;
+    }
+
+    function calcNextCode(students) {
+      const used = new Set(
+        students
+          .map(s => parseInt(String(s.student_code || '').trim(), 10))
+          .filter(n => Number.isInteger(n) && n >= 101 && n <= 999)
+      );
+
+      for (let n = 101; n <= 999; n += 1) {
+        if (!used.has(n)) return String(n);
+      }
+
+      throw new Error('student_code 자동 발급 범위를 초과했습니다. 운영 규칙 확장이 필요합니다.');
+    }
+
+    function formatDate(v) {
+      if (!v) return '-';
+      try { return new Date(v).toLocaleString('ko-KR'); } catch (_) { return v; }
+    }
+
+    function courseLabel(course) {
+      if (!course) return '-';
+      return course.course_name || course.course_code || '-';
+    }
+
+    function toggleStudentCourseTypeField() {
+      const hasCourse = Boolean($('courseId').value);
+      $('studentCourseType').disabled = !hasCourse;
+      if (!hasCourse) {
+        $('studentCourseType').value = '학원';
+      }
+    }
+
+
+    function populateCourseOptions() {
+      const options = state.courses
+        .map(c => `<option value="${escapeHtml(c.course_id)}">${escapeHtml(courseLabel(c))}</option>`)
+        .join('');
+      $('courseId').innerHTML = '<option value="">선택 안 함</option>' + options;
+      $('courseFilter').innerHTML = '<option value="">전체</option>' + options;
+      toggleStudentCourseTypeField();
+    }
+
+    function renderTable() {
+      const body = $('studentTableBody');
+      const rows = state.filtered;
+      $('totalCountChip').textContent = String(state.students.length);
+      $('nextCodeChip').textContent = state.nextCode;
+      $('studentCode').value = state.nextCode;
+
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="7" class="muted">조건에 맞는 학생이 없습니다.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = rows.map(s => `
+        <tr>
+          <td class="checkbox-cell"><input class="row-check" type="checkbox" value="${escapeHtml(s.id || '')}" /></td>
+          <td>${escapeHtml(s.student_code || '')}</td>
+          <td>${escapeHtml(s.name || '')}</td>
+          <td>${escapeHtml(s.grade_level || '')}</td>
+          <td>${escapeHtml(s.course_names || '-')}</td>
+          <td>${escapeHtml(s.student_course_types || '-')}</td>
+          <td>${s.is_active === false ? '<span class="badge" style="background:#fef2f2;color:#991b1b;">비활성</span>' : '<span class="badge">활성</span>'}</td>
+        </tr>
+      `).join('');
+
+      const selectAll = $('selectAll');
+      if (selectAll) selectAll.checked = false;
+    }
+
+    function applyFilters() {
+      const q = $('searchInput').value.trim().toLowerCase();
+      const grade = $('gradeFilter').value;
+      const courseId = $('courseFilter').value;
+      state.filtered = state.students.filter(s => {
+        const hitQ = !q || String(s.student_code || '').toLowerCase().includes(q) || String(s.name || '').toLowerCase().includes(q);
+        const hitGrade = !grade || s.grade_level === grade;
+        const hitCourse = !courseId || (Array.isArray(s.active_course_ids) && s.active_course_ids.includes(courseId));
+        return hitQ && hitGrade && hitCourse;
+      });
+      renderTable();
+    }
+
+    async function loadCourses() {
+      const client = state.supabase || makeClient();
+      const { data, error } = await client
+        .schema('auto_grading')
+        .rpc('teacher_list_course_catalog', {
+          p_search: null,
+          p_only_active: true,
+          p_limit: 200,
+          p_offset: 0
+        });
+
+      if (error) throw error;
+      state.courses = Array.isArray(data) ? data : [];
+      populateCourseOptions();
+    }
+
+    async function loadStudents() {
+      const client = state.supabase || makeClient();
+      clearStatus($('listStatus'));
+      showStatus($('listStatus'), 'info', '학생 목록을 불러오는 중입니다...');
+
+      const { data, error } = await client
+        .schema('auto_grading')
+        .from('students')
+        .select('id, student_code, name, grade_level, is_active, created_at, updated_at, student_no')
+        .order('student_code', { ascending: true });
+
+      if (error) throw error;
+      const { data: links, error: linksError } = await client
+        .schema('auto_grading')
+        .from('student_courses')
+        .select('student_id, course_id, student_course_type, is_active, courses(course_name, course_code)')
+        .eq('is_active', true);
+
+      if (linksError) throw linksError;
+
+      const byStudent = new Map();
+      (links || []).forEach(link => {
+        const list = byStudent.get(link.student_id) || [];
+        list.push(link);
+        byStudent.set(link.student_id, list);
+      });
+
+      state.students = (data || []).map(student => {
+        const activeLinks = byStudent.get(student.id) || [];
+        return {
+          ...student,
+          active_course_ids: activeLinks.map(link => link.course_id).filter(Boolean),
+          course_names: activeLinks.map(link => courseLabel(link.courses)).filter(Boolean).join(', '),
+          student_course_types: [...new Set(activeLinks.map(link => link.student_course_type).filter(Boolean))].join(', ')
+        };
+      });
+      state.nextCode = calcNextCode(state.students);
+      applyFilters();
+      showStatus($('listStatus'), 'ok', `학생 ${state.students.length}명을 불러왔습니다.`);
+    }
+
+    function getSelectedIds() {
+      return Array.from(document.querySelectorAll('.row-check:checked')).map(el => el.value).filter(Boolean);
+    }
+
+    async function deleteSelectedStudents() {
+      const client = state.supabase || makeClient();
+      clearStatus($('listStatus'));
+
+      const ids = getSelectedIds();
+      if (!ids.length) {
+        throw new Error('삭제할 학생을 먼저 선택해 주세요.');
+      }
+
+      const names = state.filtered.filter(s => ids.includes(s.id)).map(s => `${s.student_code} ${s.name}`);
+      const confirmed = window.confirm(`선택한 학생 ${ids.length}명을 삭제할까요?
+
+${names.join('\n')}`);
+      if (!confirmed) return;
+
+      showStatus($('listStatus'), 'info', `학생 ${ids.length}명을 삭제하는 중입니다...`);
+
+      const { error } = await client
+        .schema('auto_grading')
+        .from('students')
+        .delete()
+        .in('id', ids);
+
+      if (error) throw error;
+
+      await loadStudents();
+      showStatus($('listStatus'), 'ok', `학생 ${ids.length}명을 삭제했습니다.`);
+    }
+
+    async function createStudent() {
+      const client = state.supabase || makeClient();
+      clearStatus($('formStatus'));
+
+      const student_code = $('studentCode').value.trim();
+      const name = $('studentName').value.trim();
+      const grade_level = $('gradeLevel').value;
+      const course_id = $('courseId').value || null;
+      const student_course_type = $('studentCourseType').value || '학원';
+
+      if (!/^\d{3}$/.test(student_code) || Number(student_code) < 101) {
+        throw new Error('student_code는 101 이상 3자리 숫자여야 합니다.');
+      }
+      if (!name) {
+        throw new Error('학생 이름을 입력해 주세요.');
+      }
+      if (!grade_level) {
+        throw new Error('학년을 선택해 주세요.');
+      }
+      if (course_id && !student_course_type) {
+        throw new Error('수강 형태를 선택해 주세요.');
+      }
+
+      showStatus($('formStatus'), 'info', '학생을 등록하는 중입니다...');
+
+      const { data: dup, error: dupError } = await client
+        .schema('auto_grading')
+        .from('students')
+        .select('id, student_code')
+        .eq('student_code', student_code)
+        .maybeSingle();
+
+      if (dupError) throw dupError;
+      if (dup) {
+        throw new Error(`이미 사용 중인 student_code입니다: ${student_code}`);
+      }
+
+      const payload = {
+        student_code,
+        name,
+        grade_level,
+        is_active: true,
+        student_no: Number(student_code)
+      };
+
+      const { data, error } = await client
+        .schema('auto_grading')
+        .from('students')
+        .insert(payload)
+        .select('id, student_code, name, grade_level, is_active, created_at')
+        .single();
+
+      if (error) throw error;
+
+      try {
+        if (course_id) {
+          const { error: courseLinkError } = await client
+            .schema('auto_grading')
+            .from('student_courses')
+            .insert({
+              student_id: data.id,
+              course_id,
+              student_course_type,
+              is_active: true
+            });
+
+          if (courseLinkError) throw courseLinkError;
+        }
+      } catch (linkErr) {
+        await client.schema('auto_grading').from('students').delete().eq('id', data.id);
+        throw linkErr;
+      }
+
+      $('studentName').value = '';
+      $('gradeLevel').value = '';
+      $('courseId').value = '';
+      $('studentCourseType').value = '학원';
+      toggleStudentCourseTypeField();
+      await Promise.all([loadCourses(), loadStudents()]);
+
+      showStatus(
+        $('formStatus'),
+        'ok',
+        `학생 등록 완료\n- student_code: ${data.student_code}\n- 이름: ${data.name}\n- 학년: ${data.grade_level}${course_id ? `\n- 강좌 연결: 완료\n- 수강 형태: ${student_course_type}` : ''}`
+      );
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function clearForm() {
+      $('studentName').value = '';
+      $('gradeLevel').value = '';
+      $('courseId').value = '';
+      $('studentCourseType').value = '학원';
+      toggleStudentCourseTypeField();
+      clearStatus($('formStatus'));
+      $('studentName').focus();
+    }
+
+    $('connectBtn').addEventListener('click', async () => {
+      try {
+        makeClient();
+        await Promise.all([loadCourses(), loadStudents()]);
+      } catch (e) {
+        showStatus($('listStatus'), 'error', e.message || String(e));
+      }
+    });
+
+    $('createBtn').addEventListener('click', async () => {
+      try {
+        await createStudent();
+      } catch (e) {
+        showStatus($('formStatus'), 'error', e.message || String(e));
+      }
+    });
+
+    $('refreshBtn').addEventListener('click', async () => {
+      try {
+        await Promise.all([loadCourses(), loadStudents()]);
+      } catch (e) {
+        showStatus($('listStatus'), 'error', e.message || String(e));
+      }
+    });
+
+    $('deleteBtn').addEventListener('click', async () => {
+      try {
+        await deleteSelectedStudents();
+      } catch (e) {
+        showStatus($('listStatus'), 'error', e.message || String(e));
+      }
+    });
+
+    $('selectAll').addEventListener('change', (e) => {
+      document.querySelectorAll('.row-check').forEach(el => {
+        el.checked = e.target.checked;
+      });
+    });
+
+    $('courseId').addEventListener('change', toggleStudentCourseTypeField);
+    $('clearBtn').addEventListener('click', clearForm);
+    $('searchInput').addEventListener('input', applyFilters);
+    $('gradeFilter').addEventListener('change', applyFilters);
+    $('courseFilter').addEventListener('change', applyFilters);
+
+    loadConfig();
+    toggleStudentCourseTypeField();
+    renderTable();
+  </script>
+</body>
+</html>
