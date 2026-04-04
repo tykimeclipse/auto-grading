@@ -411,7 +411,7 @@
       selectedStudentIds: new Set(),
       assignments: [],
       courses: [],
-      studentCourseTypes: [],
+      studentCourseTypes: ['과외', '학원', '내신', '특강'],
       studentGrades: []
     };
 
@@ -499,6 +499,7 @@
 
     function mapStudentCourseType(v) {
       if (!v) return '-';
+      if (v === '정규') return '학원';
       return String(v);
     }
 
@@ -552,13 +553,6 @@
       $('studentGradeFilter').innerHTML = '<option value="">전체</option>' + state.studentGrades.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
       if (gradeCur && state.studentGrades.includes(gradeCur)) $('studentGradeFilter').value = gradeCur;
 
-      const { data: scData, error: scError } = await state.supabase
-        .schema('auto_grading')
-        .from('student_courses')
-        .select('student_course_type')
-        .not('student_course_type', 'is', null);
-      if (scError) throw scError;
-      state.studentCourseTypes = [...new Set((scData || []).map(r => r.student_course_type).filter(Boolean))].sort();
       const cur = $('serviceTypeFilter').value;
       $('serviceTypeFilter').innerHTML = '<option value="">전체</option>' + state.studentCourseTypes.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(mapStudentCourseType(v))}</option>`).join('');
       if (cur && state.studentCourseTypes.includes(cur)) $('serviceTypeFilter').value = cur;
@@ -745,9 +739,10 @@
 
     function studentCourseTypeBadge(v) {
       if (!v) return '<span class="tag gray">-</span>';
-      if (v === '과외') return '<span class="tag green">과외</span>';
-      if (v === '학원') return '<span class="tag">학원</span>';
-      return `<span class="tag">${escapeHtml(mapStudentCourseType(v))}</span>`;
+      const normalized = mapStudentCourseType(v);
+      if (normalized === '과외') return '<span class="tag green">과외</span>';
+      if (normalized === '학원') return '<span class="tag">학원</span>';
+      return `<span class="tag">${escapeHtml(normalized)}</span>`;
     }
 
     function renderStudentTable() {

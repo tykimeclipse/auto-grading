@@ -114,14 +114,24 @@ with sc_base as (
       ''
     ) as service_type,
     nullif(
-      coalesce(
-        to_jsonb(sc)->>'student_course_type',
-        to_jsonb(sc)->>'enrollment_type',
-        to_jsonb(sc)->>'course_type',
-        to_jsonb(sc)->>'study_type',
-        to_jsonb(sc)->>'kind',
-        ''
-      ),
+      case
+        when coalesce(
+          to_jsonb(sc)->>'student_course_type',
+          to_jsonb(sc)->>'enrollment_type',
+          to_jsonb(sc)->>'course_type',
+          to_jsonb(sc)->>'study_type',
+          to_jsonb(sc)->>'kind',
+          ''
+        ) = '정규' then '학원'
+        else coalesce(
+          to_jsonb(sc)->>'student_course_type',
+          to_jsonb(sc)->>'enrollment_type',
+          to_jsonb(sc)->>'course_type',
+          to_jsonb(sc)->>'study_type',
+          to_jsonb(sc)->>'kind',
+          ''
+        )
+      end,
       ''
     ) as student_course_type,
     nullif(
