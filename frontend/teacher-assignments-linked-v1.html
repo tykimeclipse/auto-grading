@@ -411,7 +411,7 @@
       selectedStudentIds: new Set(),
       assignments: [],
       courses: [],
-      serviceTypes: [],
+      studentCourseTypes: [],
       studentGrades: []
     };
 
@@ -497,10 +497,8 @@
       return $('testPurposeFilter').value || null;
     }
 
-    function mapServiceType(v) {
+    function mapStudentCourseType(v) {
       if (!v) return '-';
-      if (v === 'academy') return '학원';
-      if (v === 'tutoring') return '과외';
       return String(v);
     }
 
@@ -557,13 +555,13 @@
       const { data: scData, error: scError } = await state.supabase
         .schema('auto_grading')
         .from('student_courses')
-        .select('service_type')
-        .not('service_type', 'is', null);
+        .select('student_course_type')
+        .not('student_course_type', 'is', null);
       if (scError) throw scError;
-      state.serviceTypes = [...new Set((scData || []).map(r => r.service_type).filter(Boolean))].sort();
+      state.studentCourseTypes = [...new Set((scData || []).map(r => r.student_course_type).filter(Boolean))].sort();
       const cur = $('serviceTypeFilter').value;
-      $('serviceTypeFilter').innerHTML = '<option value="">전체</option>' + state.serviceTypes.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(mapServiceType(v))}</option>`).join('');
-      if (cur && state.serviceTypes.includes(cur)) $('serviceTypeFilter').value = cur;
+      $('serviceTypeFilter').innerHTML = '<option value="">전체</option>' + state.studentCourseTypes.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(mapStudentCourseType(v))}</option>`).join('');
+      if (cur && state.studentCourseTypes.includes(cur)) $('serviceTypeFilter').value = cur;
     }
 
     async function loadTestSets() {
@@ -714,8 +712,8 @@
           p_test_set_id: state.selectedTestSetId,
           p_search: [nameSearch, codeSearch].filter(Boolean).join(' ') || null,
           p_grade: $('studentGradeFilter').value || null,
-          p_service_type: $('serviceTypeFilter').value || null,
-          p_enrollment_type: null,
+          p_service_type: null,
+          p_enrollment_type: $('serviceTypeFilter').value || null,
           p_only_active: $('onlyActiveStudents').checked,
           p_only_not_assigned: $('onlyNotAssignedStudents').checked,
           p_limit: 100,
@@ -745,11 +743,11 @@
       return '<span class="tag gray">없음</span>';
     }
 
-    function serviceBadge(v) {
+    function studentCourseTypeBadge(v) {
       if (!v) return '<span class="tag gray">-</span>';
-      if (v === 'tutoring') return '<span class="tag green">과외</span>';
-      if (v === 'academy') return '<span class="tag">학원</span>';
-      return `<span class="tag">${escapeHtml(mapServiceType(v))}</span>`;
+      if (v === '과외') return '<span class="tag green">과외</span>';
+      if (v === '학원') return '<span class="tag">학원</span>';
+      return `<span class="tag">${escapeHtml(mapStudentCourseType(v))}</span>`;
     }
 
     function renderStudentTable() {
@@ -766,7 +764,7 @@
           <td>${escapeHtml(row.student_code || '-')}</td>
           <td>${escapeHtml(row.student_grade || '-')}</td>
           <td>${escapeHtml(row.course_name || '-')}</td>
-          <td>${serviceBadge(row.service_type)}</td>
+          <td>${studentCourseTypeBadge(row.student_course_type)}</td>
           <td>${escapeHtml(row.course_active_assignment_count ?? row.active_assignment_count ?? 0)}</td>
           <td>${sameTestBadge(row)}</td>
           <td>${escapeHtml(fmtPercent(row.course_round2_avg))}</td>

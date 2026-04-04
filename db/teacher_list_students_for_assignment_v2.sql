@@ -1,4 +1,12 @@
-﻿-- =========================================================
+-- =========================================================
+-- v2) teacher_list_students_for_assignment
+-- 변경 목적
+-- - 학생 학년 표준 필드를 grade_level로 통일
+-- - student_grade 계산 및 p_grade 필터에서 grade_level 우선 사용
+-- - 구 필드(grade, school_grade, student_grade)는 fallback으로만 유지
+-- =========================================================
+
+-- =========================================================
 -- 0) student_courses에 service_type(academy/tutoring) 보강
 --    이미 있으면 그대로 통과
 -- =========================================================
@@ -19,7 +27,6 @@ create index if not exists idx_student_courses_service_type
 
 -- =========================================================
 -- 1) 기존 함수 제거
---    예전 9개 인자 버전 / 혹시 존재할 수 있는 10개 인자 버전 둘 다 정리
 -- =========================================================
 drop function if exists auto_grading.teacher_list_students_for_assignment(
   uuid, uuid, text, text, text, boolean, boolean, integer, integer
@@ -29,10 +36,9 @@ drop function if exists auto_grading.teacher_list_students_for_assignment(
 );
 
 -- =========================================================
--- 2) 학생 선택 영역용 RPC 최종본
---    수정 반영:
---    - same_test_assignment_id = 가장 최근 assignment
---    - student_scope dedupe (같은 student+course 중복 제거)
+-- 2) 학생 선택 영역용 RPC v2
+--    - student_course_type 우선
+--    - 학생 학년은 grade_level 우선
 -- =========================================================
 create function auto_grading.teacher_list_students_for_assignment(
   p_course_id uuid default null,
@@ -318,6 +324,7 @@ base as (
     ) as student_name,
     nullif(
       coalesce(
+        to_jsonb(s)->>'grade_level',
         to_jsonb(s)->>'grade',
         to_jsonb(s)->>'school_grade',
         to_jsonb(s)->>'student_grade',
@@ -370,6 +377,7 @@ base as (
       p_grade is null
       or nullif(
         coalesce(
+          to_jsonb(s)->>'grade_level',
           to_jsonb(s)->>'grade',
           to_jsonb(s)->>'school_grade',
           to_jsonb(s)->>'student_grade',
