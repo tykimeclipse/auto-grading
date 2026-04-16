@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>교사용 발행상황 관리 페이지</title>
+  <style>
+    :root {
+      --bg:#f6f7fb; --panel:#fff; --line:#d9deea; --text:#1e2430; --muted:#667085; --primary:#2f6fed;
+      --primary-soft:#edf3ff; --success:#0f9d58; --danger:#c43d3d; --warning:#b26b00; --chip:#eef2f7;
+      --shadow:0 10px 30px rgba(22,34,51,.08); --radius:16px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Pretendard","Noto Sans KR",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+    .page{max-width:1680px;margin:0 auto;padding:24px}
+    .page-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px;flex-wrap:wrap}
+    .title-wrap h1{margin:0;font-size:28px;line-height:1.2}
+    .title-wrap p{margin:8px 0 0;color:var(--muted);font-size:14px}
+    .top-summary{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;width:760px;max-width:100%}
+    .summary-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px}
+    .summary-card .label{display:block;font-size:12px;color:var(--muted);margin-bottom:8px}
+    .summary-card .value{font-size:24px;font-weight:700;letter-spacing:-.02em}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
+    .panel-header{padding:18px 20px 14px;border-bottom:1px solid var(--line);background:linear-gradient(to bottom,#fff,#fbfcff)}
+    .panel-header h2{margin:0;font-size:20px;line-height:1.2}
+    .panel-header p{margin:8px 0 0;color:var(--muted);font-size:13px}
+    .panel-body{padding:18px 20px 20px}
+    .search-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .field{display:grid;gap:6px}
+    .field label{font-size:12px;color:var(--muted);font-weight:600}
+    input[type="text"],input[type="number"],select,textarea{width:100%;min-height:42px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px;background:#fff;color:var(--text)}
+    textarea{min-height:76px}
+    .toolbar,.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .check-row{display:flex;gap:8px;flex-wrap:wrap;margin:0}
+    .chip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--chip);font-size:13px}
+    button{min-height:42px;border:0;border-radius:12px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-secondary{background:#eef2f7;color:var(--text);border:1px solid var(--line)}
+    .btn-ghost{background:#fff;color:var(--text);border:1px solid var(--line)}
+    .mini-btn{min-height:32px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:12px;font-weight:700;white-space:nowrap}
+    .mini-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    details{margin-bottom:16px}
+    summary{cursor:pointer;font-weight:700}
+    .status{margin-top:12px;padding:12px;border-radius:10px;font-size:14px;line-height:1.5;white-space:pre-line;display:none}
+    .status.ok{display:block;background:#ecfdf5;border:1px solid #a7f3d0;color:#0f766e}
+    .status.error{display:block;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
+    .status.info{display:block;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8}
+    .list-card{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff}
+    .list-head,.list-row{display:grid;grid-template-columns:82px minmax(210px,2fr) 92px 70px minmax(170px,1.35fr) 64px 110px 110px 110px 180px 92px;gap:8px;align-items:center;padding:12px 10px;font-size:13px}
+    .list-head{background:#f4f7fb;color:#48505e;font-size:12px;font-weight:700;border-bottom:1px solid var(--line)}
+    .list-row{border-bottom:1px solid #eef2f7}
+    .list-row:last-child{border-bottom:0}
+    .muted{color:var(--muted)}
+    .score-cell{font-weight:700}
+    .score-cell.blank{color:#b0b8c5;font-weight:500}
+    .link-box{display:flex;align-items:center;min-width:0}
+    .link-input{width:100%;min-height:32px;border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:11px;background:#fff;color:var(--text);overflow:hidden;text-overflow:ellipsis}
+    .toggle-wrap{display:flex;align-items:center;gap:8px}
+    .switch{position:relative;display:inline-block;width:46px;height:26px}
+    .switch input{opacity:0;width:0;height:0}
+    .slider{position:absolute;cursor:pointer;inset:0;background:#cdd5e1;transition:.2s;border-radius:999px}
+    .slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;top:3px;background:#fff;transition:.2s;border-radius:50%}
+    .switch input:checked + .slider{background:var(--primary)}
+    .switch input:checked + .slider:before{transform:translateX(20px)}
+    .editor-box{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .editor-box input{min-height:34px;padding:6px 8px}
+    .editor-box .mini-note{font-size:11px;color:var(--muted)}
+    .result-box{margin-top:12px;border:1px solid var(--line);background:#f8fafc;border-radius:10px;padding:12px;font-size:12px;overflow:auto;white-space:pre-wrap;max-height:260px}
+    @media (max-width:1400px){
+      .list-head,.list-row{min-width:1550px}
+      .list-card{overflow-x:auto}
+    }
+    @media (max-width:1100px){
+      .top-summary,.search-grid{grid-template-columns:1fr}
+      .page-header{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <details>
+      <summary>Supabase 연결 설정</summary>
+      <section class="panel" style="margin-top:12px;">
+        <div class="panel-body">
+          <div class="search-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="field" style="grid-column:1/-1;">
+              <label for="supabaseUrl">Supabase URL</label>
+              <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
+            </div>
+            <div class="field" style="grid-column:1/-1;">
+              <label for="supabaseAnonKey">Supabase Anon Key</label>
+              <textarea id="supabaseAnonKey" placeholder="eyJ..."></textarea>
+            </div>
+          </div>
+          <div class="toolbar">
+            <button id="saveConfigBtn" class="btn-secondary" type="button">연결정보 저장</button>
+            <button id="connectBtn" class="btn-primary" type="button">DB 연결 확인</button>
+          </div>
+          <div id="connectStatus" class="status info"></div>
+        </div>
+      </section>
+    </details>
+
+    <div class="page-header">
+      <div class="title-wrap">
+        <h1>교사용 발행상황 관리 페이지</h1>
+        <p>assignment 조회, 학생용 링크 복사, 1차/2차/최종 점수 확인, 교사 최종점수 입력, 열림 상태 토글을 한 화면에서 관리하는 초안입니다.</p>
+      </div>
+      <div class="top-summary">
+        <div class="summary-card"><span class="label">표시 중 assignment</span><div id="sumAssignments" class="value">0건</div></div>
+        <div class="summary-card"><span class="label">열림 assignment</span><div id="sumOpenAssignments" class="value">0건</div></div>
+        <div class="summary-card"><span class="label">최종 확정 완료</span><div id="sumTeacherFinal" class="value">0건</div></div>
+        <div class="summary-card"><span class="label">현재 선택 시험</span><div id="sumSelectedTest" class="value">전체</div></div>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>조회 조건</h2>
+        <p>수강과정, 시험, 학생명으로 범위를 좁힌 뒤 발행상황과 교사 최종점수를 관리합니다.</p>
+      </div>
+      <div class="panel-body">
+        <div class="search-grid">
+          <div class="field">
+            <label for="courseSelect">수강과정</label>
+            <select id="courseSelect"><option value="">전체</option></select>
+          </div>
+          <div class="field">
+            <label for="testSetSelect">시험</label>
+            <select id="testSetSelect"><option value="">전체</option></select>
+          </div>
+          <div class="field">
+            <label for="studentSearch">학생명/학생번호</label>
+            <input id="studentSearch" type="text" placeholder="예: 김동하 또는 101" />
+          </div>
+          <div class="field">
+            <label for="purposeSelect">용도</label>
+            <select id="purposeSelect">
+              <option value="">전체</option>
+              <option value="숙제">숙제</option>
+              <option value="클리닉">클리닉</option>
+              <option value="보충">보충</option>
+            </select>
+          </div>
+        </div>
+        <div class="toolbar" style="justify-content:space-between;">
+          <div class="check-row">
+            <label class="chip"><input id="filterOpenOnly" type="checkbox" checked /> 열림만 보기</label>
+          </div>
+          <div class="actions">
+            <button id="loadAssignmentsBtn" class="btn-primary" type="button">발행상황 불러오기</button>
+            <button id="resetFiltersBtn" class="btn-secondary" type="button">필터 초기화</button>
+          </div>
+        </div>
+        <div id="assignmentStatus" class="status info"></div>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top:20px;">
+      <div class="panel-header">
+        <h2>발행상황 관리</h2>
+        <p>빈 값은 모두 <strong>-</strong>로 표시합니다. 최종점수 수정은 정답수만 입력하면 퍼센트는 총 문항수 기준으로 자동 계산됩니다.</p>
+      </div>
+      <div class="panel-body">
+        <div class="list-card">
+          <div class="list-head">
+            <div>발행일</div>
+            <div>시험 제목</div>
+            <div>학생</div>
+            <div>학년</div>
+            <div>링크</div>
+            <div>복사</div>
+            <div>1차</div>
+            <div>2차</div>
+            <div>최종</div>
+            <div>최종점수 수정</div>
+            <div>열림</div>
+          </div>
+          <div id="assignmentListBody"></div>
+        </div>
+        <pre id="debugBox" class="result-box" style="display:none;"></pre>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const STORAGE_KEY = 'ag_assignment_supabase_config_v2';
+    const $ = (id) => document.getElementById(id);
+    const state = { supabase:null, courses:[], testSets:[], assignments:[], editingAssignmentId:null };
+    const GRADE_LABELS = { E1:'초1', E2:'초2', E3:'초3', E4:'초4', E5:'초5', E6:'초6', M1:'중1', M2:'중2', M3:'중3', H1:'고1', H2:'고2', H3:'고3' };
+
+    function setStatus(id, msg, type='info') {
+      const el = $(id); if (!el) return;
+      if (!msg) { el.style.display='none'; el.className='status info'; el.textContent=''; return; }
+      el.style.display='block'; el.className=`status ${type}`; el.textContent=msg;
+    }
+    function normalizeError(err){ if(!err) return '알 수 없는 오류가 발생했습니다.'; if(typeof err==='string') return err; return err.message || JSON.stringify(err); }
+    function escapeHtml(v){ return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
+    function gradeLabel(v){ return GRADE_LABELS[String(v)] || (v || '-'); }
+    function fmtDate(v){ if(!v) return '-'; const d=new Date(v); if(Number.isNaN(d.getTime())) return v; return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+    function saveConfig(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({ url:$('supabaseUrl').value.trim(), anonKey:$('supabaseAnonKey').value.trim() })); setStatus('connectStatus','연결정보를 저장했습니다.','ok'); }
+    function loadConfig(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return; const cfg=JSON.parse(raw); $('supabaseUrl').value=cfg.url||''; $('supabaseAnonKey').value=cfg.anonKey||''; }catch(_){}}
+    function createClientOrThrow(){ const url=$('supabaseUrl').value.trim(); const anonKey=$('supabaseAnonKey').value.trim(); if(!url||!anonKey) throw new Error('Supabase URL과 Anon Key를 먼저 입력해 주세요.'); return window.supabase.createClient(url, anonKey); }
+    function buildStudentAssignmentLink(assignmentId){ if(!assignmentId) return ''; const url=new URL(window.location.href); const basePath=url.pathname.replace(/[^/]+$/, 'student-answer-omr.html'); return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`; }
+    async function copyText(text){ if(!text) throw new Error('복사할 내용이 없습니다.'); if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return true; } const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.focus(); ta.select(); const ok=document.execCommand('copy'); ta.remove(); return ok; }
+
+    function scoreText(correct, total, percent){
+      if (correct == null || total == null || percent == null) return '-';
+      return `${correct}/${total} · ${Number(percent).toFixed(0)}%`;
+    }
+
+    function hasTeacherFinal(row){
+      return Boolean(row?.has_teacher_final || (row?.final_correct_count != null && row?.final_score_percent != null));
+    }
+
+    function isPerfectScore(correct, total, percent){
+      const totalItems = Number(total || 0);
+      if (totalItems <= 0) return false;
+      if (correct != null && Number(correct) === totalItems) return true;
+      return Number(percent) === 100;
+    }
+
+    function canEditTeacherFinal(row){
+      return Boolean(row?.attempt_id) && ['completed', 'needs_review'].includes(row?.status);
+    }
+
+    function shouldShowRound2(row){
+      if (!row?.attempt_id) return false;
+      if (!['completed', 'needs_review'].includes(row?.status)) return false;
+      if (isPerfectScore(row.round1_correct_count, row.total_items, row.round1_score_percent)) return false;
+      return row.round2_correct_count != null && row.round2_score_percent != null;
+    }
+
+    function finalEditHint(row){
+      if (!row?.attempt_id) return '시도 없음';
+      if (row.status === 'awaiting_retry') return '2차 종료 후 가능';
+      if (row.status === 'not_started' || row.status === 'in_progress') return '제출 후 가능';
+      return '수정 가능';
+    }
+
+    function ensureRpcOk(data, fallbackMessage){
+      if (data && typeof data === 'object' && 'ok' in data && data.ok === false) {
+        throw new Error(data.error || fallbackMessage || 'RPC 처리에 실패했습니다.');
+      }
+      return data;
+    }
+
+    function derivedFinalDisplay(row){
+      if (hasTeacherFinal(row)) {
+        return { correct: row.final_correct_count, percent: row.final_score_percent, auto:false };
+      }
+      if (isPerfectScore(row.round1_correct_count, row.total_items, row.round1_score_percent)) {
+        return { correct: row.total_items, percent: 100, auto:true };
+      }
+      if (isPerfectScore(row.round2_correct_count, row.total_items, row.round2_score_percent)) {
+        return { correct: row.total_items, percent: 100, auto:true };
+      }
+      return null;
+    }
+
+    function renderFinalEditor(row){
+      if (!canEditTeacherFinal(row)) {
+        return `<span class="muted">${escapeHtml(finalEditHint(row))}</span>`;
+      }
+      if (state.editingAssignmentId !== row.assignment_id) {
+        return `<button class="mini-btn edit-final-btn" type="button" data-assignment-id="${row.assignment_id}">최종점수 수정</button>`;
+      }
+      const total = Number(row.total_items || 0);
+      const preset = hasTeacherFinal(row) ? (row.final_correct_count ?? '') : '';
+      return `
+        <div class="editor-box">
+          <input class="final-correct-input" type="number" min="0" max="${total}" value="${preset}" data-assignment-id="${row.assignment_id}" placeholder="정답수" style="width:74px;" />
+          <span class="mini-note">/ ${total}문항</span>
+          <button class="mini-btn primary save-final-btn" type="button" data-assignment-id="${row.assignment_id}">저장</button>
+          <button class="mini-btn cancel-final-btn" type="button" data-assignment-id="${row.assignment_id}">취소</button>
+        </div>`;
+    }
+
+    function renderAssignmentList(){
+      const body = $('assignmentListBody');
+      if (!state.assignments.length) {
+        body.innerHTML = '<div class="list-row"><div class="muted" style="grid-column:1/-1;">발행상황 결과가 없습니다.</div></div>';
+        updateSummary();
+        return;
+      }
+      body.innerHTML = state.assignments.map(row => {
+        const link = buildStudentAssignmentLink(row.assignment_id);
+        const finalInfo = derivedFinalDisplay(row);
+        const round1 = scoreText(row.round1_correct_count, row.total_items, row.round1_score_percent);
+        const round2 = shouldShowRound2(row)
+          ? scoreText(row.round2_correct_count, row.total_items, row.round2_score_percent)
+          : '-';
+        const finalText = finalInfo ? `${finalInfo.correct}/${row.total_items} · ${Number(finalInfo.percent).toFixed(0)}%` : '-';
+        const finalClass = finalText === '-' ? 'blank' : '';
+        return `
+          <div class="list-row">
+            <div>${escapeHtml(fmtDate(row.assigned_at))}</div>
+            <div><strong>${escapeHtml(row.test_title || '-')}</strong></div>
+            <div>${escapeHtml(row.student_name || '-')}</div>
+            <div>${escapeHtml(gradeLabel(row.student_grade))}</div>
+            <div class="link-box"><input class="link-input" type="text" value="${escapeHtml(link)}" readonly /></div>
+            <div><button class="mini-btn copy-link-btn" type="button" data-link="${escapeHtml(link)}">복사</button></div>
+            <div class="score-cell ${round1==='-'?'blank':''}">${escapeHtml(round1)}</div>
+            <div class="score-cell ${round2==='-'?'blank':''}">${escapeHtml(round2)}</div>
+            <div class="score-cell ${finalClass}">${escapeHtml(finalText)}</div>
+            <div>${renderFinalEditor(row)}</div>
+            <div>
+              <div class="toggle-wrap">
+                <label class="switch">
+                  <input class="open-toggle" type="checkbox" data-assignment-id="${row.assignment_id}" ${row.is_open ? 'checked' : ''} />
+                  <span class="slider"></span>
+                </label>
+                <span class="muted">${row.is_open ? '열림' : '닫힘'}</span>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      body.querySelectorAll('.copy-link-btn').forEach(btn => btn.addEventListener('click', async () => {
+        try { await copyText(btn.dataset.link || ''); setStatus('assignmentStatus','학생용 링크를 복사했습니다.','ok'); } catch (err) { setStatus('assignmentStatus', normalizeError(err), 'error'); }
+      }));
+      body.querySelectorAll('.edit-final-btn').forEach(btn => btn.addEventListener('click', () => { state.editingAssignmentId = btn.dataset.assignmentId; renderAssignmentList(); }));
+      body.querySelectorAll('.cancel-final-btn').forEach(btn => btn.addEventListener('click', () => { state.editingAssignmentId = null; renderAssignmentList(); }));
+      body.querySelectorAll('.save-final-btn').forEach(btn => btn.addEventListener('click', async () => { await saveTeacherFinal(btn.dataset.assignmentId); }));
+      body.querySelectorAll('.open-toggle').forEach(el => el.addEventListener('change', async () => { await setAssignmentOpenState(el.dataset.assignmentId, el.checked); }));
+      updateSummary();
+    }
+
+    async function saveTeacherFinal(assignmentId){
+      try {
+        const row = state.assignments.find(r => r.assignment_id === assignmentId);
+        if (!row) throw new Error('assignment 정보를 찾지 못했습니다.');
+        if (!canEditTeacherFinal(row)) throw new Error(finalEditHint(row));
+        const input = document.querySelector(`.final-correct-input[data-assignment-id="${assignmentId}"]`);
+        const total = Number(row.total_items || 0);
+        const correct = Number(input?.value);
+        if (!Number.isInteger(correct) || correct < 0 || correct > total) throw new Error(`정답수는 0 ~ ${total} 사이 정수여야 합니다.`);
+        const payload = {
+          p_attempt_id: row.attempt_id,
+          p_teacher_final_correct_count: correct,
+          p_teacher_final_note: null
+        };
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_save_final_score', payload);
+        if (error) throw error;
+        ensureRpcOk(data, '최종점수 저장에 실패했습니다.');
+        let closeMessage = '';
+        if (row.is_open) {
+          const closePayload = {
+            p_assignment_id: assignmentId,
+            p_is_open: false,
+            p_closed_reason: 'teacher_manual_close'
+          };
+          const { data: closeData, error: closeError } = await state.supabase.schema('auto_grading').rpc('teacher_set_assignment_open_state', closePayload);
+          if (closeError) throw closeError;
+          ensureRpcOk(closeData, '숙제 마감 처리에 실패했습니다.');
+          closeMessage = ' 숙제를 닫았습니다.';
+        }
+        state.editingAssignmentId = null;
+        $('debugBox').style.display = 'block';
+        $('debugBox').textContent = JSON.stringify({ payload, response: data }, null, 2);
+        const percentText = total > 0 ? Math.round((correct / total) * 100) : 0;
+        setStatus('assignmentStatus', `최종점수를 저장했습니다. (${correct}/${total} · ${percentText}%)${closeMessage}`, 'ok');
+        await loadAssignments();
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    async function setAssignmentOpenState(assignmentId, isOpen){
+      try {
+        const payload = { p_assignment_id: assignmentId, p_is_open: isOpen, p_closed_reason: isOpen ? null : 'teacher_manual_close' };
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_set_assignment_open_state', payload);
+        if (error) throw error;
+        ensureRpcOk(data, 'assignment 상태 변경에 실패했습니다.');
+        $('debugBox').style.display = 'block';
+        $('debugBox').textContent = JSON.stringify({ payload, response: data }, null, 2);
+        setStatus('assignmentStatus', `assignment를 ${isOpen ? '열림' : '닫힘'} 상태로 변경했습니다.`, 'ok');
+        await loadAssignments();
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    async function loadCourses(){
+      const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_courses', { p_search:null, p_only_active:true, p_limit:200, p_offset:0 });
+      if (error) throw error;
+      state.courses = Array.isArray(data) ? data : [];
+      $('courseSelect').innerHTML = '<option value="">전체</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
+    }
+
+    async function loadTestSets(){
+      const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_search_test_sets', {
+        p_search:null, p_grade_level:null, p_source:null, p_purpose:$('purposeSelect').value || null, p_only_active:true, p_limit:200, p_offset:0
+      });
+      if (error) throw error;
+      state.testSets = Array.isArray(data) ? data : [];
+      $('testSetSelect').innerHTML = '<option value="">전체</option>' + state.testSets.map(t => `<option value="${t.test_set_id}">${escapeHtml(t.test_title || t.test_set_id)}</option>`).join('');
+    }
+
+    async function loadAssignments(){
+      try {
+        if (!state.supabase) state.supabase = createClientOrThrow();
+        const params = {
+          p_course_id: $('courseSelect').value || null,
+          p_test_set_id: $('testSetSelect').value || null,
+          p_student_id: null,
+          p_is_open: $('filterOpenOnly').checked ? true : null,
+          p_purpose: $('purposeSelect').value || null,
+          p_status: null,
+          p_search: $('studentSearch').value.trim() || null,
+          p_limit: 200,
+          p_offset: 0
+        };
+        setStatus('assignmentStatus','발행상황을 불러오는 중입니다.','info');
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_assignments', params);
+        if (error) throw error;
+        state.assignments = Array.isArray(data) ? data : [];
+        $('debugBox').style.display = 'block';
+        $('debugBox').textContent = JSON.stringify({ request: params, rows: state.assignments.slice(0,3) }, null, 2);
+        renderAssignmentList();
+        setStatus('assignmentStatus', `assignment ${state.assignments.length}건을 불러왔습니다.`, 'ok');
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    function updateSummary(){
+      $('sumAssignments').textContent = `${state.assignments.length}건`;
+      $('sumOpenAssignments').textContent = `${state.assignments.filter(r => r.is_open).length}건`;
+      $('sumTeacherFinal').textContent = `${state.assignments.filter(r => derivedFinalDisplay(r)).length}건`;
+      const selectedText = $('testSetSelect').selectedOptions[0]?.textContent || '전체';
+      $('sumSelectedTest').textContent = selectedText;
+    }
+
+    async function connectAndBootstrap(){
+      try {
+        saveConfig();
+        state.supabase = createClientOrThrow();
+        setStatus('connectStatus','DB 연결과 기본 목록 로딩을 진행 중입니다.','info');
+        await Promise.all([loadCourses(), loadTestSets()]);
+        setStatus('connectStatus','DB 연결 완료. 조회 조건을 불러왔습니다.','ok');
+        await loadAssignments();
+      } catch (err) {
+        setStatus('connectStatus', normalizeError(err), 'error');
+      }
+    }
+
+    function resetFilters(){ $('courseSelect').value=''; $('testSetSelect').value=''; $('studentSearch').value=''; $('purposeSelect').value=''; $('filterOpenOnly').checked=true; }
+    function wireEvents(){
+      $('saveConfigBtn').addEventListener('click', saveConfig);
+      $('connectBtn').addEventListener('click', connectAndBootstrap);
+      $('loadAssignmentsBtn').addEventListener('click', loadAssignments);
+      $('resetFiltersBtn').addEventListener('click', async () => {
+        resetFilters();
+        if (state.supabase) {
+          await loadTestSets();
+          await loadAssignments();
+        }
+      });
+      $('purposeSelect').addEventListener('change', async () => { if (state.supabase) { await loadTestSets(); await loadAssignments(); } });
+      $('studentSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadAssignments(); });
+      $('courseSelect').addEventListener('change', updateSummary);
+      $('testSetSelect').addEventListener('change', updateSummary);
+    }
+
+    loadConfig(); wireEvents(); updateSummary();
+  </script>
+</body>
+</html>
