@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>교사용 시험 발행 페이지 v3 linked</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --line: #d9deea;
+      --text: #1e2430;
+      --muted: #667085;
+      --primary: #2f6fed;
+      --primary-soft: #edf3ff;
+      --success: #0f9d58;
+      --warning: #b26b00;
+      --danger: #c43d3d;
+      --chip: #eef2f7;
+      --shadow: 0 10px 30px rgba(22, 34, 51, 0.08);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Pretendard","Noto Sans KR",system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    .page { max-width: 1600px; margin:0 auto; padding:24px; }
+    .page-header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:20px; flex-wrap:wrap; }
+    .title-wrap h1 { margin:0; font-size:28px; line-height:1.2; }
+    .title-wrap p { margin:8px 0 0; color:var(--muted); font-size:14px; }
+    .top-summary { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:12px; width:720px; max-width:100%; }
+    .summary-card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; }
+    .summary-card .label { display:block; font-size:12px; color:var(--muted); margin-bottom:8px; }
+    .summary-card .value { font-size:24px; font-weight:700; letter-spacing:-0.02em; }
+    .layout { display:grid; grid-template-columns:1.08fr 0.92fr; gap:20px; align-items:start; }
+    .left-column,.right-column { display:grid; gap:20px; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:20px; box-shadow:var(--shadow); overflow:hidden; }
+    .panel-header { padding:18px 20px 14px; border-bottom:1px solid var(--line); background:linear-gradient(to bottom,#ffffff,#fbfcff); }
+    .panel-header h2 { margin:0; font-size:20px; line-height:1.2; }
+    .panel-header p { margin:8px 0 0; color:var(--muted); font-size:13px; }
+    .panel-body { padding:18px 20px 20px; }
+    .search-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+    .search-grid.three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .field { display:grid; gap:6px; }
+    .field label { font-size:12px; color:var(--muted); font-weight:600; }
+    input[type="text"], select, textarea { width:100%; min-height:42px; border:1px solid var(--line); border-radius:12px; padding:10px 12px; font-size:14px; background:#fff; color:var(--text); }
+    textarea { min-height:76px; }
+    .check-row { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 16px; }
+    .chip { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:0 12px; border:1px solid var(--line); border-radius:999px; background:var(--chip); font-size:13px; color:var(--text); }
+    .chip input { accent-color: var(--primary); }
+    .actions, .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+    button { min-height:42px; border:0; border-radius:12px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .btn-primary { background:var(--primary); color:white; }
+    .btn-secondary { background:#eef2f7; color:var(--text); border:1px solid var(--line); }
+    .btn-ghost { background:white; color:var(--text); border:1px solid var(--line); }
+    .subgrid { display:grid; grid-template-columns:1.05fr 0.95fr; gap:16px; margin-top:18px; }
+    .inner-box { border:1px solid var(--line); border-radius:16px; padding:16px; background:#fcfdff; }
+    .inner-box h3 { margin:0 0 12px; font-size:16px; }
+    .meta-list { display:grid; gap:10px; }
+    .meta-item { display:flex; justify-content:space-between; gap:12px; font-size:13px; padding-bottom:10px; border-bottom:1px dashed var(--line); }
+    .meta-item:last-child { border-bottom:0; padding-bottom:0; }
+    .meta-item .k { color:var(--muted); }
+    .meta-item .v { font-weight:700; text-align:right; }
+    .stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .stat-tile { border:1px solid var(--line); border-radius:14px; background:#fff; padding:12px; }
+    .stat-tile .label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    .stat-tile .value { font-size:18px; font-weight:700; }
+    .question-stat { display:grid; gap:8px; margin-top:14px; }
+    .question-row { display:grid; grid-template-columns:52px 1fr 92px; align-items:center; gap:10px; font-size:13px; }
+    .bar { height:10px; background:#e8edf7; border-radius:999px; overflow:hidden; }
+    .bar > span { display:block; height:100%; background:linear-gradient(90deg,#f08a24,#d45353); }
+    .student-toolbar,.posting-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+    .table-wrap { border:1px solid var(--line); border-radius:16px; overflow:hidden; background:white; }
+    table { width:100%; border-collapse:collapse; }
+    thead th { background:#f4f7fb; color:#48505e; font-size:12px; font-weight:700; padding:12px 10px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+    tbody td { padding:12px 10px; border-bottom:1px solid #edf1f6; font-size:13px; vertical-align:middle; }
+    tbody tr:last-child td { border-bottom:0; }
+    .student-name { font-weight:700; }
+    .muted { color:var(--muted); }
+    .tag { display:inline-flex; align-items:center; min-height:26px; padding:0 10px; border-radius:999px; font-size:12px; font-weight:700; background:var(--primary-soft); color:var(--primary); }
+    .tag.gray { background:#eef2f7; color:#5f6b7b; }
+    .tag.green { background:#ebf8f0; color:var(--success); }
+    .tag.orange { background:#fff4e8; color:var(--warning); }
+    .list-card { border:1px solid var(--line); border-radius:18px; overflow:hidden; background:white; }
+    .list-head,.list-row { display:grid; grid-template-columns:72px minmax(300px,2.4fr) 96px 92px 88px 88px 88px 76px minmax(220px,1.4fr) 112px; gap:10px; align-items:center; padding:12px 14px; font-size:13px; }
+    .list-head { background:#f4f7fb; color:#48505e; font-size:12px; font-weight:700; border-bottom:1px solid var(--line); }
+    .list-row { border-bottom:1px solid #eef2f7; }
+    .list-row:last-child { border-bottom:0; }
+    .score { font-weight:700; }
+    .score.blank { color:#b0b8c5; font-weight:500; }
+    .manage-box { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+    .link-box { display:flex; align-items:center; gap:8px; min-width:0; }
+    .link-input { width:100%; min-height:32px; border:1px solid var(--line); border-radius:10px; padding:6px 10px; font-size:12px; background:#fff; color:var(--text); }
+    .mini-btn { min-height:32px; padding:0 10px; border-radius:10px; border:1px solid var(--line); background:white; font-size:12px; font-weight:700; }
+    .status { margin-top:12px; padding:12px; border-radius:10px; font-size:14px; line-height:1.5; white-space:pre-line; display:none; }
+    .status.ok { display:block; background:#ecfdf5; border:1px solid #a7f3d0; color:#0f766e; }
+    .status.error { display:block; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
+    .status.info { display:block; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
+    .code-box { border:1px dashed #93c5fd; background:#eff6ff; border-radius:12px; padding:12px; font-size:14px; color:#1e3a8a; line-height:1.55; }
+    .sticky-footer { position:sticky; bottom:0; margin-top:18px; background:rgba(246,247,251,0.92); backdrop-filter:blur(8px); border-top:1px solid rgba(217,222,234,0.9); padding:14px 0 0; }
+    .footer-box { background:white; border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); padding:14px 16px; display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; }
+    .footer-summary { display:flex; gap:18px; flex-wrap:wrap; font-size:13px; }
+    .footer-summary strong { font-size:15px; }
+    details { margin-bottom: 16px; }
+    summary { cursor:pointer; font-weight:700; }
+    .result-box { margin-top:12px; border:1px solid var(--line); background:#f8fafc; border-radius:10px; padding:12px; font-size:12px; overflow:auto; white-space:pre-wrap; max-height:280px; }
+    @media (max-width:1280px) {
+      .layout,.subgrid { grid-template-columns:1fr; }
+      .list-head,.list-row { grid-template-columns:70px minmax(280px,2.2fr) 90px 80px 80px 80px 80px 70px minmax(210px,1.3fr) 110px; font-size:12px; }
+    }
+    @media (max-width:980px) {
+      .page-header { flex-direction:column; }
+      .top-summary,.search-grid,.search-grid.three,.stat-grid { grid-template-columns:1fr; }
+      .table-wrap,.list-card { overflow-x:auto; }
+      .list-head,.list-row { min-width:1320px; }
+      table { min-width:1080px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <details>
+      <summary>Supabase 연결 설정</summary>
+      <section class="panel" style="margin-top:12px;">
+        <div class="panel-body">
+          <div class="search-grid">
+            <div class="field" style="grid-column:1/-1;">
+              <label for="supabaseUrl">Supabase URL</label>
+              <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
+            </div>
+            <div class="field" style="grid-column:1/-1;">
+              <label for="supabaseAnonKey">Supabase Anon Key</label>
+              <textarea id="supabaseAnonKey" placeholder="eyJ..."></textarea>
+            </div>
+          </div>
+          <div class="toolbar">
+            <button id="saveConfigBtn" class="btn-secondary" type="button">연결정보 저장</button>
+            <button id="connectBtn" class="btn-primary" type="button">DB 연결 확인</button>
+            <button id="reloadAllBtn" class="btn-ghost" type="button">전체 새로고침</button>
+          </div>
+          <div id="connectStatus" class="status info"></div>
+        </div>
+      </section>
+    </details>
+
+    <div class="page-header">
+      <div class="title-wrap">
+        <h1>교사용 시험 발행 페이지</h1>
+        <p>prototype v2 흐름을 반영해 시험 검색, 시험 요약, 학생 선택, assignment 발행/운영을 실제 RPC와 연결한 버전입니다.</p>
+      </div>
+      <div class="top-summary">
+        <div class="summary-card"><span class="label">검색된 시험</span><div id="sumTestSets" class="value">0건</div></div>
+        <div class="summary-card"><span class="label">현재 선택 학생</span><div id="sumSelectedStudents" class="value">0명</div></div>
+        <div class="summary-card"><span class="label">표시 중 assignment</span><div id="sumAssignments" class="value">0건</div></div>
+        <div class="summary-card"><span class="label">열림 assignment</span><div id="sumOpenAssignments" class="value">0건</div></div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="left-column">
+        <section class="panel">
+          <div class="panel-header">
+            <h2>시험 선택 영역</h2>
+            <p>시험 검색 결과를 먼저 보고 선택한 뒤, 선택된 시험의 종합 지표와 발행 현황을 이어서 확인합니다.</p>
+          </div>
+          <div class="panel-body">
+            <div class="search-grid three">
+              <div class="field">
+                <label for="testGradeFilter">학년</label>
+                <select id="testGradeFilter">
+                  <option value="">전체</option>
+                  <option value="E1">초1</option>
+                  <option value="E2">초2</option>
+                  <option value="E3">초3</option>
+                  <option value="E4">초4</option>
+                  <option value="E5">초5</option>
+                  <option value="E6">초6</option>
+                  <option value="M1">중1</option>
+                  <option value="M2">중2</option>
+                  <option value="M3">중3</option>
+                  <option value="H1">고1</option>
+                  <option value="H2">고2</option>
+                  <option value="H3">고3</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="testTitleFilter">시험 제목</label>
+                <input id="testTitleFilter" type="text" placeholder="예: 질량보존" />
+              </div>
+              <div class="field">
+                <label for="testSourceFilter">출처</label>
+                <select id="testSourceFilter">
+                  <option value="">전체</option>
+                </select>
+              </div>
+            </div>
+            <div class="search-grid">
+              <div class="field">
+                <label for="testPurposeFilter">용도</label>
+                <select id="testPurposeFilter">
+                  <option value="">전체</option>
+                  <option value="숙제">숙제</option>
+                  <option value="클리닉">클리닉</option>
+                  <option value="보충">보충</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="testActiveOnly">시험 상태</label>
+                <label class="chip"><input id="testActiveOnly" type="checkbox" checked /> 활성 시험만 보기</label>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="searchTestsBtn" class="btn-primary" type="button">시험 검색</button>
+              <button id="resetTestSearchBtn" class="btn-secondary" type="button">검색/선택 초기화</button>
+            </div>
+            <div class="inner-box" style="margin-top:18px;">
+              <h3>시험 검색 결과</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:52px;">선택</th>
+                      <th>학년</th>
+                      <th>시험 제목</th>
+                      <th>출처</th>
+                      <th>용도</th>
+                      <th>문항수</th>
+                      <th>응시자수</th>
+                    </tr>
+                  </thead>
+                  <tbody id="testSetTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="subgrid">
+              <div class="inner-box">
+                <h3>선택된 시험 기본 정보</h3>
+                <div class="meta-list">
+                  <div class="meta-item"><span class="k">시험 제목</span><span id="metaTestTitle" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">학년 / 과목</span><span id="metaTestGrade" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">출처</span><span id="metaTestSource" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">문항수</span><span id="metaTestItems" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">소단원코드</span><span id="metaTestUnitCode" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">최근 사용</span><span id="metaTestLastUsed" class="v">-</span></div>
+                  <div class="meta-item"><span class="k">정답 입력 상태</span><span id="metaAnswerReady" class="v">-</span></div>
+                </div>
+              </div>
+              <div class="inner-box">
+                <h3>시험 종합 정보</h3>
+                <div class="stat-grid">
+                  <div class="stat-tile"><span class="label">누적 발행</span><div id="ovAssignmentCount" class="value">0건</div></div>
+                  <div class="stat-tile"><span class="label">열림</span><div id="ovOpenAssignmentCount" class="value">0건</div></div>
+                  <div class="stat-tile"><span class="label">시작됨</span><div id="ovStartedCount" class="value">0건</div></div>
+                  <div class="stat-tile"><span class="label">완료/검토</span><div id="ovEndedCount" class="value">0건</div></div>
+                  <div class="stat-tile"><span class="label">평균 1차</span><div id="ovAvgRound1" class="value">-</div></div>
+                  <div class="stat-tile"><span class="label">평균 최종</span><div id="ovAvgFinal" class="value">-</div></div>
+                </div>
+                <div class="question-stat">
+                  <div class="question-row"><span>주요 오답</span><div class="bar"><span style="width:0%"></span></div><span id="wrongQuestionHint">문항별 오답률 연동 준비중</span></div>
+                </div>
+                <div id="selectedTestGuide" class="code-box" style="margin-top:14px;">시험을 먼저 선택하면 학생 조회와 발행상황이 해당 시험 기준으로 갱신됩니다.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>발행상황 영역</h2>
+            <p>teacher_list_assignments 결과를 표시하고 열림/닫힘 상태를 토글합니다.</p>
+          </div>
+          <div class="panel-body">
+            <div class="posting-toolbar">
+              <div class="check-row" style="margin:0;">
+                <label class="chip"><input id="filterOpenOnly" type="checkbox" checked /> 열림만 보기</label>
+                <label class="chip"><input id="filterCurrentTestOnly" type="checkbox" checked /> 현재 선택 시험만 보기</label>
+              </div>
+              <div class="actions" style="margin:0;">
+                <button id="loadAssignmentsBtn" class="btn-secondary" type="button">발행상황 새로고침</button>
+              </div>
+            </div>
+            <div class="list-card">
+              <div class="list-head">
+                <div>학년</div>
+                <div>시험 제목</div>
+                <div>발행일</div>
+                <div>학생</div>
+                <div>1차</div>
+                <div>2차</div>
+                <div>최종</div>
+                <div>열림</div>
+                <div>학생용 링크</div>
+                <div style="text-align:right;">관리</div>
+              </div>
+              <div id="assignmentListBody"></div>
+            </div>
+            <div id="assignmentStatus" class="status info"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="right-column">
+        <section class="panel">
+          <div class="panel-header">
+            <h2>학생 선택 영역</h2>
+            <p>teacher_list_students_for_assignment를 기준으로 학생을 조회합니다.</p>
+          </div>
+          <div class="panel-body">
+            <div class="search-grid">
+              <div class="field">
+                <label for="courseSelect">수강과정</label>
+                <select id="courseSelect"><option value="">전체</option></select>
+              </div>
+              <div class="field">
+                <label for="studentGradeFilter">학년</label>
+                <select id="studentGradeFilter"><option value="">전체</option></select>
+              </div>
+              <div class="field">
+                <label for="studentNameSearch">학생 이름</label>
+                <input id="studentNameSearch" type="text" placeholder="예: 홍길동" />
+              </div>
+              <div class="field">
+                <label for="studentCodeSearch">학생 번호</label>
+                <input id="studentCodeSearch" type="text" placeholder="예: 101" />
+              </div>
+              <div class="field">
+                <label for="serviceTypeFilter">수강형태</label>
+                <select id="serviceTypeFilter"><option value="">전체</option></select>
+              </div>
+            </div>
+            <div class="check-row">
+              <label class="chip"><input id="onlyActiveStudents" type="checkbox" checked /> 현재 활성 학생만</label>
+              <label class="chip"><input id="onlyNotAssignedStudents" type="checkbox" /> 동일 시험 미배정만</label>
+              <label class="chip"><input id="selectAllStudents" type="checkbox" /> 현재 검색 결과 전체 선택</label>
+            </div>
+            <div class="student-toolbar">
+              <div id="studentToolbarInfo" class="muted" style="font-size:13px;">검색 결과 0명 · 현재 0명 선택됨</div>
+              <div class="actions" style="margin:0;">
+                <button id="searchStudentsBtn" class="btn-primary" type="button">학생 조회</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:52px;">선택</th>
+                    <th>학생</th>
+                    <th>학생번호</th>
+                    <th>학년</th>
+                    <th>수강과정</th>
+                    <th>수강형태</th>
+                    <th>활성 시험</th>
+                    <th>동일 시험</th>
+                    <th>최근 2차</th>
+                    <th>최근 최종</th>
+                  </tr>
+                </thead>
+                <tbody id="studentTableBody"></tbody>
+              </table>
+            </div>
+            <div id="studentStatus" class="status info"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>발행 설정 및 실행</h2>
+            <p>teacher_issue_assignments로 실제 assignment를 생성합니다.</p>
+          </div>
+          <div class="panel-body">
+            <div class="meta-list">
+              <div class="meta-item"><span class="k">선택 시험</span><span id="issueTestTitle" class="v">-</span></div>
+              <div class="meta-item"><span class="k">선택 학생 수</span><span id="issueSelectedCount" class="v">0명</span></div>
+              <div class="meta-item"><span class="k">발행 용도</span><span class="v"><select id="purposeSelect"><option value="숙제" selected>숙제</option><option value="클리닉">클리닉</option><option value="보충">보충</option></select></span></div>
+              <div class="meta-item"><span class="k">수강과정</span><span id="issueCourseName" class="v">전체</span></div>
+            </div>
+            <div class="check-row" style="margin-top:16px;">
+              <label class="chip"><input type="checkbox" checked disabled /> 발행 시 자동으로 열림 시작</label>
+              <label class="chip"><input type="checkbox" checked disabled /> 동일 시험 중복 발행 방지</label>
+              <label class="chip"><input id="reopenExisting" type="checkbox" /> 닫힌 기존 assignment 재오픈 허용</label>
+            </div>
+            <div id="issueWarningBox" class="inner-box" style="margin-top:10px; background:#fff8ef; border-color:#f0d8b0;">
+              <h3 style="margin-bottom:10px;">사전 경고</h3>
+              <div id="issueWarningText" class="muted" style="line-height:1.6; font-size:13px; color:#704d00;">학생을 조회하면 동일 시험 기존 assignment 여부를 여기에서 안내합니다.</div>
+            </div>
+            <div class="actions" style="margin-top:16px;">
+              <button id="issueAssignmentsBtn" class="btn-primary" type="button">선택 학생에게 일괄 발행</button>
+              <button id="clearSelectedStudentsBtn" class="btn-secondary" type="button">선택 해제</button>
+            </div>
+            <div id="issueStatus" class="status info"></div>
+            <pre id="issueResultBox" class="result-box" style="display:none;"></pre>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="sticky-footer">
+      <div class="footer-box">
+        <div class="footer-summary">
+          <span>선택 시험 <strong id="footerTestTitle">-</strong></span>
+          <span>선택 학생 <strong id="footerSelectedCount">0명</strong></span>
+          <span>수강과정 <strong id="footerCourseName">전체</strong></span>
+        </div>
+        <div class="actions" style="margin:0;">
+          <button id="footerIssueBtn" class="btn-primary" type="button">선택 학생에게 일괄 발행</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const STORAGE_KEY = 'ag_assignment_supabase_config_v2';
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      supabase: null,
+      testSets: [],
+      selectedTestSetId: null,
+      selectedTestSet: null,
+      selectedTestDetail: null,
+      testOverview: null,
+      students: [],
+      selectedStudentIds: new Set(),
+      assignments: [],
+      courses: [],
+      studentCourseTypes: [],
+      studentGrades: []
+    };
+
+    function setStatus(id, msg, type='info') {
+      const el = $(id);
+      if (!el) return;
+      if (!msg) {
+        el.style.display = 'none';
+        el.className = 'status info';
+        el.textContent = '';
+        return;
+      }
+      el.style.display = 'block';
+      el.className = `status ${type}`;
+      el.textContent = msg;
+    }
+
+    function normalizeError(err) {
+      if (!err) return '알 수 없는 오류가 발생했습니다.';
+      if (typeof err === 'string') return err;
+      if (err.message) return err.message;
+      try { return JSON.stringify(err, null, 2); } catch (_) { return '알 수 없는 오류가 발생했습니다.'; }
+    }
+
+    function saveConfig() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ url: $('supabaseUrl').value.trim(), anonKey: $('supabaseAnonKey').value.trim() }));
+      setStatus('connectStatus', '연결정보를 저장했습니다.', 'ok');
+    }
+
+    function loadConfig() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const cfg = JSON.parse(raw);
+        $('supabaseUrl').value = cfg.url || '';
+        $('supabaseAnonKey').value = cfg.anonKey || '';
+      } catch (_) {}
+    }
+
+    function createClientOrThrow() {
+      const url = $('supabaseUrl').value.trim();
+      const anonKey = $('supabaseAnonKey').value.trim();
+      if (!url || !anonKey) throw new Error('Supabase URL과 Anon Key를 먼저 입력해 주세요.');
+      return window.supabase.createClient(url, anonKey);
+    }
+
+    function fmtDate(v) {
+      if (!v) return '-';
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return v;
+      return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function fmtDateTime(v) {
+      if (!v) return '-';
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return v;
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+
+    function fmtPercent(v) {
+      return v == null ? '-' : `${Number(v).toFixed(0)}%`;
+    }
+
+    function fmtCount(v, suffix='건') {
+      return `${Number(v || 0)}${suffix}`;
+    }
+
+    function escapeHtml(v) {
+      return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+    }
+
+    function currentCourseId() {
+      return $('courseSelect').value || null;
+    }
+
+    function currentCourseName() {
+      const opt = $('courseSelect').options[$('courseSelect').selectedIndex];
+      return opt ? opt.textContent : '전체';
+    }
+
+    function currentPurposeFilter() {
+      return $('testPurposeFilter').value || null;
+    }
+
+    const GRADE_LABELS = { E1:'초1', E2:'초2', E3:'초3', E4:'초4', E5:'초5', E6:'초6', M1:'중1', M2:'중2', M3:'중3', H1:'고1', H2:'고2', H3:'고3' };
+    const GRADE_ORDER = ['E1','E2','E3','E4','E5','E6','M1','M2','M3','H1','H2','H3'];
+    const FIXED_STUDENT_COURSE_TYPES = ['학원', '과외', '내신', '특강'];
+
+    function mapStudentCourseType(v) {
+      if (!v) return '-';
+      return String(v);
+    }
+
+    function gradeLabel(v) {
+      if (!v) return '-';
+      return GRADE_LABELS[String(v)] || String(v);
+    }
+
+    function sortGradeCodes(values) {
+      return [...new Set(values.filter(Boolean))].sort((a, b) => {
+        const ai = GRADE_ORDER.indexOf(String(a));
+        const bi = GRADE_ORDER.indexOf(String(b));
+        const av = ai === -1 ? 999 : ai;
+        const bv = bi === -1 ? 999 : bi;
+        if (av !== bv) return av - bv;
+        return String(a).localeCompare(String(b), 'ko');
+      });
+    }
+
+    async function connectAndBootstrap() {
+      try {
+        saveConfig();
+        state.supabase = createClientOrThrow();
+        setStatus('connectStatus', 'DB 연결과 기본 데이터 로딩을 진행 중입니다.', 'info');
+        await Promise.all([loadCourses(), loadTestSets(), loadStudentFilterOptions()]);
+        setStatus('connectStatus', 'DB 연결 완료. 시험/과정/학생 필터를 불러왔습니다.', 'ok');
+      } catch (err) {
+        setStatus('connectStatus', normalizeError(err), 'error');
+      }
+    }
+
+    async function loadCourses() {
+      const { data, error } = await state.supabase
+        .schema('auto_grading')
+        .rpc('teacher_list_courses', {
+          p_search: null,
+          p_only_active: true,
+          p_limit: 200,
+          p_offset: 0
+        });
+      if (error) throw error;
+      state.courses = Array.isArray(data) ? data : [];
+      const cur = $('courseSelect').value;
+      $('courseSelect').innerHTML = '<option value="">전체</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
+      if (cur && state.courses.some(c => c.course_id === cur)) $('courseSelect').value = cur;
+      updateFooter();
+    }
+
+    async function loadStudentFilterOptions() {
+      const { data, error } = await state.supabase
+        .schema('auto_grading')
+        .rpc('teacher_list_students_for_assignment', {
+          p_course_id: null,
+          p_test_set_id: null,
+          p_search: null,
+          p_grade: null,
+          p_service_type: null,
+          p_enrollment_type: null,
+          p_only_active: false,
+          p_only_not_assigned: false,
+          p_limit: 500,
+          p_offset: 0
+        });
+      if (error) throw error;
+      state.studentGrades = sortGradeCodes((data || []).map(r => r.student_grade));
+      const gradeCur = $('studentGradeFilter').value;
+      $('studentGradeFilter').innerHTML = '<option value="">전체</option>' + state.studentGrades.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(gradeLabel(g))}</option>`).join('');
+      if (gradeCur && state.studentGrades.includes(gradeCur)) $('studentGradeFilter').value = gradeCur;
+
+      state.studentCourseTypes = FIXED_STUDENT_COURSE_TYPES;
+      const cur = $('serviceTypeFilter').value;
+      $('serviceTypeFilter').innerHTML = '<option value="">전체</option>' + state.studentCourseTypes.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(mapStudentCourseType(v))}</option>`).join('');
+      if (cur && state.studentCourseTypes.includes(cur)) $('serviceTypeFilter').value = cur;
+    }
+
+    async function loadTestSets() {
+      try {
+        if (!state.supabase) state.supabase = createClientOrThrow();
+        setStatus('assignmentStatus', '시험 목록을 불러오는 중입니다.', 'info');
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_search_test_sets', {
+            p_search: $('testTitleFilter').value.trim() || null,
+            p_grade_level: $('testGradeFilter').value || null,
+            p_source: $('testSourceFilter').value || null,
+            p_purpose: currentPurposeFilter(),
+            p_only_active: $('testActiveOnly').checked,
+            p_limit: 100,
+            p_offset: 0
+          });
+        if (error) throw error;
+        state.testSets = Array.isArray(data) ? data : [];
+        renderTestSourceOptions();
+        renderTestSetTable();
+        updateSummaryCards();
+        setStatus('assignmentStatus', `시험 목록 ${state.testSets.length}건을 불러왔습니다.`, 'ok');
+        if (state.selectedTestSetId) {
+          const found = state.testSets.find(t => t.test_set_id === state.selectedTestSetId);
+          if (found) {
+            await selectTestSet(found.test_set_id, false);
+          } else {
+            clearSelectedTest();
+          }
+        }
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    function renderTestSourceOptions() {
+      const current = $('testSourceFilter').value;
+      const categories = [...new Set(state.testSets.map(t => t.test_source).filter(Boolean))].sort();
+      $('testSourceFilter').innerHTML = '<option value="">전체</option>' + categories.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+      if (current && categories.includes(current)) $('testSourceFilter').value = current;
+    }
+
+    function renderTestSetTable() {
+      const body = $('testSetTableBody');
+      if (!state.testSets.length) {
+        body.innerHTML = '<tr><td colspan="7" class="muted">검색 결과가 없습니다.</td></tr>';
+        return;
+      }
+      body.innerHTML = state.testSets.map(ts => `
+        <tr>
+          <td><input type="radio" name="testset" ${state.selectedTestSetId === ts.test_set_id ? 'checked' : ''} data-test-id="${ts.test_set_id}" /></td>
+          <td>${escapeHtml(gradeLabel(ts.grade_level))}</td>
+          <td><strong>${escapeHtml(ts.test_title || '-')}</strong><div class="muted">평균 최종 ${escapeHtml(fmtPercent(ts.avg_final_score))}</div></td>
+          <td>${escapeHtml(ts.test_source || '-')}</td>
+          <td>${escapeHtml(currentPurposeFilter() || '전체')}</td>
+          <td>${escapeHtml(ts.total_items ?? '-')}</td>
+          <td>${escapeHtml(ts.started_assignment_count ?? ts.assignment_count ?? 0)}명</td>
+        </tr>
+      `).join('');
+      body.querySelectorAll('input[name="testset"]').forEach(el => {
+        el.addEventListener('change', () => selectTestSet(el.dataset.testId, true));
+      });
+    }
+
+    async function selectTestSet(testSetId, refreshDownstream = true) {
+      state.selectedTestSetId = testSetId;
+      state.selectedTestSet = state.testSets.find(t => t.test_set_id === testSetId) || null;
+      await Promise.all([loadTestOverview(testSetId), loadTestDetail(testSetId)]);
+      renderSelectedTest();
+      renderTestSetTable();
+      updateFooter();
+      if (refreshDownstream) {
+        await Promise.all([loadStudents(), loadAssignments()]);
+      }
+    }
+
+    async function loadTestOverview(testSetId) {
+      if (!testSetId) {
+        state.testOverview = null;
+        return;
+      }
+      const { data, error } = await state.supabase
+        .schema('auto_grading')
+        .rpc('teacher_get_test_set_overview', {
+          p_test_set_id: testSetId,
+          p_purpose: $('purposeSelect').value || null
+        });
+      if (error) throw error;
+      state.testOverview = Array.isArray(data) ? (data[0] || null) : data;
+    }
+
+    async function loadTestDetail(testSetId) {
+      if (!testSetId) {
+        state.selectedTestDetail = null;
+        return;
+      }
+      const { data, error } = await state.supabase
+        .schema('auto_grading')
+        .from('test_sets')
+        .select('id,subject,unit_code,source_category,source_name,source_type,total_items,updated_at,created_at')
+        .eq('id', testSetId)
+        .maybeSingle();
+      if (error) throw error;
+      state.selectedTestDetail = data || null;
+    }
+
+    function renderSelectedTest() {
+      const ts = state.selectedTestSet;
+      const td = state.selectedTestDetail;
+      const ov = state.testOverview;
+      $('metaTestTitle').textContent = ts?.test_title || '-';
+      $('metaTestGrade').textContent = ts ? `${gradeLabel(ts.grade_level)} / ${td?.subject || '-'}` : '-';
+      $('metaTestSource').textContent = td?.source_category || ts?.test_source || td?.source_name || td?.source_type || '-';
+      $('metaTestItems').textContent = `${td?.total_items ?? ts?.total_items ?? '-'}문항`;
+      $('metaTestUnitCode').textContent = td?.unit_code || '-';
+      $('metaTestLastUsed').textContent = ts?.last_used_at ? fmtDateTime(ts.last_used_at) : '-';
+      $('metaAnswerReady').textContent = td?.total_items ? '확인 필요' : '-';
+      $('ovAssignmentCount').textContent = fmtCount(ov?.assignment_count);
+      $('ovOpenAssignmentCount').textContent = fmtCount(ov?.open_assignment_count);
+      $('ovStartedCount').textContent = fmtCount(ov?.started_assignment_count);
+      $('ovEndedCount').textContent = fmtCount(ov?.ended_assignment_count);
+      $('ovAvgRound1').textContent = fmtPercent(ov?.avg_round1_score);
+      $('ovAvgFinal').textContent = fmtPercent(ov?.avg_final_score);
+      $('selectedTestGuide').innerHTML = ts
+        ? `선택 시험 ID: ${escapeHtml(ts.test_set_id)}<br>누적 발행 ${escapeHtml(ov?.assignment_count ?? 0)}건, 열림 ${escapeHtml(ov?.open_assignment_count ?? 0)}건, 최근 사용 ${escapeHtml(fmtDateTime(ts.last_used_at))}`
+        : '시험을 먼저 선택해 주세요.';
+      $('issueTestTitle').textContent = ts?.test_title || '-';
+      $('footerTestTitle').textContent = ts?.test_title || '-';
+    }
+
+    function clearSelectedTest() {
+      state.selectedTestSetId = null;
+      state.selectedTestSet = null;
+      state.selectedTestDetail = null;
+      state.testOverview = null;
+      renderSelectedTest();
+      renderTestSetTable();
+    }
+
+    async function loadStudents() {
+      try {
+        if (!state.supabase) state.supabase = createClientOrThrow();
+        const nameSearch = $('studentNameSearch').value.trim();
+        const codeSearch = $('studentCodeSearch').value.trim();
+        const params = {
+          p_course_id: currentCourseId(),
+          p_test_set_id: state.selectedTestSetId,
+          p_search: [nameSearch, codeSearch].filter(Boolean).join(' ') || null,
+          p_grade: $('studentGradeFilter').value || null,
+          p_service_type: null,
+          p_enrollment_type: $('serviceTypeFilter').value || null,
+          p_only_active: $('onlyActiveStudents').checked,
+          p_only_not_assigned: $('onlyNotAssignedStudents').checked,
+          p_limit: 100,
+          p_offset: 0
+        };
+        setStatus('studentStatus', '학생 목록을 불러오는 중입니다.', 'info');
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_students_for_assignment', params);
+        if (error) throw error;
+        state.students = Array.isArray(data) ? data : [];
+        reconcileSelectedStudents();
+        renderStudentTable();
+        setStatus('studentStatus', `학생 목록 ${state.students.length}건을 불러왔습니다.`, 'ok');
+      } catch (err) {
+        setStatus('studentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    function reconcileSelectedStudents() {
+      const existing = new Set(state.students.map(s => s.student_id));
+      state.selectedStudentIds = new Set([...state.selectedStudentIds].filter(id => existing.has(id)));
+      $('selectAllStudents').checked = state.students.length > 0 && state.students.every(s => state.selectedStudentIds.has(s.student_id));
+    }
+
+    function sameTestBadge(row) {
+      if (row.has_same_test_open_assignment) return '<span class="tag orange">열림 있음</span>';
+      if (row.has_same_test_assignment) return '<span class="tag gray">기존 있음</span>';
+      return '<span class="tag gray">없음</span>';
+    }
+
+    function studentCourseTypeBadge(v) {
+      if (!v) return '<span class="tag gray">-</span>';
+      if (v === '과외') return '<span class="tag green">과외</span>';
+      if (v === '학원') return '<span class="tag">학원</span>';
+      return `<span class="tag">${escapeHtml(mapStudentCourseType(v))}</span>`;
+    }
+
+    function renderStudentTable() {
+      const body = $('studentTableBody');
+      if (!state.students.length) {
+        body.innerHTML = '<tr><td colspan="10" class="muted">학생 조회 결과가 없습니다.</td></tr>';
+        updateSelectionUi();
+        return;
+      }
+      body.innerHTML = state.students.map(row => `
+        <tr>
+          <td><input type="checkbox" class="student-check" data-student-id="${row.student_id}" ${state.selectedStudentIds.has(row.student_id) ? 'checked' : ''} /></td>
+          <td><span class="student-name">${escapeHtml(row.student_name || '-')}</span></td>
+          <td>${escapeHtml(row.student_code || '-')}</td>
+          <td>${escapeHtml(gradeLabel(row.student_grade))}</td>
+          <td>${escapeHtml(row.course_name || '-')}</td>
+          <td>${studentCourseTypeBadge(row.student_course_type)}</td>
+          <td>${escapeHtml(row.course_active_assignment_count ?? row.active_assignment_count ?? 0)}</td>
+          <td>${sameTestBadge(row)}</td>
+          <td>${escapeHtml(fmtPercent(row.course_round2_avg))}</td>
+          <td>${escapeHtml(fmtPercent(row.course_final_avg))}</td>
+        </tr>
+      `).join('');
+      body.querySelectorAll('.student-check').forEach(el => {
+        el.addEventListener('change', () => {
+          const id = el.dataset.studentId;
+          if (el.checked) state.selectedStudentIds.add(id); else state.selectedStudentIds.delete(id);
+          updateSelectionUi();
+        });
+      });
+      updateSelectionUi();
+    }
+
+
+    function buildStudentAssignmentLink(assignmentId) {
+      if (!assignmentId) return '';
+      const url = new URL(window.location.href);
+      const basePath = url.pathname.replace(/[^/]+$/, 'student-answer-omr.html');
+      return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`;
+    }
+
+    async function copyText(text) {
+      if (!text) throw new Error('복사할 내용이 없습니다.');
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+
+    async function loadAssignments() {
+      try {
+        if (!state.supabase) state.supabase = createClientOrThrow();
+        const params = {
+          p_course_id: currentCourseId(),
+          p_test_set_id: $('filterCurrentTestOnly').checked ? state.selectedTestSetId : null,
+          p_student_id: null,
+          p_is_open: $('filterOpenOnly').checked ? true : null,
+          p_purpose: $('purposeSelect').value || null,
+          p_status: null,
+          p_search: null,
+          p_limit: 100,
+          p_offset: 0
+        };
+        setStatus('assignmentStatus', '발행상황을 불러오는 중입니다.', 'info');
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_assignments', params);
+        if (error) throw error;
+        state.assignments = Array.isArray(data) ? data : [];
+        renderAssignmentList();
+        setStatus('assignmentStatus', `assignment ${state.assignments.length}건을 불러왔습니다.`, 'ok');
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    function renderAssignmentList() {
+      const body = $('assignmentListBody');
+      if (!state.assignments.length) {
+        body.innerHTML = '<div class="list-row"><div class="muted" style="grid-column:1/-1;">발행상황 결과가 없습니다.</div></div>';
+        updateSummaryCards();
+        return;
+      }
+      body.innerHTML = state.assignments.map(row => {
+        const studentLink = buildStudentAssignmentLink(row.assignment_id);
+        return `
+        <div class="list-row">
+          <div>${escapeHtml(gradeLabel(row.student_grade))}</div>
+          <div><strong>${escapeHtml(row.test_title || '-')}</strong></div>
+          <div>${escapeHtml(fmtDate(row.assigned_at))}</div>
+          <div>${escapeHtml(row.student_name || '-')}</div>
+          <div class="score ${row.round1_score_percent == null ? 'blank' : ''}">${escapeHtml(fmtPercent(row.round1_score_percent))}</div>
+          <div class="score ${row.round2_score_percent == null ? 'blank' : ''}">${escapeHtml(fmtPercent(row.round2_score_percent))}</div>
+          <div class="score ${row.final_score_percent == null ? 'blank' : ''}">${escapeHtml(fmtPercent(row.final_score_percent ?? row.round2_score_percent))}</div>
+          <div><input type="checkbox" class="assignment-open-toggle" data-assignment-id="${row.assignment_id}" ${row.is_open ? 'checked' : ''} /></div>
+          <div class="link-box">
+            <input class="link-input" type="text" readonly value="${escapeHtml(studentLink)}" />
+            <button class="mini-btn assignment-copy-link-btn" type="button" data-link="${escapeHtml(studentLink)}">복사</button>
+          </div>
+          <div class="manage-box"><button class="mini-btn assignment-toggle-btn" type="button" data-assignment-id="${row.assignment_id}" data-is-open="${row.is_open}">${row.is_open ? '닫기' : '열기'}</button></div>
+        </div>
+      `}).join('');
+      body.querySelectorAll('.assignment-open-toggle').forEach(el => {
+        el.addEventListener('change', async () => {
+          await setAssignmentOpenState(el.dataset.assignmentId, el.checked);
+        });
+      });
+      body.querySelectorAll('.assignment-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await setAssignmentOpenState(btn.dataset.assignmentId, btn.dataset.isOpen !== 'true');
+        });
+      });
+      body.querySelectorAll('.assignment-copy-link-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await copyText(btn.dataset.link || '');
+            setStatus('assignmentStatus', '학생용 링크를 복사했습니다.', 'ok');
+          } catch (err) {
+            setStatus('assignmentStatus', normalizeError(err), 'error');
+          }
+        });
+      });
+      updateSummaryCards();
+    }
+
+    async function setAssignmentOpenState(assignmentId, isOpen) {
+      try {
+        const closedReason = isOpen ? null : 'teacher_manual_close';
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_set_assignment_open_state', {
+          p_assignment_id: assignmentId,
+          p_is_open: isOpen,
+          p_closed_reason: closedReason
+        });
+        if (error) throw error;
+        if (data && data.ok === false) throw new Error(data.error || 'assignment 상태 변경 실패');
+        await loadAssignments();
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    function updateSelectionUi() {
+      const selectedCount = state.selectedStudentIds.size;
+      $('studentToolbarInfo').textContent = `검색 결과 ${state.students.length}명 · 현재 ${selectedCount}명 선택됨`;
+      $('issueSelectedCount').textContent = `${selectedCount}명`;
+      $('footerSelectedCount').textContent = `${selectedCount}명`;
+      $('sumSelectedStudents').textContent = `${selectedCount}명`;
+      updateIssueWarning();
+      updateFooter();
+    }
+
+    function updateIssueWarning() {
+      const selectedRows = state.students.filter(s => state.selectedStudentIds.has(s.student_id));
+      const openSame = selectedRows.filter(r => r.has_same_test_open_assignment).length;
+      const sameAny = selectedRows.filter(r => r.has_same_test_assignment).length;
+      if (!selectedRows.length) {
+        $('issueWarningText').textContent = '학생을 선택하면 동일 시험 기존 assignment 여부를 여기에서 안내합니다.';
+        return;
+      }
+      $('issueWarningText').textContent = `선택한 학생 ${selectedRows.length}명 중 ${openSame}명은 동일 시험 열림 assignment가 있고, ${sameAny}명은 동일 시험 이력이 있습니다. reopen_existing를 켜면 닫힌 기존 assignment는 재오픈 대상이 됩니다.`;
+    }
+
+    function updateSummaryCards() {
+      $('sumTestSets').textContent = `${state.testSets.length}건`;
+      $('sumAssignments').textContent = `${state.assignments.length}건`;
+      $('sumOpenAssignments').textContent = `${state.assignments.filter(a => a.is_open).length}건`;
+    }
+
+    function updateFooter() {
+      $('issueCourseName').textContent = currentCourseName() || '전체';
+      $('footerCourseName').textContent = currentCourseName() || '전체';
+    }
+
+    async function issueAssignments() {
+      try {
+        if (!state.supabase) state.supabase = createClientOrThrow();
+        if (!state.selectedTestSetId) throw new Error('먼저 시험을 선택해 주세요.');
+        const studentIds = [...state.selectedStudentIds];
+        if (!studentIds.length) throw new Error('발행할 학생을 1명 이상 선택해 주세요.');
+        setStatus('issueStatus', 'assignment 발행을 진행 중입니다.', 'info');
+        const payload = {
+          p_test_set_id: state.selectedTestSetId,
+          p_student_ids: studentIds,
+          p_course_id: currentCourseId(),
+          p_purpose: $('purposeSelect').value || null,
+          p_reopen_existing: $('reopenExisting').checked
+        };
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_issue_assignments', payload);
+        if (error) throw error;
+        setStatus('issueStatus', `발행 처리 완료\ncreated: ${data?.created_count ?? 0}\nreopened: ${data?.reopened_count ?? 0}\nskipped_existing_open: ${data?.skipped_existing_open_count ?? 0}\nskipped_existing_closed: ${data?.skipped_existing_closed_count ?? 0}`, 'ok');
+        $('issueResultBox').style.display = 'block';
+        $('issueResultBox').textContent = JSON.stringify({ payload, response: data }, null, 2);
+        await Promise.all([loadStudents(), loadAssignments(), loadTestOverview(state.selectedTestSetId)]);
+        renderSelectedTest();
+      } catch (err) {
+        setStatus('issueStatus', normalizeError(err), 'error');
+        $('issueResultBox').style.display = 'block';
+        $('issueResultBox').textContent = JSON.stringify({ error: normalizeError(err) }, null, 2);
+      }
+    }
+
+    function clearSelectedStudents() {
+      state.selectedStudentIds = new Set();
+      $('selectAllStudents').checked = false;
+      renderStudentTable();
+    }
+
+    function resetTestSearch() {
+      $('testGradeFilter').value = '';
+      $('testTitleFilter').value = '';
+      $('testSourceFilter').value = '';
+      $('testPurposeFilter').value = '';
+      $('testActiveOnly').checked = true;
+      clearSelectedTest();
+      loadTestSets();
+    }
+
+    function wireEvents() {
+      $('saveConfigBtn').addEventListener('click', saveConfig);
+      $('connectBtn').addEventListener('click', connectAndBootstrap);
+      $('reloadAllBtn').addEventListener('click', async () => {
+        await connectAndBootstrap();
+        await Promise.all([loadStudents(), loadAssignments()]);
+      });
+      $('searchTestsBtn').addEventListener('click', loadTestSets);
+      $('resetTestSearchBtn').addEventListener('click', resetTestSearch);
+      $('searchStudentsBtn').addEventListener('click', loadStudents);
+      $('loadAssignmentsBtn').addEventListener('click', loadAssignments);
+      $('issueAssignmentsBtn').addEventListener('click', issueAssignments);
+      $('footerIssueBtn').addEventListener('click', issueAssignments);
+      $('clearSelectedStudentsBtn').addEventListener('click', clearSelectedStudents);
+      $('purposeSelect').addEventListener('change', async () => {
+        if (state.selectedTestSetId) {
+          await loadTestOverview(state.selectedTestSetId);
+          renderSelectedTest();
+        }
+        await loadAssignments();
+      });
+      $('selectAllStudents').addEventListener('change', (e) => {
+        if (e.target.checked) state.students.forEach(s => state.selectedStudentIds.add(s.student_id));
+        else state.selectedStudentIds.clear();
+        renderStudentTable();
+      });
+      $('courseSelect').addEventListener('change', async () => {
+        updateFooter();
+        await Promise.all([loadStudents(), loadAssignments()]);
+      });
+      $('filterOpenOnly').addEventListener('change', loadAssignments);
+      $('filterCurrentTestOnly').addEventListener('change', loadAssignments);
+      $('studentNameSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadStudents(); });
+      $('studentCodeSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadStudents(); });
+      $('testTitleFilter').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadTestSets(); });
+    }
+
+    function init() {
+      loadConfig();
+      wireEvents();
+      updateSelectionUi();
+      updateSummaryCards();
+      updateFooter();
+      renderSelectedTest();
+    }
+
+    init();
+  </script>
+</body>
+</html>
