@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>단원 체계 업로드</title>
+    <style>
+      :root {
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --line: #d9deea;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --accent: #2563eb;
+        --accent-soft: #dbeafe;
+        --ok: #0f766e;
+        --warn: #92400e;
+        --danger: #b91c1c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Arial, "Noto Sans KR", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 1220px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .sub {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .badge {
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 999px;
+        font-size: 13px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 16px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+      }
+      .panel h2 {
+        margin: 0 0 14px;
+        font-size: 18px;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .field label {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 14px;
+        background: #fff;
+      }
+      .wide {
+        grid-column: 1/-1;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      button {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 700;
+      }
+      .soft {
+        background: var(--accent-soft);
+        border-color: #bfdbfe;
+        color: #1d4ed8;
+      }
+      .hint,
+      .mini {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .code-box {
+        border: 1px dashed #93c5fd;
+        background: #eff6ff;
+        border-radius: 12px;
+        padding: 12px;
+        font-size: 14px;
+        color: #1e3a8a;
+        line-height: 1.6;
+      }
+      .summary-list {
+        display: grid;
+        gap: 10px;
+      }
+      .summary-item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+      }
+      .summary-item .k {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .summary-item .v {
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.45;
+        word-break: break-word;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.6;
+        display: none;
+        white-space: pre-line;
+      }
+      .status.ok {
+        display: block;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: var(--ok);
+      }
+      .status.error {
+        display: block;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: var(--danger);
+      }
+      .status.info {
+        display: block;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1d4ed8;
+      }
+      .table-wrap {
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: auto;
+        background: #fff;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 760px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #eef2f7;
+        padding: 10px 12px;
+        text-align: left;
+        font-size: 13px;
+        vertical-align: top;
+      }
+      th {
+        background: #f8fafc;
+        color: #475569;
+        font-weight: 700;
+      }
+      .tag {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        border: 1px solid #dbe3f0;
+        background: #f8fafc;
+      }
+      .result-box {
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 12px;
+        font-size: 12px;
+        overflow: auto;
+        white-space: pre-wrap;
+        display: none;
+      }
+      @media (max-width: 980px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+        .topbar {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <div>
+          <h1>단원 체계 CSV 업로드</h1>
+          <p class="sub">
+            `단원번호, 대단원명, 중단원번호, 중단원명, 소단원번호, 소단원명`
+            형식의 CSV를 읽어 빈칸 상속 규칙으로 해석한 뒤
+            `auto_grading.upsert_curriculum_unit_hierarchy(...)`로
+            대/중/소단원 row를 DB에 반영합니다.
+          </p>
+        </div>
+        <div class="badge">curriculum_units 업로드</div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>연결 및 업로드</h2>
+          <div class="form-grid">
+            <div class="field wide">
+              <label for="supabaseUrl">Supabase URL</label>
+              <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
+            </div>
+            <div class="field wide">
+              <label for="supabaseAnonKey">Supabase Anon Key</label>
+              <textarea id="supabaseAnonKey" rows="3" placeholder="eyJ..."></textarea>
+            </div>
+            <div class="field">
+              <label for="curriculumVersion">교육과정</label>
+              <select id="curriculumVersion">
+                <option value="2015" selected>2015</option>
+                <option value="2022">2022</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="gradeLevel">학년 코드</label>
+              <select id="gradeLevel">
+                <option value="M1">M1</option>
+                <option value="M2">M2</option>
+                <option value="M3" selected>M3</option>
+                <option value="H1">H1</option>
+              </select>
+            </div>
+            <div class="field wide">
+              <label for="subject">과목</label>
+              <input id="subject" type="text" value="중3과학" />
+              <div class="hint">
+                DB에 저장되는 `subject` 문자열입니다. 기존 문제지 등록 페이지와 정확히
+                같은 값을 넣어야 합니다.
+              </div>
+            </div>
+            <div class="field wide">
+              <label for="csvFile">단원 CSV</label>
+              <input id="csvFile" type="file" accept=".csv,text/csv" />
+            </div>
+            <div class="field wide">
+              <label>해석 규칙</label>
+              <div class="code-box">
+                1) 빈칸은 바로 위의 대단원/중단원 값을 이어받습니다.<br />
+                2) 소단원 행 1개는 `100 / 110 / 111` 식 계층 row를 보장합니다.<br />
+                3) 예: `5 / 생식과 유전`, `2 / 유전`, `1 / 멘델의 유전 원리와 중간 유전`
+                이면 `500`, `520`, `521`이 산출됩니다.
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="saveConfigBtn" type="button">연결정보 저장</button>
+            <button id="connectBtn" class="soft" type="button">DB 연결 확인</button>
+            <button id="validateBtn" class="soft" type="button">CSV 해석 미리보기</button>
+            <button id="uploadBtn" class="primary" type="button">DB 업로드 실행</button>
+            <button id="resetBtn" type="button">초기화</button>
+          </div>
+
+          <div id="connectStatus" class="status info"></div>
+          <div id="statusBox" class="status info"></div>
+          <pre id="resultBox" class="result-box"></pre>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>원본 행</th>
+                  <th>해석 레벨</th>
+                  <th>대단원</th>
+                  <th>중단원</th>
+                  <th>소단원</th>
+                  <th>산출 코드</th>
+                </tr>
+              </thead>
+              <tbody id="previewBody">
+                <tr>
+                  <td colspan="6" class="mini">CSV를 선택하고 `CSV 해석 미리보기`를 눌러 주세요.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>업로드 요약</h2>
+          <div class="summary-list">
+            <div class="summary-item">
+              <div class="k">대상 메타</div>
+              <div id="summaryMeta" class="v">2015 / M3 / 중3과학</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">원본 CSV 행 수</div>
+              <div id="summarySourceRows" class="v">0건</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">해석된 입력 호출 수</div>
+              <div id="summaryUploadCalls" class="v">0건</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">예상 대단원 row</div>
+              <div id="summaryMajorRows" class="v">0건</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">예상 중단원 row</div>
+              <div id="summaryMiddleRows" class="v">0건</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">예상 소단원 row</div>
+              <div id="summaryNanoRows" class="v">0건</div>
+            </div>
+            <div class="summary-item">
+              <div class="k">예상 총 DB row</div>
+              <div id="summaryTotalRows" class="v">0건</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script>
+      const STORAGE_KEY = "ag_curriculum_units_upload_config_v1";
+      const REQUIRED_HEADERS = ["단원번호", "대단원명", "중단원번호", "중단원명", "소단원번호", "소단원명"];
+      const $ = (id) => document.getElementById(id);
+
+      const state = {
+        supabase: null,
+        parsedRows: [],
+        stats: null,
+      };
+
+      function setStatus(message, type = "info", targetId = "statusBox") {
+        const box = $(targetId);
+        if (!box) return;
+        if (!message) {
+          box.className = "status info";
+          box.style.display = "none";
+          box.textContent = "";
+          return;
+        }
+        box.style.display = "block";
+        box.className = `status ${type}`;
+        box.textContent = message;
+      }
+
+      function normalizeError(err) {
+        if (!err) return "알 수 없는 오류가 발생했습니다.";
+        if (typeof err === "string") return err;
+        if (err.message) return err.message;
+        try {
+          return JSON.stringify(err, null, 2);
+        } catch (_) {
+          return "알 수 없는 오류가 발생했습니다.";
+        }
+      }
+
+      function clean(value) {
+        return String(value ?? "").trim();
+      }
+
+      function oneDigit(value, label, allowZero = false) {
+        const text = clean(value);
+        if (!text) return "";
+        if (!/^\d$/.test(text)) throw new Error(`${label}는 한 자리 숫자여야 합니다. 입력값=${text}`);
+        if (!allowZero && text === "0") throw new Error(`${label}는 0일 수 없습니다.`);
+        return text;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function loadConfig() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return;
+          const saved = JSON.parse(raw);
+          $("supabaseUrl").value = saved.url || "";
+          $("supabaseAnonKey").value = saved.anonKey || "";
+          $("curriculumVersion").value = saved.curriculumVersion || "2015";
+          $("gradeLevel").value = saved.gradeLevel || "M3";
+          $("subject").value = saved.subject || "중3과학";
+        } catch (_) {}
+      }
+
+      function saveConfig() {
+        const payload = {
+          url: $("supabaseUrl").value.trim(),
+          anonKey: $("supabaseAnonKey").value.trim(),
+          curriculumVersion: $("curriculumVersion").value,
+          gradeLevel: $("gradeLevel").value,
+          subject: $("subject").value.trim(),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        setStatus("연결정보를 저장했습니다.", "ok", "connectStatus");
+      }
+
+      function createClientOrThrow() {
+        const url = $("supabaseUrl").value.trim();
+        const anonKey = $("supabaseAnonKey").value.trim();
+        if (!url || !anonKey) throw new Error("Supabase URL과 Anon Key를 먼저 입력해 주세요.");
+        return window.supabase.createClient(url, anonKey);
+      }
+
+      async function connect() {
+        try {
+          saveConfig();
+          state.supabase = createClientOrThrow();
+          const { count, error } = await state.supabase
+            .schema("auto_grading")
+            .from("curriculum_units")
+            .select("*", { head: true, count: "exact" });
+          if (error) {
+            setStatus(
+              `클라이언트는 생성됐지만 curriculum_units 조회는 실패했습니다.\n${normalizeError(error)}\n테이블 조회 권한이 없어도 RPC 업로드는 동작할 수 있습니다.`,
+              "info",
+              "connectStatus"
+            );
+            return;
+          }
+          setStatus(`DB 연결 확인 완료. 현재 curriculum_units ${count ?? 0}건`, "ok", "connectStatus");
+        } catch (err) {
+          setStatus(normalizeError(err), "error", "connectStatus");
+        }
+      }
+
+      function updateSummary() {
+        $("summaryMeta").textContent =
+          `${$("curriculumVersion").value} / ${$("gradeLevel").value} / ${$("subject").value.trim() || "-"}`;
+        $("summarySourceRows").textContent = `${state.parsedRows.length}건`;
+        $("summaryUploadCalls").textContent = `${state.parsedRows.length}건`;
+        $("summaryMajorRows").textContent = `${state.stats?.majorCount || 0}건`;
+        $("summaryMiddleRows").textContent = `${state.stats?.middleCount || 0}건`;
+        $("summaryNanoRows").textContent = `${state.stats?.nanoCount || 0}건`;
+        $("summaryTotalRows").textContent = `${state.stats?.totalCount || 0}건`;
+      }
+
+      function renderPreview() {
+        const body = $("previewBody");
+        if (!state.parsedRows.length) {
+          body.innerHTML = '<tr><td colspan="6" class="mini">CSV를 선택하고 `CSV 해석 미리보기`를 눌러 주세요.</td></tr>';
+          updateSummary();
+          return;
+        }
+        body.innerHTML = state.parsedRows.map((row) => `
+          <tr>
+            <td>${row.sourceLine}</td>
+            <td><span class="tag">${escapeHtml(row.targetLevel)}</span></td>
+            <td>${escapeHtml(row.majorCode)} / ${escapeHtml(row.majorName)}</td>
+            <td>${escapeHtml(row.minorCode)} / ${escapeHtml(row.minorName || '-')}</td>
+            <td>${escapeHtml(row.nanoCode)} / ${escapeHtml(row.nanoName || '-')}</td>
+            <td>${escapeHtml(row.targetUnitCode)}</td>
+          </tr>
+        `).join("");
+        updateSummary();
+      }
+
+      async function parseCsvFile() {
+        const file = $("csvFile").files[0];
+        if (!file) throw new Error("CSV 파일을 선택해 주세요.");
+        return new Promise((resolve, reject) => {
+          Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+              const rows = results.data || [];
+              if (!rows.length) {
+                reject(new Error("CSV에 데이터가 없습니다."));
+                return;
+              }
+              const headers = Object.keys(rows[0] || {}).map((key) => key.trim());
+              const missing = REQUIRED_HEADERS.filter((header) => !headers.includes(header));
+              if (missing.length) {
+                reject(new Error(`필수 헤더가 없습니다: ${missing.join(", ")}`));
+                return;
+              }
+              resolve(rows);
+            },
+            error: (err) => reject(err),
+          });
+        });
+      }
+
+      function deriveRows(csvRows) {
+        let currentMajorCode = "";
+        let currentMajorName = "";
+        let currentMinorCode = "";
+        let currentMinorName = "";
+        const derived = [];
+
+        csvRows.forEach((raw, index) => {
+          const sourceLine = index + 2;
+          const majorCodeRaw = clean(raw["단원번호"]);
+          const majorNameRaw = clean(raw["대단원명"]);
+          const minorCodeRaw = clean(raw["중단원번호"]);
+          const minorNameRaw = clean(raw["중단원명"]);
+          const nanoCodeRaw = clean(raw["소단원번호"]);
+          const nanoNameRaw = clean(raw["소단원명"]);
+
+          if (majorCodeRaw || majorNameRaw) {
+            if (!majorCodeRaw || !majorNameRaw) {
+              throw new Error(`${sourceLine}행: 대단원번호와 대단원명은 함께 있어야 합니다.`);
+            }
+            currentMajorCode = oneDigit(majorCodeRaw, `${sourceLine}행 대단원번호`);
+            currentMajorName = majorNameRaw;
+            currentMinorCode = "";
+            currentMinorName = "";
+          }
+
+          if (minorCodeRaw || minorNameRaw) {
+            if (!currentMajorCode) {
+              throw new Error(`${sourceLine}행: 중단원보다 먼저 대단원이 나와야 합니다.`);
+            }
+            if (!minorCodeRaw || !minorNameRaw) {
+              throw new Error(`${sourceLine}행: 중단원번호와 중단원명은 함께 있어야 합니다.`);
+            }
+            currentMinorCode = oneDigit(minorCodeRaw, `${sourceLine}행 중단원번호`);
+            currentMinorName = minorNameRaw;
+          }
+
+          if (!currentMajorCode || !currentMajorName) {
+            throw new Error(`${sourceLine}행: 현재 대단원 컨텍스트를 해석할 수 없습니다.`);
+          }
+
+          let targetLevel = "major";
+          let minorCode = "0";
+          let minorName = "";
+          let nanoCode = "0";
+          let nanoName = "";
+
+          if (nanoCodeRaw || nanoNameRaw) {
+            if (!currentMinorCode || !currentMinorName) {
+              throw new Error(`${sourceLine}행: 소단원보다 먼저 중단원이 나와야 합니다.`);
+            }
+            if (!nanoCodeRaw || !nanoNameRaw) {
+              throw new Error(`${sourceLine}행: 소단원번호와 소단원명은 함께 있어야 합니다.`);
+            }
+            targetLevel = "nano";
+            minorCode = currentMinorCode;
+            minorName = currentMinorName;
+            nanoCode = oneDigit(nanoCodeRaw, `${sourceLine}행 소단원번호`);
+            nanoName = nanoNameRaw;
+          } else if (minorCodeRaw || minorNameRaw) {
+            targetLevel = "middle";
+            minorCode = currentMinorCode;
+            minorName = currentMinorName;
+          } else if (majorCodeRaw || majorNameRaw) {
+            targetLevel = "major";
+          } else {
+            throw new Error(`${sourceLine}행: 해석할 단원 정보가 없습니다.`);
+          }
+
+          const targetUnitCode =
+            targetLevel === "major"
+              ? `${currentMajorCode}00`
+              : targetLevel === "middle"
+                ? `${currentMajorCode}${minorCode}0`
+                : `${currentMajorCode}${minorCode}${nanoCode}`;
+
+          derived.push({
+            sourceLine,
+            targetLevel,
+            majorCode: currentMajorCode,
+            majorName: currentMajorName,
+            minorCode,
+            minorName,
+            nanoCode,
+            nanoName,
+            targetUnitCode,
+          });
+        });
+
+        return derived;
+      }
+
+      function buildStats(parsedRows) {
+        const majorMap = new Map();
+        const middleMap = new Map();
+        const nanoMap = new Map();
+
+        parsedRows.forEach((row) => {
+          majorMap.set(`${row.majorCode}00`, row.majorName);
+          if (row.targetLevel === "middle" || row.targetLevel === "nano") {
+            middleMap.set(`${row.majorCode}${row.minorCode}0`, row.minorName);
+          }
+          if (row.targetLevel === "nano") {
+            nanoMap.set(`${row.majorCode}${row.minorCode}${row.nanoCode}`, row.nanoName);
+          }
+        });
+
+        return {
+          majorCount: majorMap.size,
+          middleCount: middleMap.size,
+          nanoCount: nanoMap.size,
+          totalCount: majorMap.size + middleMap.size + nanoMap.size,
+        };
+      }
+
+      async function validateCsv() {
+        const csvRows = await parseCsvFile();
+        state.parsedRows = deriveRows(csvRows);
+        state.stats = buildStats(state.parsedRows);
+        renderPreview();
+        setStatus(
+          `CSV 해석 완료\n원본 ${state.parsedRows.length}행\n예상 DB row ${state.stats.totalCount}건 (대 ${state.stats.majorCount}, 중 ${state.stats.middleCount}, 소 ${state.stats.nanoCount})`,
+          "ok"
+        );
+        return state.parsedRows;
+      }
+
+      async function uploadUnits() {
+        try {
+          saveConfig();
+          if (!state.supabase) state.supabase = createClientOrThrow();
+          if (!state.parsedRows.length) {
+            await validateCsv();
+          }
+
+          const gradeLevel = $("gradeLevel").value;
+          const curriculumVersion = $("curriculumVersion").value;
+          const subject = $("subject").value.trim();
+          if (!subject) throw new Error("과목 값을 입력해 주세요.");
+
+          const responses = [];
+          for (let i = 0; i < state.parsedRows.length; i += 1) {
+            const row = state.parsedRows[i];
+            setStatus(`DB 업로드 중... ${i + 1}/${state.parsedRows.length}\n현재 코드 ${row.targetUnitCode}`, "info");
+
+            const payload = {
+              p_grade_level: gradeLevel,
+              p_curriculum_version: curriculumVersion,
+              p_subject: subject,
+              p_major_unit_code: row.majorCode,
+              p_major_unit_name: row.majorName,
+              p_minor_unit_code: row.minorCode === "0" ? null : row.minorCode,
+              p_minor_unit_name: row.minorName || null,
+              p_nano_unit_code: row.nanoCode === "0" ? null : row.nanoCode,
+              p_nano_unit_name: row.nanoName || null,
+              p_is_active: true,
+            };
+
+            const { data, error } = await state.supabase
+              .schema("auto_grading")
+              .rpc("upsert_curriculum_unit_hierarchy", payload);
+            if (error) throw new Error(`${row.sourceLine}행 업로드 실패: ${normalizeError(error)}`);
+            responses.push({ sourceLine: row.sourceLine, code: row.targetUnitCode, response: data });
+          }
+
+          setStatus(
+            `업로드 완료\n입력 호출 ${state.parsedRows.length}건\n예상 계층 row ${state.stats?.totalCount || 0}건`,
+            "ok"
+          );
+          $("resultBox").style.display = "block";
+          $("resultBox").textContent = JSON.stringify({
+            meta: {
+              grade_level: gradeLevel,
+              curriculum_version: curriculumVersion,
+              subject,
+            },
+            stats: state.stats,
+            sample_responses: responses.slice(0, 10),
+          }, null, 2);
+        } catch (err) {
+          setStatus(normalizeError(err), "error");
+          $("resultBox").style.display = "block";
+          $("resultBox").textContent = JSON.stringify({ error: normalizeError(err) }, null, 2);
+        }
+      }
+
+      function resetPage() {
+        $("csvFile").value = "";
+        state.parsedRows = [];
+        state.stats = null;
+        $("previewBody").innerHTML = '<tr><td colspan="6" class="mini">CSV를 선택하고 `CSV 해석 미리보기`를 눌러 주세요.</td></tr>';
+        $("resultBox").style.display = "none";
+        $("resultBox").textContent = "";
+        setStatus("", "info");
+        updateSummary();
+      }
+
+      function wireEvents() {
+        $("saveConfigBtn").addEventListener("click", saveConfig);
+        $("connectBtn").addEventListener("click", connect);
+        $("validateBtn").addEventListener("click", async () => {
+          try {
+            await validateCsv();
+          } catch (err) {
+            state.parsedRows = [];
+            state.stats = null;
+            renderPreview();
+            setStatus(normalizeError(err), "error");
+          }
+        });
+        $("uploadBtn").addEventListener("click", uploadUnits);
+        $("resetBtn").addEventListener("click", resetPage);
+        ["curriculumVersion", "gradeLevel", "subject"].forEach((id) => {
+          $(id).addEventListener("input", updateSummary);
+          $(id).addEventListener("change", updateSummary);
+        });
+      }
+
+      function init() {
+        loadConfig();
+        wireEvents();
+        updateSummary();
+      }
+
+      init();
+    </script>
+  </body>
+</html>

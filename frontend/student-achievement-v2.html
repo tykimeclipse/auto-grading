@@ -51,7 +51,7 @@
       }
       .cards {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 12px;
         margin-bottom: 18px;
       }
@@ -89,7 +89,7 @@
       table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 760px;
+        min-width: 900px;
       }
       thead {
         background: #f9fafb;
@@ -168,6 +168,10 @@
             <div class="card-label">누적 2차 성취도</div>
             <div id="avgRound2" class="card-value">-</div>
           </div>
+          <div class="card">
+            <div class="card-label">누적 최종 성취도</div>
+            <div id="avgFinal" class="card-value">-</div>
+          </div>
         </div>
 
         <div class="table-box">
@@ -181,6 +185,7 @@
                   <th>문항수</th>
                   <th>1차 성취도</th>
                   <th>2차 성취도</th>
+                  <th>최종 성취도</th>
                 </tr>
               </thead>
               <tbody id="historyBody"></tbody>
@@ -206,6 +211,7 @@
       const totalSolvedEl = document.getElementById("totalSolved");
       const avgRound1El = document.getElementById("avgRound1");
       const avgRound2El = document.getElementById("avgRound2");
+      const avgFinalEl = document.getElementById("avgFinal");
       const historyBody = document.getElementById("historyBody");
 
       function showMessage(type, text) {
@@ -242,6 +248,18 @@
       function formatGradeLevel(value) {
         if (!value) return "-";
         const map = {
+          E1: "초1",
+          E2: "초2",
+          E3: "초3",
+          E4: "초4",
+          E5: "초5",
+          E6: "초6",
+          M1: "중1",
+          M2: "중2",
+          M3: "중3",
+          H1: "고1",
+          H2: "고2",
+          H3: "고3",
           middle_1: "중1",
           middle_2: "중2",
           middle_3: "중3",
@@ -304,7 +322,7 @@
         if (!rows || rows.length === 0) {
           const tr = document.createElement("tr");
           const td = document.createElement("td");
-          td.colSpan = 5;
+          td.colSpan = 6;
           td.className = "muted";
           td.textContent = "배정된 시험 기록이 없습니다.";
           tr.appendChild(td);
@@ -332,7 +350,10 @@
           const tdR2 = document.createElement("td");
           tdR2.textContent = formatPercent(row.round2_score_percent);
 
-          tr.append(tdDate, tdTitle, tdItems, tdR1, tdR2);
+          const tdFinal = document.createElement("td");
+          tdFinal.textContent = formatPercent(row.final_score_percent);
+
+          tr.append(tdDate, tdTitle, tdItems, tdR1, tdR2, tdFinal);
           historyBody.appendChild(tr);
         }
       }
@@ -385,6 +406,11 @@
               : "-";
 
           avgRound2El.textContent =
+            stats?.round2_accuracy != null
+              ? `${Number(stats.round2_accuracy).toFixed(1)}%`
+              : "-";
+
+          avgFinalEl.textContent =
             stats?.final_accuracy != null
               ? `${Number(stats.final_accuracy).toFixed(1)}%`
               : "-";

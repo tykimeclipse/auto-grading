@@ -1,3 +1,5 @@
+drop function if exists auto_grading.get_student_assignment_history_by_code(text, integer);
+
 create or replace function auto_grading.get_student_assignment_history_by_code(
     p_student_code text,
     p_limit integer default 200
@@ -13,6 +15,8 @@ returns table (
     round1_score_percent numeric(5,1),
     round2_correct_count integer,
     round2_score_percent numeric(5,1),
+    final_correct_count integer,
+    final_score_percent numeric(5,1),
     last_activity_at timestamptz
 )
 language plpgsql
@@ -66,8 +70,10 @@ begin
             at.assignment_id,
             at.first_correct_count,
             at.final_correct_count,
+            at.teacher_final_correct_count,
             at.first_score_percent,
             at.final_score_percent,
+            at.teacher_final_score_percent,
             at.started_at,
             at.round1_submitted_at,
             at.round2_submitted_at,
@@ -124,6 +130,18 @@ begin
                 else null
             end as round2_score_percent,
             coalesce(
+                la.teacher_final_correct_count,
+                la.final_correct_count
+            ) as final_correct_count,
+            case
+                when coalesce(la.teacher_final_score_percent, la.final_score_percent) is not null
+                then round(coalesce(la.teacher_final_score_percent, la.final_score_percent)::numeric, 1)
+                when coalesce(la.teacher_final_correct_count, la.final_correct_count) is not null
+                     and tic.total_items > 0
+                then round((coalesce(la.teacher_final_correct_count, la.final_correct_count)::numeric * 100) / tic.total_items, 1)
+                else null
+            end as final_score_percent,
+            coalesce(
                 la.completed_at,
                 la.round2_submitted_at,
                 la.round1_submitted_at,
@@ -150,6 +168,8 @@ begin
         hb.round1_score_percent,
         hb.round2_correct_count,
         hb.round2_score_percent,
+        hb.final_correct_count,
+        hb.final_score_percent,
         hb.last_activity_at
     from history_base hb
     order by hb.last_activity_at desc, hb.assignment_id desc
@@ -157,3 +177,6 @@ begin
 
 end;
 $$;
+
+grant execute on function auto_grading.get_student_assignment_history_by_code(text, integer)
+to anon, authenticated;

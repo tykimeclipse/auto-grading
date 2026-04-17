@@ -357,7 +357,8 @@
               />
               <div class="hint">
                 학년 코드는 위에서 선택하고, 여기에는 curriculum_units의
-                unit_code 3자리만 입력합니다.
+                unit_code 3자리만 입력합니다. 대단원은 `100`, 중단원은 `110`,
+                소단원은 `111`처럼 뒤 자리를 0으로 채워 계층을 표현합니다.
               </div>
             </div>
           </div>
@@ -384,14 +385,17 @@
                 <option value="problem_bank|족보(오답)">족보(오답)</option>
                 <option value="problem_bank|족보(발전)">족보(발전)</option>
                 <option value="published_book|오투">오투</option>
-                
+                <option value="published_book|오투(시험대비)">오투(시험대비)</option>
+              
               </select>
             </div>
             <div class="field wide">
               <label>단원 안내</label>
               <div id="unitGuide" class="code-box">
                 DB 연결 후 curriculum_units를 불러오면 현재 선택한 교육과정 /
-                학년 / 과목 조합에 맞는 단원 목록이 여기에 반영됩니다.
+                학년 / 과목 조합에 맞는 단원 목록이 여기에 반영됩니다. 중단원과
+                소단원 드롭다운에는 `0. 선택없음`이 포함되어 대단원/중단원/소단원
+                범위를 모두 선택할 수 있습니다.
               </div>
             </div>
           </div>
@@ -433,11 +437,11 @@
             </div>
             <div class="summary-item">
               <div class="k">대단원 / 중단원</div>
-              <div id="summaryMajorMinor" class="v">1 / 1</div>
+              <div id="summaryMajorMinor" class="v">1 - 대단원 / 0 - 선택없음</div>
             </div>
             <div class="summary-item">
-              <div class="k">단원 코드 / 소단원명</div>
-              <div id="summaryUnitNano" class="v">112 / (소단원명 미지정)</div>
+              <div class="k">단원 코드 / 선택 단원</div>
+              <div id="summaryUnitNano" class="v">112 / 소단원: (소단원명 미지정)</div>
             </div>
             <div class="summary-item">
               <div class="k">소스</div>
@@ -478,6 +482,12 @@
         csvRows: [],
         csvFileName: "",
         unitSyncLock: false,
+      };
+
+      const UNIT_LEVEL_LABELS = {
+        major: "대단원",
+        middle: "중단원",
+        nano: "소단원",
       };
 
       function setStatus(message, type = "info", targetId = "statusBox") {
@@ -581,6 +591,49 @@
         return String(value || "").replace(/\D/g, "").slice(0, 3);
       }
 
+      function normalizeSingleDigit(value, fallback = "0") {
+        const digits = String(value ?? "").replace(/\D/g, "").slice(0, 1);
+        return digits || fallback;
+      }
+
+      function sortOptionValues(options) {
+        return [...options].sort((a, b) => {
+          const av = Number(a.value);
+          const bv = Number(b.value);
+          if (!Number.isNaN(av) && !Number.isNaN(bv) && av !== bv) return av - bv;
+          return String(a.label).localeCompare(String(b.label), "ko");
+        });
+      }
+
+      function buildZeroOption() {
+        return { value: "0", label: "0 - 선택없음" };
+      }
+
+      function getUnitDisplayName(unit) {
+        if (!unit) return "-";
+        if (unit.unit_level === "major") return unit.major_unit_name || "(대단원명 미지정)";
+        if (unit.unit_level === "middle") return unit.minor_unit_name || "(중단원명 미지정)";
+        return unit.nano_unit_name || "(소단원명 미지정)";
+      }
+
+      function getUnitLevelLabel(unit) {
+        return UNIT_LEVEL_LABELS[unit?.unit_level] || "단원";
+      }
+
+      function buildSelectedUnitCode() {
+        const majorCode = normalizeSingleDigit($("majorUnit").value, "");
+        if (!majorCode) return "";
+        const minorCode = normalizeSingleDigit($("middleUnit").value, "0");
+        const nanoCode = normalizeSingleDigit($("nanoUnit").value, "0");
+        return `${majorCode}${minorCode}${nanoCode}`;
+      }
+
+      function findUnitByCode(unitCode, units = getFilteredUnits()) {
+        const normalized = normalizeUnitCode(unitCode);
+        if (!normalized) return null;
+        return units.find((unit) => String(unit.unit_code).padStart(3, "0") === normalized) || null;
+      }
+
       function getFilteredUnits() {
         const curriculumVersion = $("curriculumVersion").value;
         const gradeLevel = $("gradeLevel").value;
@@ -651,35 +704,52 @@
       function refreshUnitSelectors() {
         const filteredUnits = getFilteredUnits();
 
-        const majorOptions = [...new Map(
-          filteredUnits.map((unit) => [
-            String(unit.major_unit_code),
-            `${unit.major_unit_code} - ${unit.major_unit_name}`,
-          ])
-        ).entries()].map(([value, label]) => ({ value, label }));
+        const majorOptions = sortOptionValues(
+          [...new Map(
+            filteredUnits.map((unit) => [
+              String(unit.major_unit_code),
+              { value: String(unit.major_unit_code), label: `${unit.major_unit_code} - ${unit.major_unit_name}` },
+            ])
+          ).values()]
+        );
         fillSimpleSelect($("majorUnit"), majorOptions, $("majorUnit").value);
 
         const selectedMajor = $("majorUnit").value;
-        const minorOptions = [...new Map(
-          filteredUnits
-            .filter((unit) => String(unit.major_unit_code) === selectedMajor)
-            .map((unit) => [
-              String(unit.minor_unit_code),
-              `${unit.minor_unit_code} - ${unit.minor_unit_name}`,
-            ])
-        ).entries()].map(([value, label]) => ({ value, label }));
+        const minorMap = new Map();
+        filteredUnits
+          .filter((unit) => String(unit.major_unit_code) === selectedMajor && String(unit.minor_unit_code) !== "0")
+          .forEach((unit) => {
+            const code = String(unit.minor_unit_code);
+            if (!minorMap.has(code)) {
+              minorMap.set(code, {
+                value: code,
+                label: `${code} - ${unit.minor_unit_name || "(중단원명 미지정)"}`,
+              });
+            }
+          });
+        const minorOptions = [buildZeroOption(), ...sortOptionValues([...minorMap.values()])];
         fillSimpleSelect($("middleUnit"), minorOptions, $("middleUnit").value);
 
         const selectedMinor = $("middleUnit").value;
-        const nanoOptions = filteredUnits
-          .filter((unit) =>
-            String(unit.major_unit_code) === selectedMajor &&
-            String(unit.minor_unit_code) === selectedMinor
-          )
-          .map((unit) => ({
-            value: String(unit.nano_unit_code),
-            label: `${unit.nano_unit_code} - ${unit.nano_unit_name}`,
-          }));
+        const nanoMap = new Map();
+        if (selectedMinor !== "0") {
+          filteredUnits
+            .filter((unit) =>
+              String(unit.major_unit_code) === selectedMajor &&
+              String(unit.minor_unit_code) === selectedMinor &&
+              String(unit.nano_unit_code) !== "0"
+            )
+            .forEach((unit) => {
+              const code = String(unit.nano_unit_code);
+              if (!nanoMap.has(code)) {
+                nanoMap.set(code, {
+                  value: code,
+                  label: `${code} - ${unit.nano_unit_name || "(소단원명 미지정)"}`,
+                });
+              }
+            });
+        }
+        const nanoOptions = [buildZeroOption(), ...sortOptionValues([...nanoMap.values()])];
         fillSimpleSelect($("nanoUnit"), nanoOptions, $("nanoUnit").value);
 
         updateUnitGuide(filteredUnits);
@@ -699,18 +769,21 @@
         const majorText = selectedText($("majorUnit")) || "-";
         const minorText = selectedText($("middleUnit")) || "-";
         const nanoText = selectedText($("nanoUnit")) || "-";
+        const levelText = selected ? getUnitLevelLabel(selected) : "단원";
+        const selectedName = selected ? getUnitDisplayName(selected) : "(해당 unit row 없음)";
         guide.innerHTML =
           `현재 조합 기준 단원 ${filteredUnits.length}건이 로드되어 있습니다.<br>` +
           `대단원: ${escapeHtml(majorText)}<br>` +
           `중단원: ${escapeHtml(minorText)}<br>` +
           `소단원: ${escapeHtml(nanoText)}` +
-          (selected ? `<br>unit_code: ${escapeHtml(String(selected.unit_code).padStart(3, "0"))}` : "");
+          `<br>선택 단원: ${escapeHtml(levelText)} / ${escapeHtml(selectedName)}` +
+          `<br>unit_code: ${escapeHtml(normalizeUnitCode($("unitCode").value) || buildSelectedUnitCode() || "-")}`;
       }
 
       function getSelectedUnit() {
-        const unitCode = normalizeUnitCode($("unitCode").value);
+        const unitCode = normalizeUnitCode($("unitCode").value) || buildSelectedUnitCode();
         if (!unitCode || !state.units.length) return null;
-        return getFilteredUnits().find((unit) => String(unit.unit_code).padStart(3, "0") === unitCode) || null;
+        return findUnitByCode(unitCode, getFilteredUnits());
       }
 
       function syncSelectorsFromUnitCode() {
@@ -721,9 +794,7 @@
         }
         const unitCode = $("unitCode").value;
         refreshUnitSelectors();
-        const found = getFilteredUnits().find(
-          (unit) => String(unit.unit_code).padStart(3, "0") === unitCode
-        );
+        const found = findUnitByCode(unitCode, getFilteredUnits());
         if (!found) {
           updateUnitGuide();
           updateSummary();
@@ -747,13 +818,11 @@
           return;
         }
         refreshUnitSelectors();
-        const found = getFilteredUnits().find((unit) =>
-          String(unit.major_unit_code) === $("majorUnit").value &&
-          String(unit.minor_unit_code) === $("middleUnit").value &&
-          String(unit.nano_unit_code) === $("nanoUnit").value
-        );
+        const found = findUnitByCode(buildSelectedUnitCode(), getFilteredUnits());
         if (found) {
           $("unitCode").value = String(found.unit_code).padStart(3, "0");
+        } else {
+          $("unitCode").value = buildSelectedUnitCode();
         }
         updateUnitGuide();
         updateSummary();
@@ -767,7 +836,7 @@
           const { data, error } = await state.supabase
             .schema("auto_grading")
             .from("curriculum_units")
-            .select("curriculum_version,grade_level,subject,unit_code,major_unit_code,major_unit_name,minor_unit_code,minor_unit_name,nano_unit_code,nano_unit_name,is_active")
+            .select("curriculum_version,grade_level,subject,unit_code,unit_level,major_unit_code,major_unit_name,minor_unit_code,minor_unit_name,nano_unit_code,nano_unit_name,is_active")
             .eq("is_active", true)
             .order("grade_level", { ascending: true })
             .order("curriculum_version", { ascending: false })
@@ -796,12 +865,11 @@
         $("summaryTitle").textContent = $("title").value.trim() || "-";
         $("summaryMeta").textContent =
           `${$("curriculumVersion").value} / ${$("gradeLevel").value} / ${formatSubjectLabel($("subject").value)}`;
-        $("summaryMajorMinor").textContent = selectedUnit
-          ? `${selectedUnit.major_unit_code} / ${selectedUnit.minor_unit_code}`
-          : `${$("majorUnit").value || "-"} / ${$("middleUnit").value || "-"}`;
+        $("summaryMajorMinor").textContent =
+          `${selectedText($("majorUnit")) || "-"} / ${selectedText($("middleUnit")) || "-"}`;
         $("summaryUnitNano").textContent = selectedUnit
-          ? `${String(selectedUnit.unit_code).padStart(3, "0")} / ${selectedUnit.nano_unit_name}`
-          : `${normalizeUnitCode($("unitCode").value) || "-"} / -`;
+          ? `${String(selectedUnit.unit_code).padStart(3, "0")} / ${getUnitLevelLabel(selectedUnit)}: ${getUnitDisplayName(selectedUnit)}`
+          : `${normalizeUnitCode($("unitCode").value) || "-"} / 선택 단원 row 없음`;
         $("summarySource").textContent = getSourceLabel() || "-";
         $("summarySubmittedTitle").textContent = buildSummaryRegistrationKey();
         const file = $("csvFile").files[0];
@@ -878,6 +946,9 @@
         if (!/^\d{3}$/.test(unitCode)) throw new Error("단원 코드는 3자리 숫자로 입력해 주세요.");
         if (!state.csvRows.length) throw new Error("CSV를 먼저 검증해 주세요.");
         if (!subject) throw new Error("과목 값이 비어 있습니다.");
+        if (state.units.length && !getSelectedUnit()) {
+          throw new Error("선택한 교육과정/학년/과목 기준으로 해당 unit_code row를 찾지 못했습니다. curriculum_units에 100/110/111 계층 row가 있는지 확인해 주세요.");
+        }
 
         return {
           p_title: title,
