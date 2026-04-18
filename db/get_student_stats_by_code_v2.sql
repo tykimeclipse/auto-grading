@@ -12,6 +12,8 @@ declare
   v_first_correct integer := 0;
   v_round2_correct integer := 0;
   v_final_correct integer := 0;
+  v_teacher_final_correct integer;
+  v_teacher_final_items integer;
 begin
   /*
     전제:
@@ -38,19 +40,18 @@ begin
     coalesce(sum(a.first_correct_count), 0),
     coalesce(sum(a.final_correct_count), 0),
     coalesce(
-      sum(
-        coalesce(
-          a.teacher_final_correct_count,
-          a.final_correct_count
-        )
-      ),
+      sum(coalesce(a.teacher_final_correct_count, a.final_correct_count)),
       0
-    )
+    ),
+    sum(case when a.teacher_final_correct_count is not null then a.teacher_final_correct_count end),
+    sum(case when a.teacher_final_correct_count is not null then a.total_items end)
   into
     v_total_solved,
     v_first_correct,
     v_round2_correct,
-    v_final_correct
+    v_final_correct,
+    v_teacher_final_correct,
+    v_teacher_final_items
   from auto_grading.attempts a
   where a.student_id = v_student_id
     and a.status in ('completed', 'needs_review');
@@ -79,6 +80,14 @@ begin
       when v_total_solved = 0 then null
       else round(
         (v_final_correct::numeric / v_total_solved::numeric) * 100,
+        2
+      )
+    end,
+    'teacher_final_accuracy',
+    case
+      when v_teacher_final_items is null or v_teacher_final_items = 0 then null
+      else round(
+        (v_teacher_final_correct::numeric / v_teacher_final_items::numeric) * 100,
         2
       )
     end

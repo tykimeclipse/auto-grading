@@ -230,7 +230,7 @@
       }
 
       function formatPercent(value) {
-        if (value === null || value === undefined) return "";
+        if (value === null || value === undefined) return "-";
         return `${Number(value).toFixed(1)}%`;
       }
 
@@ -351,7 +351,12 @@
           tdR2.textContent = formatPercent(row.round2_score_percent);
 
           const tdFinal = document.createElement("td");
-          tdFinal.textContent = formatPercent(row.final_score_percent);
+          const hasTeacherFinal = row.teacher_final_score_percent != null;
+          const isAutoFinal = Number(row.round1_score_percent) === 100 || Number(row.round2_score_percent) === 100;
+          let finalValue = null;
+          if (hasTeacherFinal) finalValue = row.teacher_final_score_percent;
+          else if (isAutoFinal) finalValue = 100;
+          tdFinal.textContent = finalValue == null ? "-" : formatPercent(finalValue);
 
           tr.append(tdDate, tdTitle, tdItems, tdR1, tdR2, tdFinal);
           historyBody.appendChild(tr);
@@ -411,8 +416,8 @@
               : "-";
 
           avgFinalEl.textContent =
-            stats?.final_accuracy != null
-              ? `${Number(stats.final_accuracy).toFixed(1)}%`
+            stats?.teacher_final_accuracy != null
+              ? `${Number(stats.teacher_final_accuracy).toFixed(1)}%`
               : "-";
 
           renderHistory(history);

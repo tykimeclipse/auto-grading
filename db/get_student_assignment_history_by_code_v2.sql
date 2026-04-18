@@ -17,6 +17,7 @@ returns table (
     round2_score_percent numeric(5,1),
     final_correct_count integer,
     final_score_percent numeric(5,1),
+    teacher_final_score_percent numeric(5,1),
     last_activity_at timestamptz
 )
 language plpgsql
@@ -113,18 +114,18 @@ begin
             coalesce(tic.total_items, 0) as total_items,
             la.first_correct_count as round1_correct_count,
             case
-                when la.first_score_percent is not null
+                when la.round1_submitted_at is not null and la.first_score_percent is not null
                 then round(la.first_score_percent::numeric, 1)
-                when la.first_correct_count is not null
+                when la.round1_submitted_at is not null and la.first_correct_count is not null
                      and tic.total_items > 0
                 then round((la.first_correct_count::numeric * 100) / tic.total_items, 1)
                 else null
             end as round1_score_percent,
             la.final_correct_count as round2_correct_count,
             case
-                when la.final_score_percent is not null
+                when la.round2_submitted_at is not null and la.final_score_percent is not null
                 then round(la.final_score_percent::numeric, 1)
-                when la.final_correct_count is not null
+                when la.round2_submitted_at is not null and la.final_correct_count is not null
                      and tic.total_items > 0
                 then round((la.final_correct_count::numeric * 100) / tic.total_items, 1)
                 else null
@@ -141,6 +142,14 @@ begin
                 then round((coalesce(la.teacher_final_correct_count, la.final_correct_count)::numeric * 100) / tic.total_items, 1)
                 else null
             end as final_score_percent,
+            case
+                when la.teacher_final_score_percent is not null
+                then round(la.teacher_final_score_percent::numeric, 1)
+                when la.teacher_final_correct_count is not null
+                     and tic.total_items > 0
+                then round((la.teacher_final_correct_count::numeric * 100) / tic.total_items, 1)
+                else null
+            end as teacher_final_score_percent,
             coalesce(
                 la.completed_at,
                 la.round2_submitted_at,
@@ -170,6 +179,7 @@ begin
         hb.round2_score_percent,
         hb.final_correct_count,
         hb.final_score_percent,
+        hb.teacher_final_score_percent,
         hb.last_activity_at
     from history_base hb
     order by hb.last_activity_at desc, hb.assignment_id desc

@@ -175,7 +175,7 @@
 
         .stats-row {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 8px;
         }
 
@@ -417,11 +417,19 @@
             }
 
             .stats-row {
-                gap: 6px;
+                gap: 5px;
             }
 
             .stat-card {
-                padding: 8px;
+                padding: 6px 5px;
+            }
+
+            .stat-label {
+                font-size: 9px;
+            }
+
+            .stat-value {
+                font-size: 13px;
             }
 
             .omr-row {
@@ -493,6 +501,10 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-label">누적 2차 성취도</div>
+                    <div id="statRound2Accuracy" class="stat-value">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">누적 최종 성취도</div>
                     <div id="statFinalAccuracy" class="stat-value">-</div>
                 </div>
             </div>
@@ -673,6 +685,7 @@
 
             document.getElementById('statTotalSolved').textContent = formatCount(state.studentStats.totalSolved);
             document.getElementById('statRound1Accuracy').textContent = formatPercent(state.studentStats.round1Accuracy);
+            document.getElementById('statRound2Accuracy').textContent = formatPercent(state.studentStats.round2Accuracy);
             document.getElementById('statFinalAccuracy').textContent = formatPercent(state.studentStats.finalAccuracy);
         }
 
@@ -733,7 +746,7 @@
             labelSpan.textContent = `${label}: `;
 
             const valueStrong = document.createElement('strong');
-            valueStrong.textContent = `${correctCount} / ${totalItems} (${percent}%)`;
+            valueStrong.textContent = `${correctCount} / ${totalItems} (${Math.round(percent)}%)`;
 
             div.appendChild(labelSpan);
             div.appendChild(valueStrong);
@@ -763,7 +776,7 @@
             title.className = 'result-title';
 
             if (s.type === 'round1') {
-                title.textContent = `1차 결과: ${s.totalItems}문항 중 ${s.correctCount}문항 정답 (${s.scorePercent}%)`;
+                title.textContent = `1차 결과: ${s.totalItems}문항 중 ${s.correctCount}문항 정답 (${Math.round(s.scorePercent)}%)`;
                 el.appendChild(title);
 
                 if (Array.isArray(s.retryItemNos) && s.retryItemNos.length) {
@@ -774,7 +787,7 @@
                 return;
             }
 
-            title.textContent = `최종 결과: ${s.totalItems}문항 중 ${s.finalCorrectCount}문항 정답 (${s.finalScorePercent}%)`;
+            title.textContent = `최종 결과: ${s.totalItems}문항 중 ${s.finalCorrectCount}문항 정답 (${Math.round(s.finalScorePercent)}%)`;
             el.appendChild(title);
 
             const round1Percent = s.totalItems
@@ -1168,7 +1181,8 @@
             state.studentStats = {
                 totalSolved: unwrapped?.total_solved ?? 0,
                 round1Accuracy: unwrapped?.round1_accuracy ?? null,
-                finalAccuracy: unwrapped?.final_accuracy ?? null
+                round2Accuracy: unwrapped?.round2_accuracy ?? null,
+                finalAccuracy: unwrapped?.teacher_final_accuracy ?? null
             };
         }
 
@@ -1193,6 +1207,7 @@
 
         function applyRound2Result(result) {
             state.status = result.status;
+            state.retryItemNos = (result.remaining_item_nos || []).map(n => String(n));
 
             state.resultSummary = {
                 type: 'round2',
