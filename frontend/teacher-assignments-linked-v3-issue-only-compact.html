@@ -582,7 +582,7 @@
             p_grade_level: $('testGradeFilter').value || null,
             p_source: $('testSourceFilter').value || null,
             p_purpose: currentPurposeFilter(),
-            p_only_active: $('testActiveOnly').checked,
+            p_only_active: $('testActiveOnly').checked ? true : null,
             p_limit: 100,
             p_offset: 0
           });
@@ -607,7 +607,7 @@
 
     function renderTestSourceOptions() {
       const current = $('testSourceFilter').value;
-      const categories = [...new Set(state.testSets.map(t => t.test_source).filter(Boolean))].sort();
+      const categories = [...new Set(state.testSets.map(t => t.source_category || t.test_source).filter(Boolean))].sort();
       $('testSourceFilter').innerHTML = '<option value="">전체</option>' + categories.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
       if (current && categories.includes(current)) $('testSourceFilter').value = current;
     }
@@ -623,7 +623,7 @@
           <td><input type="radio" name="testset" ${state.selectedTestSetId === ts.test_set_id ? 'checked' : ''} data-test-id="${ts.test_set_id}" /></td>
           <td>${escapeHtml(gradeLabel(ts.grade_level))}</td>
           <td><strong>${escapeHtml(ts.test_title || '-')}</strong><div class="muted">평균 최종 ${escapeHtml(fmtPercent(ts.avg_final_score))}</div></td>
-          <td>${escapeHtml(ts.test_source || '-')}</td>
+          <td>${escapeHtml(ts.source_category || ts.test_source || '-')}</td>
           <td>${escapeHtml(currentPurposeFilter() || '전체')}</td>
           <td>${escapeHtml(ts.total_items ?? '-')}</td>
           <td>${escapeHtml(ts.started_assignment_count ?? ts.assignment_count ?? 0)}명</td>

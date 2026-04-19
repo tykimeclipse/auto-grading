@@ -12,6 +12,7 @@ returns table(
   test_set_id uuid,
   test_title text,
   test_source text,
+  source_category text,
   grade_level text,
   total_items integer,
   assignment_count integer,
@@ -41,17 +42,19 @@ candidate_test_sets as (
     v.test_set_id,
     v.test_title,
     v.test_source,
+    ts.source_category,
     v.grade_level,
     v.total_items,
     v.created_at,
     v.is_active,
     p.search_q
   from auto_grading.v_test_sets_normalized v
+  join auto_grading.test_sets ts on ts.id = v.test_set_id
   cross join params p
   where 1 = 1
     and (p_only_active is null or v.is_active = p_only_active)
     and (p.grade_q is null or v.grade_level = p.grade_q)
-    and (p.source_q is null or v.test_source = p.source_q)
+    and (p.source_q is null or ts.source_category = p.source_q)
     and (
       p.search_q is null
       or v.test_title ilike '%' || p.search_q || '%'
@@ -145,6 +148,7 @@ base as (
     f.test_set_id,
     f.test_title,
     f.test_source,
+    f.source_category,
     f.grade_level,
     f.total_items,
     f.created_at,
@@ -168,6 +172,7 @@ select
   b.test_set_id,
   b.test_title,
   b.test_source,
+  b.source_category,
   b.grade_level,
   b.total_items,
   b.assignment_count,
