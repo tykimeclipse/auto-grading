@@ -8,7 +8,12 @@
 
 -- =========================================================
 -- 1) 교사용 발행현황 / 결과 리스트 RPC v2
+-- returns table 변경(reset_token 추가) 시 signature가 바뀌므로 DROP 필요
 -- =========================================================
+drop function if exists auto_grading.teacher_list_assignments(
+  uuid, uuid, uuid, boolean, text, text, text, integer, integer
+);
+
 create or replace function auto_grading.teacher_list_assignments(
   p_course_id uuid default null,
   p_test_set_id uuid default null,
@@ -49,7 +54,8 @@ returns table(
   has_teacher_final boolean,
   teacher_final_note text,
   teacher_final_updated_at timestamptz,
-  last_activity_at timestamptz
+  last_activity_at timestamptz,
+  reset_token uuid
 )
 language sql
 security definer
@@ -165,7 +171,8 @@ base as (
         coalesce(to_jsonb(a)->>'updated_at', to_jsonb(a)->>'created_at'),
         ''
       )::timestamptz
-    ) as last_activity_at
+    ) as last_activity_at,
+    a.reset_token
   from auto_grading.assignments a
   join auto_grading.students s
     on s.id = a.student_id
@@ -227,7 +234,8 @@ select
   b.has_teacher_final,
   b.teacher_final_note,
   b.teacher_final_updated_at,
-  b.last_activity_at
+  b.last_activity_at,
+  b.reset_token
 from base b
 order by
   b.assigned_at desc nulls last,
@@ -239,4 +247,4 @@ $function$;
 
 grant execute on function auto_grading.teacher_list_assignments(
   uuid, uuid, uuid, boolean, text, text, text, integer, integer
-) to authenticated;
+) to authenticated, anon, service_role;

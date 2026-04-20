@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>문제지 등록 페이지 v3</title>
+    <title>문제지 등록 페이지 v2</title>
     <style>
       :root {
         --bg: #f6f7fb;
@@ -351,10 +351,10 @@
             <div class="field">
               <label for="gradeLevel">학년 코드</label
               ><select id="gradeLevel">
-                <option value="M1">M1</option>
-                <option value="M2">M2</option>
-                <option value="M3" selected>M3</option>
-                <option value="H1">H1</option>
+                <option value="M1">중1</option>
+                <option value="M2">중2</option>
+                <option value="M3" selected>중3</option>
+                <option value="H1">고1</option>
               </select>
             </div>
             <div class="field">
@@ -460,7 +460,7 @@
             </div>
             <div class="summary-item">
               <div class="k">교육과정 / 학년 / 과목</div>
-              <div id="summaryMeta" class="v">2022 / M3 / 중3 과학</div>
+              <div id="summaryMeta" class="v">2022 / 중3 / 중3 과학</div>
             </div>
             <div class="summary-item">
               <div class="k">대단원 / 중단원</div>
@@ -594,6 +594,11 @@
           "통합과학": "통합과학",
         };
         return map[value] || value || "-";
+      }
+
+      function formatGradeLabel(code) {
+        const map = { M1: "중1", M2: "중2", M3: "중3", H1: "고1", H2: "고2", H3: "고3" };
+        return map[code] || code || "-";
       }
 
       function loadConfig() {
@@ -906,7 +911,7 @@
         const selectedUnit = getSelectedUnit();
         $("summaryTitle").textContent = $("title").value.trim() || "-";
         $("summaryMeta").textContent =
-          `${$("curriculumVersion").value} / ${$("gradeLevel").value} / ${formatSubjectLabel($("subject").value)}`;
+          `${$("curriculumVersion").value} / ${formatGradeLabel($("gradeLevel").value)} / ${formatSubjectLabel($("subject").value)}`;
         $("summaryMajorMinor").textContent =
           `${selectedText($("majorUnit")) || "-"} / ${selectedText($("middleUnit")) || "-"}`;
         $("summaryUnitNano").textContent = selectedUnit
@@ -1108,6 +1113,11 @@
         $("searchResultArea").style.display = isSearch  ? "" : "none";
         $("editActionBox").style.display   = isEdit     ? "" : "none";
 
+        if (isEdit) {
+          $("cancelBtn").textContent = "취소";
+          $("saveBtn").disabled = false;
+        }
+
         if (isSearch && !state.foundTestSet) {
           $("editBtn").disabled = true;
           $("searchResultText").textContent = "검색 결과가 여기에 표시됩니다.";
@@ -1152,6 +1162,8 @@
               .eq("subject", $("subject").value)
               .eq("unit_code", unitCode)
               .eq("source_category", sourceCategory);
+            const titleVal = $("title").value.trim();
+            if (titleVal) query = query.ilike("title", `%${titleVal}%`);
           }
           const { data, error } = await query;
           if (error) throw error;
@@ -1172,7 +1184,7 @@
             $("editBtn").disabled = false;
             $("searchResultText").textContent =
               `제목: ${f.title}\n` +
-              `${f.curriculum_version} / ${f.grade_level} / ${f.subject}\n` +
+              `${f.curriculum_version} / ${formatGradeLabel(f.grade_level)} / ${f.subject}\n` +
               `단원코드: ${String(f.unit_code).padStart(3, "0")} / ${f.source_category}\n` +
               `문항수: ${itemCount(f)}문항\n` +
               `ID: ${f.id}`;
@@ -1213,13 +1225,14 @@
         }
         const title = $("title").value.trim();
         const unitCode = normalizeUnitCode($("unitCode").value);
-        const { sourceCategory } = getSourceParts();
+        const { sourceType, sourceCategory } = getSourceParts();
         if (!title) { setStatus("문제지 제목을 입력해 주세요.", "error"); return; }
         if (!/^\d{3}$/.test(unitCode)) { setStatus("단원 코드는 3자리 숫자로 입력해 주세요.", "error"); return; }
         const btn = $("saveBtn");
         btn.disabled = true;
         btn.textContent = "저장 중...";
         setStatus("저장 중...", "info");
+        let success = false;
         try {
           const { data, error } = await state.supabase
             .schema("auto_grading")
@@ -1230,21 +1243,26 @@
               p_grade_level: $("gradeLevel").value,
               p_subject: $("subject").value,
               p_unit_code: unitCode,
+              p_source_type: sourceType,
               p_source_category: sourceCategory,
-              p_source_name: state.foundTestSet.source_name || sourceCategory,
+              p_source_name: sourceCategory,
             });
           if (error) throw error;
           if (data && data.ok === false) throw new Error(data.error || "저장 실패");
+          success = true;
           setStatus(`저장 완료: ${data.title || title}`, "ok");
           $("resultBox").style.display = "block";
           $("resultBox").textContent = JSON.stringify(data, null, 2);
           state.foundTestSet = null;
-          setTimeout(() => { resetForm(); setMode("register"); }, 1500);
+          $("saveBtn").disabled = true;
+          $("cancelBtn").textContent = "등록 모드로 돌아가기";
         } catch (err) {
           setStatus(normalizeError(err), "error");
         } finally {
-          btn.disabled = false;
-          btn.textContent = "저장";
+          if (!success) {
+            btn.disabled = false;
+            btn.textContent = "저장";
+          }
         }
       }
 

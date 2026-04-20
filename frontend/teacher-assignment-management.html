@@ -39,6 +39,9 @@
     .btn-secondary{background:#eef2f7;color:var(--text);border:1px solid var(--line)}
     .btn-ghost{background:#fff;color:var(--text);border:1px solid var(--line)}
     .mini-btn{min-height:32px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:12px;font-weight:700;white-space:nowrap}
+    .mini-btn.warn{background:#fffbeb;color:#92400e;border-color:#fde68a}
+    .mini-btn.danger{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+    .reset-menu{display:flex;flex-wrap:wrap;gap:4px}
     .mini-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
     details{margin-bottom:16px}
     summary{cursor:pointer;font-weight:700}
@@ -47,7 +50,23 @@
     .status.error{display:block;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
     .status.info{display:block;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8}
     .list-card{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff}
-    .list-head,.list-row{display:grid;grid-template-columns:82px minmax(210px,2fr) 92px 70px minmax(170px,1.35fr) 64px 110px 110px 110px 180px 92px;gap:8px;align-items:center;padding:12px 10px;font-size:13px}
+    .list-head,.list-row{display:grid;grid-template-columns:
+    82px
+    minmax(210px,2fr)
+    92px
+    70px
+    minmax(150px,1.1fr)
+    64px
+    100px
+    100px
+    100px
+    140px
+    92px
+    82px;
+  gap:6px;
+  align-items:center;
+  padding:12px 8px;
+  font-size:13px;}
     .list-head{background:#f4f7fb;color:#48505e;font-size:12px;font-weight:700;border-bottom:1px solid var(--line)}
     .list-row{border-bottom:1px solid #eef2f7}
     .list-row:last-child{border-bottom:0}
@@ -68,7 +87,7 @@
     .editor-box .mini-note{font-size:11px;color:var(--muted)}
     .result-box{margin-top:12px;border:1px solid var(--line);background:#f8fafc;border-radius:10px;padding:12px;font-size:12px;overflow:auto;white-space:pre-wrap;max-height:260px}
     @media (max-width:1400px){
-      .list-head,.list-row{min-width:1550px}
+      .list-head,.list-row{min-width:1700px}
       .list-card{overflow-x:auto}
     }
     @media (max-width:1100px){
@@ -175,6 +194,7 @@
             <div>2차</div>
             <div>최종</div>
             <div>최종점수 수정</div>
+            <div>입력 초기화</div>
             <div>열림</div>
           </div>
           <div id="assignmentListBody"></div>
@@ -188,7 +208,7 @@
   <script>
     const STORAGE_KEY = 'ag_assignment_supabase_config_v2';
     const $ = (id) => document.getElementById(id);
-    const state = { supabase:null, courses:[], testSets:[], assignments:[], editingAssignmentId:null };
+    const state = { supabase:null, courses:[], testSets:[], assignments:[], editingAssignmentId:null, resetingAssignmentId:null };
     const GRADE_LABELS = { E1:'초1', E2:'초2', E3:'초3', E4:'초4', E5:'초5', E6:'초6', M1:'중1', M2:'중2', M3:'중3', H1:'고1', H2:'고2', H3:'고3' };
 
     function setStatus(id, msg, type='info') {
@@ -203,7 +223,7 @@
     function saveConfig(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({ url:$('supabaseUrl').value.trim(), anonKey:$('supabaseAnonKey').value.trim() })); setStatus('connectStatus','연결정보를 저장했습니다.','ok'); }
     function loadConfig(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return; const cfg=JSON.parse(raw); $('supabaseUrl').value=cfg.url||''; $('supabaseAnonKey').value=cfg.anonKey||''; }catch(_){}}
     function createClientOrThrow(){ const url=$('supabaseUrl').value.trim(); const anonKey=$('supabaseAnonKey').value.trim(); if(!url||!anonKey) throw new Error('Supabase URL과 Anon Key를 먼저 입력해 주세요.'); return window.supabase.createClient(url, anonKey); }
-    function buildStudentAssignmentLink(assignmentId){ if(!assignmentId) return ''; const url=new URL(window.location.href); const basePath=url.pathname.replace(/[^/]+$/, 'student-answer-omr.html'); return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`; }
+    function buildStudentAssignmentLink(assignmentId){ if(!assignmentId) return ''; const url=new URL(window.location.href); const basePath=url.pathname.replace(/[^/]+$/, 'student-answer-omr-v3.html'); return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`; }
     async function copyText(text){ if(!text) throw new Error('복사할 내용이 없습니다.'); if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return true; } const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.focus(); ta.select(); const ok=document.execCommand('copy'); ta.remove(); return ok; }
 
     function scoreText(correct, total, percent){
@@ -212,7 +232,7 @@
     }
 
     function hasTeacherFinal(row){
-      return Boolean(row?.has_teacher_final || (row?.final_correct_count != null && row?.final_score_percent != null));
+      return Boolean(row?.has_teacher_final);
     }
 
     function isPerfectScore(correct, total, percent){
@@ -258,6 +278,29 @@
         return { correct: row.total_items, percent: 100, auto:true };
       }
       return null;
+    }
+
+    function canResetRound2(row){
+      return Boolean(row?.attempt_id) && ['completed', 'needs_review'].includes(row?.status);
+    }
+
+    function canResetFull(row){
+      return Boolean(row?.attempt_id) && ['in_progress', 'awaiting_retry', 'completed', 'needs_review'].includes(row?.status);
+    }
+
+    function renderResetButton(row){
+      if (!canResetFull(row)) return '<span class="muted">-</span>';
+      if (state.resetingAssignmentId !== row.assignment_id) {
+        return `<button class="mini-btn warn reset-open-btn" type="button" data-assignment-id="${row.assignment_id}">입력초기화</button>`;
+      }
+      let html = '<div class="reset-menu">';
+      if (canResetRound2(row)) {
+        html += `<button class="mini-btn reset-r2-btn" type="button" data-assignment-id="${row.assignment_id}">2차만</button>`;
+      }
+      html += `<button class="mini-btn danger reset-full-btn" type="button" data-assignment-id="${row.assignment_id}">전체</button>`;
+      html += `<button class="mini-btn cancel-reset-btn" type="button" data-assignment-id="${row.assignment_id}">취소</button>`;
+      html += '</div>';
+      return html;
     }
 
     function renderFinalEditor(row){
@@ -306,6 +349,7 @@
             <div class="score-cell ${round2==='-'?'blank':''}">${escapeHtml(round2)}</div>
             <div class="score-cell ${finalClass}">${escapeHtml(finalText)}</div>
             <div>${renderFinalEditor(row)}</div>
+            <div>${renderResetButton(row)}</div>
             <div>
               <div class="toggle-wrap">
                 <label class="switch">
@@ -321,10 +365,14 @@
       body.querySelectorAll('.copy-link-btn').forEach(btn => btn.addEventListener('click', async () => {
         try { await copyText(btn.dataset.link || ''); setStatus('assignmentStatus','학생용 링크를 복사했습니다.','ok'); } catch (err) { setStatus('assignmentStatus', normalizeError(err), 'error'); }
       }));
-      body.querySelectorAll('.edit-final-btn').forEach(btn => btn.addEventListener('click', () => { state.editingAssignmentId = btn.dataset.assignmentId; renderAssignmentList(); }));
+      body.querySelectorAll('.edit-final-btn').forEach(btn => btn.addEventListener('click', () => { state.editingAssignmentId = btn.dataset.assignmentId; state.resetingAssignmentId = null; renderAssignmentList(); }));
       body.querySelectorAll('.cancel-final-btn').forEach(btn => btn.addEventListener('click', () => { state.editingAssignmentId = null; renderAssignmentList(); }));
       body.querySelectorAll('.save-final-btn').forEach(btn => btn.addEventListener('click', async () => { await saveTeacherFinal(btn.dataset.assignmentId); }));
       body.querySelectorAll('.open-toggle').forEach(el => el.addEventListener('change', async () => { await setAssignmentOpenState(el.dataset.assignmentId, el.checked); }));
+      body.querySelectorAll('.reset-open-btn').forEach(btn => btn.addEventListener('click', () => { state.resetingAssignmentId = btn.dataset.assignmentId; state.editingAssignmentId = null; renderAssignmentList(); }));
+      body.querySelectorAll('.cancel-reset-btn').forEach(btn => btn.addEventListener('click', () => { state.resetingAssignmentId = null; renderAssignmentList(); }));
+      body.querySelectorAll('.reset-r2-btn').forEach(btn => btn.addEventListener('click', async () => { await resetAttemptRound2(btn.dataset.assignmentId); }));
+      body.querySelectorAll('.reset-full-btn').forEach(btn => btn.addEventListener('click', async () => { await resetAttemptFull(btn.dataset.assignmentId); }));
       updateSummary();
     }
 
@@ -365,6 +413,62 @@
         await loadAssignments();
       } catch (err) {
         setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    async function resetAttemptRound2(assignmentId){
+      const row = state.assignments.find(r => r.assignment_id === assignmentId);
+      if (!row) return;
+      if (!row.reset_token) { setStatus('assignmentStatus', 'reset_token 정보가 없습니다. 목록을 다시 불러오세요.', 'error'); return; }
+      const msg = hasTeacherFinal(row)
+        ? `⚠️ 교사 최종점수(${row.final_correct_count}/${row.total_items})가 저장되어 있습니다.\n2차 초기화 시 교사 최종점수도 함께 삭제됩니다.\n계속하시겠습니까?`
+        : `${row.student_name} 학생의 2차 입력을 초기화하시겠습니까?\n2차 답안이 삭제되고 학생이 처음부터 2차를 다시 입력해야 합니다.`;
+      if (!confirm(msg)) { state.resetingAssignmentId = null; renderAssignmentList(); return; }
+      try {
+        setStatus('assignmentStatus', '2차 입력을 초기화하는 중...', 'info');
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_reset_attempt_round2', {
+          p_assignment_id: assignmentId,
+          p_reset_token: row.reset_token
+        });
+        if (error) throw error;
+        ensureRpcOk(data, '2차 초기화에 실패했습니다.');
+        state.resetingAssignmentId = null;
+        $('debugBox').style.display = 'block';
+        $('debugBox').textContent = JSON.stringify(data, null, 2);
+        setStatus('assignmentStatus', '2차 입력 초기화 완료. 학생이 OMR 화면을 새로고침하도록 안내하세요.', 'ok');
+        await loadAssignments();
+      } catch (err) {
+        state.resetingAssignmentId = null;
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+        renderAssignmentList();
+      }
+    }
+
+    async function resetAttemptFull(assignmentId){
+      const row = state.assignments.find(r => r.assignment_id === assignmentId);
+      if (!row) return;
+      if (!row.reset_token) { setStatus('assignmentStatus', 'reset_token 정보가 없습니다. 목록을 다시 불러오세요.', 'error'); return; }
+      const msg = hasTeacherFinal(row)
+        ? `⚠️ 교사 최종점수(${row.final_correct_count}/${row.total_items})가 저장되어 있습니다.\n전체 초기화 시 교사 최종점수도 함께 삭제됩니다.\n계속하시겠습니까?`
+        : `${row.student_name} 학생의 1차부터 전체 초기화하시겠습니까?\n1차, 2차 모든 답안이 삭제됩니다.`;
+      if (!confirm(msg)) { state.resetingAssignmentId = null; renderAssignmentList(); return; }
+      try {
+        setStatus('assignmentStatus', '전체 입력을 초기화하는 중...', 'info');
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_reset_attempt_full', {
+          p_assignment_id: assignmentId,
+          p_reset_token: row.reset_token
+        });
+        if (error) throw error;
+        ensureRpcOk(data, '전체 초기화에 실패했습니다.');
+        state.resetingAssignmentId = null;
+        $('debugBox').style.display = 'block';
+        $('debugBox').textContent = JSON.stringify(data, null, 2);
+        setStatus('assignmentStatus', '전체 초기화 완료. 학생이 OMR 화면을 새로고침하도록 안내하세요.', 'ok');
+        await loadAssignments();
+      } catch (err) {
+        state.resetingAssignmentId = null;
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+        renderAssignmentList();
       }
     }
 

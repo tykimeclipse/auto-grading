@@ -791,7 +791,7 @@
     function buildStudentAssignmentLink(assignmentId) {
       if (!assignmentId) return '';
       const url = new URL(window.location.href);
-      const basePath = url.pathname.replace(/[^/]+$/, 'student-answer-omr.html');
+      const basePath = url.pathname.replace(/[^/]+$/, 'student-answer-omr-v3.html');
       return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`;
     }
 

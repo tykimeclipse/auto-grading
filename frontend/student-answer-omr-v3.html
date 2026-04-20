@@ -618,6 +618,11 @@
             return `${Math.round(Number(v))}%`;
         }
 
+        function formatPercentDecimal(v) {
+            if (v == null || Number.isNaN(v)) return '-';
+            return `${Number(v).toFixed(1)}%`;
+        }
+
         function buildFinishedResultSummaryFromAttempt(result) {
             const totalItems = Number(result?.total_items || 0);
             const firstScorePercent = Number(result?.first_score_percent || 0);
@@ -684,9 +689,9 @@
             }
 
             document.getElementById('statTotalSolved').textContent = formatCount(state.studentStats.totalSolved);
-            document.getElementById('statRound1Accuracy').textContent = formatPercent(state.studentStats.round1Accuracy);
-            document.getElementById('statRound2Accuracy').textContent = formatPercent(state.studentStats.round2Accuracy);
-            document.getElementById('statFinalAccuracy').textContent = formatPercent(state.studentStats.finalAccuracy);
+            document.getElementById('statRound1Accuracy').textContent = formatPercentDecimal(state.studentStats.round1Accuracy);
+            document.getElementById('statRound2Accuracy').textContent = formatPercentDecimal(state.studentStats.round2Accuracy);
+            document.getElementById('statFinalAccuracy').textContent = formatPercentDecimal(state.studentStats.finalAccuracy);
         }
 
         function hideGateInline() {
@@ -1182,7 +1187,7 @@
                 totalSolved: unwrapped?.total_solved ?? 0,
                 round1Accuracy: unwrapped?.round1_accuracy ?? null,
                 round2Accuracy: unwrapped?.round2_accuracy ?? null,
-                finalAccuracy: unwrapped?.teacher_final_accuracy ?? null
+                finalAccuracy: unwrapped?.final_accuracy ?? null
             };
         }
 
