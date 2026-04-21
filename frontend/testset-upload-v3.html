@@ -1224,6 +1224,9 @@
           return;
         }
         const title = $("title").value.trim();
+        const curriculumVersion = $("curriculumVersion").value;
+        const gradeLevel = $("gradeLevel").value;
+        const subject = $("subject").value;
         const unitCode = normalizeUnitCode($("unitCode").value);
         const { sourceType, sourceCategory } = getSourceParts();
         if (!title) { setStatus("문제지 제목을 입력해 주세요.", "error"); return; }
@@ -1237,14 +1240,14 @@
           const { data, error } = await state.supabase
             .schema("auto_grading")
             .rpc("teacher_update_test_set_metadata", {
-              p_test_set_id: testSetId,
+              p_test_set_id: state.foundTestSet.id,
               p_title: title,
               p_curriculum_version: curriculumVersion,
               p_grade_level: gradeLevel,
               p_subject: subject,
               p_unit_code: unitCode,
               p_source_category: sourceCategory,
-              p_source_name: sourceName,
+              p_source_name: sourceCategory,
             });
           if (error) throw error;
           if (data && data.ok === false) throw new Error(data.error || "저장 실패");
