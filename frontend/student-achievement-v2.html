@@ -344,22 +344,30 @@
           tdItems.textContent =
             row.total_items != null ? String(row.total_items) : "";
 
+          const r1Pct = row.round1_score_percent != null ? Number(row.round1_score_percent) : null;
+          const r2Pct = row.round2_score_percent != null ? Number(row.round2_score_percent) : null;
+          const r1Perfect = r1Pct === 100;
+          const r2Perfect = r2Pct === 100;
+
           const tdR1 = document.createElement("td");
-          tdR1.textContent = formatPercent(row.round1_score_percent);
+          tdR1.textContent = r1Pct != null ? formatPercent(r1Pct) : "-";
 
+          // 2차: round1이 100점이면 2차 응시 없음 → '-', 아니면 제출된 경우에만 표시
           const tdR2 = document.createElement("td");
-          tdR2.textContent = formatPercent(row.round2_score_percent);
+          tdR2.textContent = (!r1Perfect && r2Pct != null) ? formatPercent(r2Pct) : "-";
 
+          // 최종: teacher_final이 있거나, round1 또는 round2가 100점일 때만 확정값 표시
           const tdFinal = document.createElement("td");
           let finalValue = null;
           if (row.teacher_final_score_percent != null) {
             finalValue = row.teacher_final_score_percent;
-          } else if (row.round2_score_percent != null) {
-            finalValue = row.round2_score_percent;
-          } else {
-            finalValue = row.round1_score_percent ?? null;
+          } else if (r1Perfect) {
+            finalValue = 100;
+          } else if (r2Perfect) {
+            finalValue = 100;
           }
-          tdFinal.textContent = finalValue == null ? "-" : formatPercent(finalValue);
+          // 위 조건 모두 해당 없으면 finalValue = null → '-'
+          tdFinal.textContent = finalValue != null ? formatPercent(finalValue) : "-";
 
           tr.append(tdDate, tdTitle, tdItems, tdR1, tdR2, tdFinal);
           historyBody.appendChild(tr);
