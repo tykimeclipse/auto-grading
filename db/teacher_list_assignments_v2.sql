@@ -55,7 +55,9 @@ returns table(
   teacher_final_note text,
   teacher_final_updated_at timestamptz,
   last_activity_at timestamptz,
-  reset_token uuid
+  reset_token uuid,
+  round1_submitted_at timestamptz,
+  round2_submitted_at timestamptz
 )
 language sql
 security definer
@@ -74,6 +76,8 @@ with latest_attempt as (
     at.teacher_final_score_percent,
     at.teacher_final_note,
     at.teacher_final_updated_at,
+    at.round1_submitted_at,
+    at.round2_submitted_at,
     coalesce(to_jsonb(at)->>'status', 'not_started') as status,
     nullif(coalesce(to_jsonb(at)->>'created_at', ''), '')::timestamptz as attempt_created_at,
     nullif(
@@ -172,7 +176,9 @@ base as (
         ''
       )::timestamptz
     ) as last_activity_at,
-    a.reset_token
+    a.reset_token,
+    la.round1_submitted_at,
+    la.round2_submitted_at
   from auto_grading.assignments a
   join auto_grading.students s
     on s.id = a.student_id
@@ -235,7 +241,9 @@ select
   b.teacher_final_note,
   b.teacher_final_updated_at,
   b.last_activity_at,
-  b.reset_token
+  b.reset_token,
+  b.round1_submitted_at,
+  b.round2_submitted_at
 from base b
 order by
   b.assigned_at desc nulls last,

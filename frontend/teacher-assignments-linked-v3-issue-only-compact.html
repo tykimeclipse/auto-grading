@@ -250,7 +250,7 @@
                   <div class="stat-tile"><span class="label">시작됨</span><div id="ovStartedCount" class="value">0건</div></div>
                   <div class="stat-tile"><span class="label">완료/검토</span><div id="ovEndedCount" class="value">0건</div></div>
                   <div class="stat-tile"><span class="label">평균 1차</span><div id="ovAvgRound1" class="value">-</div></div>
-                  <div class="stat-tile"><span class="label">평균 최종</span><div id="ovAvgFinal" class="value">-</div></div>
+                  <div class="stat-tile"><span class="label">평균 2차</span><div id="ovAvgFinal" class="value">-</div></div>
                 </div>
                 <div class="question-stat">
                   <div class="question-row"><span>주요 오답</span><div class="bar"><span style="width:0%"></span></div><span id="wrongQuestionHint">문항별 오답률 연동 준비중</span></div>
@@ -622,7 +622,7 @@
         <tr>
           <td><input type="radio" name="testset" ${state.selectedTestSetId === ts.test_set_id ? 'checked' : ''} data-test-id="${ts.test_set_id}" /></td>
           <td>${escapeHtml(gradeLabel(ts.grade_level))}</td>
-          <td><strong>${escapeHtml(ts.test_title || '-')}</strong><div class="muted">평균 최종 ${escapeHtml(fmtPercent(ts.avg_final_score))}</div></td>
+          <td><strong>${escapeHtml(ts.test_title || '-')}</strong><div class="muted">평균 2차 ${escapeHtml(fmtPercent(ts.avg_round2_score))}</div></td>
           <td>${escapeHtml(ts.source_category || ts.test_source || '-')}</td>
           <td>${escapeHtml(currentPurposeFilter() || '전체')}</td>
           <td>${escapeHtml(ts.total_items ?? '-')}</td>
@@ -692,7 +692,7 @@
       $('ovStartedCount').textContent = fmtCount(ov?.started_assignment_count);
       $('ovEndedCount').textContent = fmtCount(ov?.ended_assignment_count);
       $('ovAvgRound1').textContent = fmtPercent(ov?.avg_round1_score);
-      $('ovAvgFinal').textContent = fmtPercent(ov?.avg_final_score);
+      $('ovAvgFinal').textContent = fmtPercent(ov?.avg_round2_score);
       $('selectedTestGuide').innerHTML = ts
         ? `선택 시험 ID: ${escapeHtml(ts.test_set_id)}<br>누적 발행 ${escapeHtml(ov?.assignment_count ?? 0)}건, 열림 ${escapeHtml(ov?.open_assignment_count ?? 0)}건, 최근 사용 ${escapeHtml(fmtDateTime(ts.last_used_at))}`
         : '시험을 먼저 선택해 주세요.';

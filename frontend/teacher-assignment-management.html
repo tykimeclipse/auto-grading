@@ -50,8 +50,7 @@
     .status.error{display:block;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
     .status.info{display:block;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8}
     .list-card{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff}
-    .list-head,.list-row{display:grid;grid-template-columns:
-    82px
+    .list-head,.list-row{display:grid;grid-template-columns:82px
     minmax(210px,2fr)
     92px
     70px
@@ -220,6 +219,7 @@
     function escapeHtml(v){ return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
     function gradeLabel(v){ return GRADE_LABELS[String(v)] || (v || '-'); }
     function fmtDate(v){ if(!v) return '-'; const d=new Date(v); if(Number.isNaN(d.getTime())) return v; return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+    function fmtDateTime(v){ if(!v) return ''; const d=new Date(v); if(Number.isNaN(d.getTime())) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
     function saveConfig(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({ url:$('supabaseUrl').value.trim(), anonKey:$('supabaseAnonKey').value.trim() })); setStatus('connectStatus','연결정보를 저장했습니다.','ok'); }
     function loadConfig(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return; const cfg=JSON.parse(raw); $('supabaseUrl').value=cfg.url||''; $('supabaseAnonKey').value=cfg.anonKey||''; }catch(_){}}
     function createClientOrThrow(){ const url=$('supabaseUrl').value.trim(); const anonKey=$('supabaseAnonKey').value.trim(); if(!url||!anonKey) throw new Error('Supabase URL과 Anon Key를 먼저 입력해 주세요.'); return window.supabase.createClient(url, anonKey); }
@@ -345,8 +345,8 @@
             <div>${escapeHtml(gradeLabel(row.student_grade))}</div>
             <div class="link-box"><input class="link-input" type="text" value="${escapeHtml(link)}" readonly /></div>
             <div><button class="mini-btn copy-link-btn" type="button" data-link="${escapeHtml(link)}">복사</button></div>
-            <div class="score-cell ${round1==='-'?'blank':''}">${escapeHtml(round1)}</div>
-            <div class="score-cell ${round2==='-'?'blank':''}">${escapeHtml(round2)}</div>
+            <div class="score-cell ${round1==='-'?'blank':''}" ${fmtDateTime(row.round1_submitted_at)?`title="${escapeHtml(fmtDateTime(row.round1_submitted_at))}"`:''}>${escapeHtml(round1)}</div>
+            <div class="score-cell ${round2==='-'?'blank':''}" ${fmtDateTime(row.round2_submitted_at)?`title="${escapeHtml(fmtDateTime(row.round2_submitted_at))}"`:''}>${escapeHtml(round2)}</div>
             <div class="score-cell ${finalClass}">${escapeHtml(finalText)}</div>
             <div>${renderFinalEditor(row)}</div>
             <div>${renderResetButton(row)}</div>
