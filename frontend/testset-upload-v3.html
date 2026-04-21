@@ -1237,15 +1237,14 @@
           const { data, error } = await state.supabase
             .schema("auto_grading")
             .rpc("teacher_update_test_set_metadata", {
-              p_test_set_id: state.foundTestSet.id,
+              p_test_set_id: testSetId,
               p_title: title,
-              p_curriculum_version: $("curriculumVersion").value,
-              p_grade_level: $("gradeLevel").value,
-              p_subject: $("subject").value,
+              p_curriculum_version: curriculumVersion,
+              p_grade_level: gradeLevel,
+              p_subject: subject,
               p_unit_code: unitCode,
-              p_source_type: sourceType,
               p_source_category: sourceCategory,
-              p_source_name: sourceCategory,
+              p_source_name: sourceName,
             });
           if (error) throw error;
           if (data && data.ok === false) throw new Error(data.error || "저장 실패");
