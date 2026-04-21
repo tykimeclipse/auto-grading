@@ -91,16 +91,18 @@
         }
 
         .round-badge {
+            display: inline-flex;
+            align-items: center;
             border: 1px solid #c6d2ff;
             background: var(--brand-soft);
             color: #16327f;
-            padding: 5px 10px;
+            padding: 8px 12px;
             border-radius: 999px;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 700;
             white-space: nowrap;
             box-shadow: var(--shadow);
-            align-self: flex-start;
+            margin: 0 0 10px 0;
         }
 
         .gate-inline {
@@ -485,7 +487,6 @@
                     <button id="startExamBtn" class="gate-inline-btn" type="button">시작</button>
                 </div>
 
-                <div id="roundBadge" class="round-badge hidden" aria-label="현재 상태: 1차 입력">1차 입력</div>
             </div>
 
             <div id="gateError" class="gate-inline-error hidden"></div>
@@ -511,6 +512,7 @@
         </header>
 
         <div id="examShell" class="hidden">
+            <div id="roundBadge" class="round-badge hidden" aria-label="현재 상태: 1차 입력">1차 입력</div>
             <section id="resultSummary" class="result-summary hidden" aria-live="polite"></section>
             <main id="omrRoot" class="omr-layout" aria-label="OMR 답안 입력 영역"></main>
 
@@ -670,7 +672,9 @@
 
             if (hasStudent) {
                 studentNameEl.classList.remove('hidden');
-                studentNameEl.textContent = state.studentName ? `학생: ${state.studentName}` : `학생 코드: ${state.studentCode}`;
+                studentNameEl.textContent = state.studentName
+                    ? `${state.studentName} (학생코드 ${state.studentCode})`
+                    : `학생 코드: ${state.studentCode}`;
 
                 const badgeText = getRoundBadgeText();
                 roundBadge.textContent = badgeText;
