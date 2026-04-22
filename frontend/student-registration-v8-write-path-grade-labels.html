@@ -148,6 +148,19 @@
       background: #ecfeff;
       color: #155e75;
     }
+    .mini-btn {
+      min-height: 28px;
+      padding: 0 8px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .mini-btn:hover { background: #f3f4f6; }
+    .mini-btn:disabled { opacity: .5; cursor: not-allowed; }
     .disabled-box {
       margin-top: 12px;
       padding: 12px;
@@ -300,12 +313,12 @@
           <thead>
             <tr>
               <th class="checkbox-cell"><span class="select-all-wrap"><input id="selectAll" type="checkbox" /></span></th>
-              <th>학생코드</th>
+              <th style="width:58px">코드</th>
               <th>이름</th>
               <th>학년</th>
               <th>강좌</th>
-              <th>과정구분</th>
               <th>활성</th>
+              <th>성취도 링크</th>
             </tr>
           </thead>
           <tbody id="studentTableBody">
@@ -434,8 +447,11 @@
           <td>${escapeHtml(s.name || '')}</td>
           <td>${escapeHtml(gradeLabel(s.grade_level))}</td>
           <td>${escapeHtml(s.course_names || '-')}</td>
-          <td>${escapeHtml(s.student_course_types || '-')}</td>
           <td>${s.is_active === false ? '<span class="badge" style="background:#fef2f2;color:#991b1b;">비활성</span>' : '<span class="badge">활성</span>'}</td>
+          <td style="white-space:nowrap">
+            <button class="mini-btn achievement-link-btn" data-student-id="${escapeHtml(s.id || '')}">링크 복사</button>
+            <button class="mini-btn achievement-reissue-btn" data-student-id="${escapeHtml(s.id || '')}" title="링크 재발급 (기존 링크 무효화)">재발급</button>
+          </td>
         </tr>
       `).join('');
 
@@ -642,6 +658,35 @@ ${names.join('\n')}`);
         .replace(/'/g, '&#039;');
     }
 
+    function buildAchievementUrl(token) {
+      const url = new URL(window.location.href);
+      const basePath = url.pathname.replace(/[^/]+$/, 'student-achievement-v2.html');
+      return `${url.origin}${basePath}?token=${token}`;
+    }
+
+    async function copyAchievementLink(studentId, reissue = false) {
+      const client = state.supabase;
+      if (!client) {
+        showStatus($('listStatus'), 'error', 'DB 연결 후 사용해 주세요.');
+        return;
+      }
+      const rpcName = reissue
+        ? 'revoke_and_reissue_student_public_token'
+        : 'get_or_create_student_public_token';
+
+      const { data, error } = await client
+        .schema('auto_grading')
+        .rpc(rpcName, { p_student_id: studentId });
+
+      if (error) throw error;
+      const result = Array.isArray(data) ? data[0] : data;
+      if (!result?.token) throw new Error('토큰 발급에 실패했습니다.');
+
+      const url = buildAchievementUrl(result.token);
+      await navigator.clipboard.writeText(url);
+      return url;
+    }
+
     function clearForm() {
       $('studentName').value = '';
       $('gradeLevel').value = '';
@@ -696,6 +741,31 @@ ${names.join('\n')}`);
     $('searchInput').addEventListener('input', applyFilters);
     $('gradeFilter').addEventListener('change', applyFilters);
     $('courseFilter').addEventListener('change', applyFilters);
+
+    // 성취도 링크 버튼 — 이벤트 위임 (행이 동적 렌더링되므로)
+    $('studentTableBody').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.achievement-link-btn, .achievement-reissue-btn');
+      if (!btn) return;
+      const studentId = btn.dataset.studentId;
+      if (!studentId) return;
+
+      const isReissue = btn.classList.contains('achievement-reissue-btn');
+      if (isReissue && !window.confirm('기존 링크가 즉시 무효화됩니다. 재발급할까요?')) return;
+
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '처리 중...';
+      try {
+        await copyAchievementLink(studentId, isReissue);
+        btn.textContent = '복사 완료!';
+        showStatus($('listStatus'), 'ok', isReissue ? '링크를 재발급하고 클립보드에 복사했습니다.' : '성취도 링크를 클립보드에 복사했습니다.');
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2000);
+      } catch (err) {
+        btn.textContent = orig;
+        btn.disabled = false;
+        showStatus($('listStatus'), 'error', err.message || String(err));
+      }
+    });
 
     loadConfig();
     toggleStudentCourseTypeField();

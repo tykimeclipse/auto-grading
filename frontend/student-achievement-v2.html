@@ -270,22 +270,21 @@
         return map[value] || value;
       }
 
-      function getStudentCodeFromUrl() {
+      function getTokenFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        return (params.get("code") || "").trim();
+        return (params.get("token") || "").trim();
       }
 
-      async function fetchStudentInfo(studentCode) {
+      async function fetchStudentByToken(token) {
+        // get_student_by_public_token: 유효하지 않은 토큰이면 null 반환
         const { data, error } = await supabase
           .schema("auto_grading")
-          .from("students")
-          .select("name, grade_level, student_code")
-          .eq("student_code", studentCode)
-          .eq("is_active", true)
-          .maybeSingle();
+          .rpc("get_student_by_public_token", { p_token: token });
 
         if (error) throw error;
-        return data;
+        // RPC가 배열로 올 수도 있음
+        const row = Array.isArray(data) ? data[0] : data;
+        return row ?? null;
       }
 
       async function fetchStats(studentCode) {
@@ -377,18 +376,18 @@
       function normalizeErrorMessage(err) {
         const msg = err?.message || "";
         if (msg.includes("등록되지 않은 학생 코드")) {
-          return "등록된 학생 정보를 찾을 수 없습니다.";
+          return "조회 중 오류가 발생했습니다.";
         }
         return "조회 중 오류가 발생했습니다.";
       }
 
       async function loadPage() {
-        const studentCode = getStudentCodeFromUrl();
+        const token = getTokenFromUrl();
 
-        if (!studentCode) {
+        if (!token) {
           showMessage(
             "empty",
-            "학생코드가 없습니다. 주소 뒤에 ?code=101 형태로 접속해 주세요.",
+            "유효한 링크가 아닙니다. 선생님께 성취도 링크를 요청해 주세요.",
           );
           return;
         }
@@ -396,13 +395,17 @@
         showMessage("loading", "조회 중입니다...");
 
         try {
-          const studentInfo = await fetchStudentInfo(studentCode);
+          // 1단계: 토큰으로 학생 정보 조회
+          const studentInfo = await fetchStudentByToken(token);
 
           if (!studentInfo) {
-            showMessage("error", "등록된 학생 정보를 찾을 수 없습니다.");
+            showMessage("error", "유효하지 않은 링크입니다. 선생님께 새 링크를 요청해 주세요.");
             return;
           }
 
+          const studentCode = studentInfo.student_code;
+
+          // 2단계: 학생코드로 통계·기록 조회 (기존 RPC 재활용)
           const [stats, history] = await Promise.all([
             fetchStats(studentCode),
             fetchHistory(studentCode),
