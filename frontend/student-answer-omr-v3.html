@@ -484,7 +484,7 @@
             <div class="hero-row">
                 <div class="title-wrap">
                     <h1 id="testTitle" class="test-title">OMR 입력</h1>
-                    <div id="subline" class="subline">문제지는 종이로 보고, 이 화면에는 답만 입력합니다.</div>
+                    <div id="subline" class="subline">문제를 먼저 풀고, 정답을 입력합니다.</div>
                     <div id="studentName" class="student-name hidden"></div>
                 </div>
 
@@ -691,7 +691,7 @@
 
         function renderHeader() {
             document.getElementById('testTitle').textContent = state.testTitle || 'OMR 입력';
-            document.getElementById('subline').textContent = '문제지는 종이로 보고, 이 화면에는 답만 입력합니다.';
+            document.getElementById('subline').textContent = '문제를 먼저 풀고, 정답을 입력합니다.';
 
             const hasStudent = Boolean(state.studentCode);
             const studentNameEl = document.getElementById('studentName');
