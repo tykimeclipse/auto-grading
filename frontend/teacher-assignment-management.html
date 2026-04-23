@@ -309,7 +309,10 @@
         return `<span class="muted">${escapeHtml(finalEditHint(row))}</span>`;
       }
       if (state.editingAssignmentId !== row.assignment_id) {
-        return `<button class="mini-btn edit-final-btn" type="button" data-assignment-id="${row.assignment_id}">최종점수 수정</button>`;
+        const canFinalize = row.status === 'needs_review' && !hasTeacherFinal(row) && row.round2_score_percent != null;
+        return `
+          <button class="mini-btn edit-final-btn" type="button" data-assignment-id="${row.assignment_id}">수정</button>
+          ${canFinalize ? `<button class="mini-btn primary confirm-final-btn" type="button" data-assignment-id="${row.assignment_id}">확정</button>` : ''}`;
       }
       const total = Number(row.total_items || 0);
       const preset = hasTeacherFinal(row) ? (row.final_correct_count ?? '') : '';
@@ -367,6 +370,7 @@
         try { await copyText(btn.dataset.link || ''); setStatus('assignmentStatus','학생용 링크를 복사했습니다.','ok'); } catch (err) { setStatus('assignmentStatus', normalizeError(err), 'error'); }
       }));
       body.querySelectorAll('.edit-final-btn').forEach(btn => btn.addEventListener('click', () => { state.editingAssignmentId = btn.dataset.assignmentId; state.resetingAssignmentId = null; renderAssignmentList(); }));
+      body.querySelectorAll('.confirm-final-btn').forEach(btn => btn.addEventListener('click', async () => { await finalizeAttempt(btn.dataset.assignmentId); }));
       body.querySelectorAll('.cancel-final-btn').forEach(btn => btn.addEventListener('click', () => { state.editingAssignmentId = null; renderAssignmentList(); }));
       body.querySelectorAll('.save-final-btn').forEach(btn => btn.addEventListener('click', async () => { await saveTeacherFinal(btn.dataset.assignmentId); }));
       body.querySelectorAll('.open-toggle').forEach(el => el.addEventListener('change', async () => { await setAssignmentOpenState(el.dataset.assignmentId, el.checked); }));
@@ -411,6 +415,32 @@
         $('debugBox').textContent = JSON.stringify({ payload, response: data }, null, 2);
         const percentText = total > 0 ? Math.round((correct / total) * 100) : 0;
         setStatus('assignmentStatus', `최종점수를 저장했습니다. (${correct}/${total} · ${percentText}%)${closeMessage}`, 'ok');
+        await loadAssignments();
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    async function finalizeAttempt(assignmentId){
+      const row = state.assignments.find(r => r.assignment_id === assignmentId);
+      if (!row) return;
+      if (!row.reset_token) { setStatus('assignmentStatus', 'reset_token 정보가 없습니다. 목록을 다시 불러오세요.', 'error'); return; }
+      const r2Correct = row.round2_correct_count;
+      const r2Total = row.total_items;
+      const r2Pct = row.round2_score_percent != null ? Math.round(Number(row.round2_score_percent)) : '-';
+      const msg = `${row.student_name} 학생의 2차 성취도(${r2Correct}/${r2Total}문항 · ${r2Pct}%)를 최종 성취도로 확정하고 종료합니다.\n계속하시겠습니까?`;
+      if (!confirm(msg)) return;
+      try {
+        setStatus('assignmentStatus', '확정 처리 중...', 'info');
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_finalize_attempt', {
+          p_assignment_id: assignmentId,
+          p_reset_token: row.reset_token
+        });
+        if (error) throw error;
+        ensureRpcOk(data, '확정 처리에 실패했습니다.');
+        $('debugBox').style.display = 'block';
+        $('debugBox').textContent = JSON.stringify(data, null, 2);
+        setStatus('assignmentStatus', `최종 성취도를 확정하고 종료했습니다. (${r2Correct}/${r2Total}문항 · ${r2Pct}%)`, 'ok');
         await loadAssignments();
       } catch (err) {
         setStatus('assignmentStatus', normalizeError(err), 'error');

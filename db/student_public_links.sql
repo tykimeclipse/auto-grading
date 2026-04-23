@@ -8,10 +8,11 @@
 create table if not exists auto_grading.student_public_links (
   id           uuid        primary key default gen_random_uuid(),
   student_id   uuid        not null references auto_grading.students(id) on delete cascade,
-  public_token uuid        not null default gen_random_uuid(),
+  public_token uuid        not null default gen_random_uuid() unique,
   is_active    boolean     not null default true,
   created_at   timestamptz not null default now(),
-  revoked_at   timestamptz
+  revoked_at   timestamptz,
+  expires_at   timestamptz
 );
 
 -- ----------------------------------------------------------------
@@ -42,6 +43,8 @@ alter table auto_grading.student_public_links
   add column if not exists created_at timestamptz not null default now();
 alter table auto_grading.student_public_links
   add column if not exists revoked_at timestamptz;
+alter table auto_grading.student_public_links
+  add column if not exists expires_at timestamptz;
 
 comment on table auto_grading.student_public_links
   is '학생 성취도 페이지 공개 링크 토큰. 학생 1명당 활성 토큰 1개 유지.';
@@ -51,11 +54,14 @@ comment on column auto_grading.student_public_links.public_token
 -- ----------------------------------------------------------------
 -- 3. 인덱스
 -- ----------------------------------------------------------------
+-- 학생당 활성 토큰 1개 제한
 create unique index if not exists student_public_links_student_active_uidx
   on auto_grading.student_public_links (student_id)
   where is_active = true;
 
-create index if not exists student_public_links_token_idx
+-- 토큰 중복 방지 (일반 index → unique index로 교체)
+drop index if exists auto_grading.student_public_links_token_idx;
+create unique index if not exists student_public_links_token_uidx
   on auto_grading.student_public_links (public_token);
 
 
@@ -89,6 +95,7 @@ as $$
   join auto_grading.students s on s.id = l.student_id
   where l.public_token = p_token
     and l.is_active    = true
+    and (l.expires_at is null or l.expires_at > now())
     and s.is_active    = true;
 $$;
 
