@@ -1116,6 +1116,7 @@
         if (isEdit) {
           $("cancelBtn").textContent = "취소";
           $("saveBtn").disabled = false;
+          $("saveBtn").textContent = "저장";
         }
 
         if (isSearch && !state.foundTestSet) {
@@ -1256,7 +1257,8 @@
           $("resultBox").style.display = "block";
           $("resultBox").textContent = JSON.stringify(data, null, 2);
           state.foundTestSet = null;
-          $("saveBtn").disabled = true;
+          btn.textContent = "저장 완료";
+          btn.disabled = true;
           $("cancelBtn").textContent = "등록 모드로 돌아가기";
         } catch (err) {
           setStatus(normalizeError(err), "error");
