@@ -625,6 +625,25 @@
             return `${Number(v).toFixed(1)}%`;
         }
 
+        function getShieldIcon(count) {
+            if (count == null || count < 1) return '';
+            let level;
+            if (count >= 1000)     level = 5;
+            else if (count >= 500) level = 4;
+            else if (count >= 150) level = 3;
+            else if (count >= 50)  level = 2;
+            else                   level = 1;
+            return `<img src="assets/images/shield-l${level}.png" alt="L${level}" style="height:22px;vertical-align:middle;margin-left:6px;">`;
+        }
+
+        function getRibbonIcon(percent) {
+            if (percent == null || Number.isNaN(Number(percent))) return '';
+            const p = Number(percent);
+            if (p >= 95) return `<img src="assets/images/gold-ribbon-s.png"   alt="gold"   style="height:22px;vertical-align:middle;margin-left:6px;">`;
+            if (p >= 85) return `<img src="assets/images/silver-ribbon-s.png" alt="silver" style="height:22px;vertical-align:middle;margin-left:6px;">`;
+            return '';
+        }
+
         function buildFinishedResultSummaryFromAttempt(result) {
             const totalItems = Number(result?.total_items || 0);
             const firstScorePercent = Number(result?.first_score_percent || 0);
@@ -692,10 +711,16 @@
                 statsRow.classList.add('hidden');
             }
 
-            document.getElementById('statTotalSolved').textContent = formatCount(state.studentStats.totalSolved);
-            document.getElementById('statRound1Accuracy').textContent = formatPercentDecimal(state.studentStats.round1Accuracy);
-            document.getElementById('statRound2Accuracy').textContent = formatPercentDecimal(state.studentStats.round2Accuracy);
-            document.getElementById('statFinalAccuracy').textContent = formatPercentDecimal(state.studentStats.finalAccuracy);
+            const totalSolved = state.studentStats.totalSolved;
+            document.getElementById('statTotalSolved').innerHTML =
+                formatCount(totalSolved) + (totalSolved != null && totalSolved !== '-' ? getShieldIcon(totalSolved) : '');
+
+            const r1Acc = state.studentStats.round1Accuracy;
+            const r2Acc = state.studentStats.round2Accuracy;
+            const rfAcc = state.studentStats.finalAccuracy;
+            document.getElementById('statRound1Accuracy').innerHTML = formatPercentDecimal(r1Acc) + getRibbonIcon(r1Acc);
+            document.getElementById('statRound2Accuracy').innerHTML = formatPercentDecimal(r2Acc) + getRibbonIcon(r2Acc);
+            document.getElementById('statFinalAccuracy').innerHTML  = formatPercentDecimal(rfAcc) + getRibbonIcon(rfAcc);
         }
 
         function hideGateInline() {

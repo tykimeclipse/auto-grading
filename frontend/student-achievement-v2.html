@@ -234,6 +234,34 @@
         return `${Math.round(Number(value))}%`;
       }
 
+      function getShieldIcon(count) {
+        if (count == null || count < 1) return "";
+        let level;
+        if (count >= 1000)     level = 5;
+        else if (count >= 500) level = 4;
+        else if (count >= 150) level = 3;
+        else if (count >= 50)  level = 2;
+        else                   level = 1;
+        return `<img src="assets/images/shield-l${level}.png" alt="L${level}" style="height:22px;vertical-align:middle;margin-left:6px;">`;
+      }
+
+      function getRibbonIcon(percent) {
+        if (percent == null) return "";
+        const p = Number(percent);
+        if (p >= 95) return `<img src="assets/images/gold-ribbon-s.png"   alt="gold"   style="height:22px;vertical-align:middle;margin-left:6px;">`;
+        if (p >= 85) return `<img src="assets/images/silver-ribbon-s.png" alt="silver" style="height:22px;vertical-align:middle;margin-left:6px;">`;
+        return "";
+      }
+
+      function getScoreBgColor(percent) {
+        if (percent == null) return "";
+        const p = Number(percent);
+        if (p === 100) return "#00ff00";
+        if (p >= 80)   return "#ffa500";
+        if (p >= 60)   return "#ffff00";
+        return "#ff0000";
+      }
+
       function formatDate(value) {
         if (!value) return "";
         if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -349,11 +377,21 @@
           const r2Perfect = r2Pct === 100;
 
           const tdR1 = document.createElement("td");
-          tdR1.textContent = r1Pct != null ? formatPercent(r1Pct) : "-";
+          if (r1Pct != null) {
+            tdR1.textContent = formatPercent(r1Pct);
+            tdR1.style.backgroundColor = getScoreBgColor(r1Pct);
+          } else {
+            tdR1.textContent = "-";
+          }
 
           // 2차: round1이 100점이면 2차 응시 없음 → '-', 아니면 제출된 경우에만 표시
           const tdR2 = document.createElement("td");
-          tdR2.textContent = (!r1Perfect && r2Pct != null) ? formatPercent(r2Pct) : "-";
+          if (!r1Perfect && r2Pct != null) {
+            tdR2.textContent = formatPercent(r2Pct);
+            tdR2.style.backgroundColor = getScoreBgColor(r2Pct);
+          } else {
+            tdR2.textContent = "-";
+          }
 
           // 최종: teacher_final이 있거나, round1 또는 round2가 100점일 때만 확정값 표시
           const tdFinal = document.createElement("td");
@@ -366,7 +404,12 @@
             finalValue = 100;
           }
           // 위 조건 모두 해당 없으면 finalValue = null → '-'
-          tdFinal.textContent = finalValue != null ? formatPercent(finalValue) : "-";
+          if (finalValue != null) {
+            tdFinal.textContent = formatPercent(finalValue);
+            tdFinal.style.backgroundColor = getScoreBgColor(finalValue);
+          } else {
+            tdFinal.textContent = "-";
+          }
 
           tr.append(tdDate, tdTitle, tdItems, tdR1, tdR2, tdFinal);
           historyBody.appendChild(tr);
@@ -414,25 +457,24 @@
           studentNameEl.textContent = studentInfo.name || "이름 없음";
           studentMetaEl.textContent = `학생코드 ${studentInfo.student_code || "-"} · ${formatGradeLevel(studentInfo.grade_level)}`;
 
-          totalSolvedEl.textContent =
-          stats && stats.total_solved !== null && stats.total_solved !== undefined
-          ? stats.total_solved
-          : '-';
-
-          avgRound1El.textContent =
-            stats?.round1_accuracy != null
-              ? `${Number(stats.round1_accuracy).toFixed(1)}%`
+          const totalSolved = (stats && stats.total_solved != null) ? stats.total_solved : null;
+          totalSolvedEl.innerHTML =
+            totalSolved != null
+              ? `${totalSolved}${getShieldIcon(totalSolved)}`
               : "-";
 
-          avgRound2El.textContent =
-            stats?.round2_accuracy != null
-              ? `${Number(stats.round2_accuracy).toFixed(1)}%`
-              : "-";
+          const r1Acc = stats?.round1_accuracy ?? null;
+          const r2Acc = stats?.round2_accuracy ?? null;
+          const rfAcc = stats?.final_accuracy   ?? null;
 
-          avgFinalEl.textContent =
-            stats?.final_accuracy != null
-              ? `${Number(stats.final_accuracy).toFixed(1)}%`
-              : "-";
+          avgRound1El.innerHTML =
+            r1Acc != null ? `${Number(r1Acc).toFixed(1)}%${getRibbonIcon(r1Acc)}` : "-";
+
+          avgRound2El.innerHTML =
+            r2Acc != null ? `${Number(r2Acc).toFixed(1)}%${getRibbonIcon(r2Acc)}` : "-";
+
+          avgFinalEl.innerHTML =
+            rfAcc != null ? `${Number(rfAcc).toFixed(1)}%${getRibbonIcon(rfAcc)}` : "-";
 
           renderHistory(history);
 
