@@ -639,8 +639,9 @@
         function getRibbonIcon(percent) {
             if (percent == null || Number.isNaN(Number(percent))) return '';
             const p = Number(percent);
-            if (p >= 95) return `<img src="assets/images/gold-ribbon-s.png"   alt="gold"   style="height:22px;vertical-align:middle;margin-left:6px;">`;
-            if (p >= 85) return `<img src="assets/images/silver-ribbon-s.png" alt="silver" style="height:22px;vertical-align:middle;margin-left:6px;">`;
+            const fallbackStyle = 'margin-left:6px;font-size:18px;vertical-align:middle;';
+            if (p >= 95) return `<img src="assets/images/gold-ribbon-s.png"   alt="" style="height:22px;vertical-align:middle;margin-left:6px;" onerror="this.outerHTML='<span style=\\"${fallbackStyle}\\" title=\\"Gold\\">🥇</span>'">`;
+            if (p >= 85) return `<img src="assets/images/silver-ribbon-s.png" alt="" style="height:22px;vertical-align:middle;margin-left:6px;" onerror="this.outerHTML='<span style=\\"${fallbackStyle}\\" title=\\"Silver\\">🥈</span>'">`;
             return '';
         }
 

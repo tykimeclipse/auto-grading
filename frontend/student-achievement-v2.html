@@ -248,18 +248,21 @@
       function getRibbonIcon(percent) {
         if (percent == null) return "";
         const p = Number(percent);
-        if (p >= 95) return `<img src="assets/images/gold-ribbon-s.png"   alt="gold"   style="height:22px;vertical-align:middle;margin-left:6px;">`;
-        if (p >= 85) return `<img src="assets/images/silver-ribbon-s.png" alt="silver" style="height:22px;vertical-align:middle;margin-left:6px;">`;
+        const fallbackStyle = "margin-left:6px;font-size:18px;vertical-align:middle;";
+        if (p >= 95) return `<img src="assets/images/gold-ribbon-s.png"   alt="" style="height:22px;vertical-align:middle;margin-left:6px;" onerror="this.outerHTML='<span style=\\"${fallbackStyle}\\" title=\\"Gold\\">🥇</span>'">`;
+        if (p >= 85) return `<img src="assets/images/silver-ribbon-s.png" alt="" style="height:22px;vertical-align:middle;margin-left:6px;" onerror="this.outerHTML='<span style=\\"${fallbackStyle}\\" title=\\"Silver\\">🥈</span>'">`;
         return "";
       }
 
-      function getScoreBgColor(percent) {
-        if (percent == null) return "";
+      function getScoreHighlight(percent, text) {
+        if (percent == null) return text;
         const p = Number(percent);
-        if (p === 100) return "#00ff00";
-        if (p >= 80)   return "#ffa500";
-        if (p >= 60)   return "#ffff00";
-        return "#ff0000";
+        let color;
+        if (p === 100) color = "#00ff00";
+        else if (p >= 80) color = "#ffa500";
+        else if (p >= 60) color = "#ffff00";
+        else color = "#ff0000";
+        return `<span style="background-color:${color};padding:1px 5px;border-radius:3px;">${text}</span>`;
       }
 
       function formatDate(value) {
@@ -377,21 +380,15 @@
           const r2Perfect = r2Pct === 100;
 
           const tdR1 = document.createElement("td");
-          if (r1Pct != null) {
-            tdR1.textContent = formatPercent(r1Pct);
-            tdR1.style.backgroundColor = getScoreBgColor(r1Pct);
-          } else {
-            tdR1.textContent = "-";
-          }
+          tdR1.innerHTML = r1Pct != null
+            ? getScoreHighlight(r1Pct, formatPercent(r1Pct))
+            : "-";
 
           // 2차: round1이 100점이면 2차 응시 없음 → '-', 아니면 제출된 경우에만 표시
           const tdR2 = document.createElement("td");
-          if (!r1Perfect && r2Pct != null) {
-            tdR2.textContent = formatPercent(r2Pct);
-            tdR2.style.backgroundColor = getScoreBgColor(r2Pct);
-          } else {
-            tdR2.textContent = "-";
-          }
+          tdR2.innerHTML = (!r1Perfect && r2Pct != null)
+            ? getScoreHighlight(r2Pct, formatPercent(r2Pct))
+            : "-";
 
           // 최종: teacher_final이 있거나, round1 또는 round2가 100점일 때만 확정값 표시
           const tdFinal = document.createElement("td");
@@ -404,12 +401,9 @@
             finalValue = 100;
           }
           // 위 조건 모두 해당 없으면 finalValue = null → '-'
-          if (finalValue != null) {
-            tdFinal.textContent = formatPercent(finalValue);
-            tdFinal.style.backgroundColor = getScoreBgColor(finalValue);
-          } else {
-            tdFinal.textContent = "-";
-          }
+          tdFinal.innerHTML = finalValue != null
+            ? getScoreHighlight(finalValue, formatPercent(finalValue))
+            : "-";
 
           tr.append(tdDate, tdTitle, tdItems, tdR1, tdR2, tdFinal);
           historyBody.appendChild(tr);
