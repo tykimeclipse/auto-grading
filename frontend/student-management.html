@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>학생 종합 관리</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --line: #d9deea;
+      --line-soft: #edf0f6;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-weak: #dbeafe;
+      --green: #059669;
+      --green-weak: #ecfdf5;
+      --danger: #dc2626;
+      --danger-weak: #fef2f2;
+      --warn: #92400e;
+      --warn-weak: #fffbeb;
+      --shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .header h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
+    .header p { margin: 0; color: var(--muted); font-size: 14px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .badge.ok    { border-color: var(--green); color: var(--green); background: var(--green-weak); }
+    .badge.error { border-color: var(--danger); color: var(--danger); background: var(--danger-weak); }
+    .layout {
+      display: grid;
+      grid-template-columns: 4fr 6fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    .panel-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .panel h2, .section h3 {
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+    .panel h2 { font-size: 18px; }
+    .section h3 { font-size: 16px; }
+    .note { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+    .search-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 13px; font-weight: 700; color: #374151; }
+    .field input, .field select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 11px;
+      background: #fff;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.09);
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 10px;
+    }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 12px;
+      cursor: pointer;
+    }
+    button:hover { background: #f8fafc; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-soft { background: var(--primary-weak); color: var(--primary-dark); border-color: #bfdbfe; }
+    .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .btn-ghost { background: #f3f4f6; color: #374151; }
+    .btn-small { padding: 7px 9px; font-size: 12px; border-radius: 8px; }
+    .list-wrap {
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 12px;
+      background: #fff;
+    }
+    .student-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .student-table th, .student-table td {
+      border-bottom: 1px solid var(--line-soft);
+      padding: 10px 8px;
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .student-table th { color: var(--muted); font-size: 12px; background: #f8fafc; }
+    .student-table tbody tr { cursor: pointer; }
+    .student-table tbody tr:hover { background: #f8fbff; }
+    .student-table tbody tr.selected { background: #eff6ff; }
+    .student-table tbody tr.inactive { color: #9ca3af; background: #fafafa; }
+    .student-table tbody tr.inactive.selected { background: #f1f5f9; }
+    .checkbox-cell { width: 34px; text-align: center !important; }
+    .student-name-cell { font-weight: 800; color: #111827; }
+    .course-chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      padding: 4px 7px;
+      font-size: 12px;
+      color: #374151;
+    }
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 24px;
+      vertical-align: middle;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle span {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #cbd5e1;
+      border-radius: 999px;
+      transition: .18s;
+    }
+    .toggle span:before {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: .18s;
+      box-shadow: 0 1px 3px rgba(0,0,0,.18);
+    }
+    .toggle input:checked + span { background: var(--green); }
+    .toggle input:checked + span:before { transform: translateX(18px); }
+    .status-box {
+      margin-top: 10px;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      display: none;
+      white-space: pre-line;
+    }
+    .status-box.show { display: block; }
+    .status-box.info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
+    .status-box.warn { background: var(--warn-weak); border: 1px solid #fde68a; color: var(--warn); }
+    .status-box.error { background: var(--danger-weak); border: 1px solid #fecaca; color: #991b1b; }
+    .empty-detail {
+      min-height: 520px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-detail strong { display: block; color: #374151; font-size: 20px; margin-bottom: 8px; }
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--line-soft);
+      padding-bottom: 14px;
+    }
+    .detail-name { font-size: 24px; font-weight: 900; margin: 0 0 4px; letter-spacing: -0.03em; }
+    .detail-sub { color: var(--muted); font-size: 13px; }
+    .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .section {
+      border: 1px solid var(--line-soft);
+      border-radius: 14px;
+      padding: 14px;
+      background: #fff;
+      margin-top: 12px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+      margin-top: 12px;
+    }
+    .meta-item {
+      border: 1px solid #eef2f7;
+      border-radius: 12px;
+      padding: 10px 11px;
+      background: #fbfcff;
+      min-height: 64px;
+    }
+    .meta-item .k { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .meta-item .v { font-size: 15px; font-weight: 800; word-break: break-word; }
+    .meta-item input, .meta-item select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 8px 9px;
+      font-size: 14px;
+      background: #fff;
+    }
+    .achievement-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .metric-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      background: #f8fafc;
+      padding: 12px;
+      min-height: 82px;
+    }
+    .metric-card .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .metric-card .value { font-size: 22px; font-weight: 900; color: #111827; }
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    .history-table th, .history-table td {
+      border-bottom: 1px solid var(--line-soft);
+      padding: 9px 8px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .history-table th { background: #f8fafc; color: var(--muted); font-size: 12px; }
+    .history-table td.title-cell { text-align: left; font-weight: 700; }
+    .placeholder {
+      margin-top: 12px;
+      padding: 16px;
+      border: 1px dashed #cbd5e1;
+      background: #f8fafc;
+      color: #64748b;
+      border-radius: 12px;
+      font-size: 14px;
+    }
+    .course-history {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    .course-history th, .course-history td {
+      border-bottom: 1px solid var(--line-soft);
+      padding: 9px 8px;
+      text-align: left;
+    }
+    .mobile-scroll { overflow-x: auto; }
+    .stat-icon {
+      width: 1.1em; height: 1.1em;
+      margin-left: 0.18em; vertical-align: -0.1em;
+      object-fit: contain;
+    }
+    @media (max-width: 1040px) {
+      .layout { grid-template-columns: 1fr; }
+      .empty-detail { min-height: 260px; }
+    }
+    @media (max-width: 680px) {
+      .wrap { padding: 14px; }
+      .header { flex-direction: column; }
+      .search-grid, .meta-grid, .achievement-grid { grid-template-columns: 1fr 1fr; }
+      .detail-header { flex-direction: column; }
+      .detail-actions { justify-content: flex-start; }
+      .student-table { min-width: 720px; }
+    }
+    @media (max-width: 420px) {
+      .search-grid, .meta-grid, .achievement-grid { grid-template-columns: 1fr; }
+      .detail-name { font-size: 21px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div>
+        <h1>학생 종합 관리</h1>
+        <p>학생 검색, 메타정보 수정, 활성/휴원 관리, 성취도 확인을 한 화면에서 처리합니다.</p>
+      </div>
+      <div class="badge" id="connectionBadge">연결 중...</div>
+    </header>
+
+    <main class="layout">
+      <section class="panel" aria-label="학생 검색 및 목록">
+        <div class="panel-title-row">
+          <div>
+            <h2>학생 검색</h2>
+            <p class="note">조건을 입력하면 아래 목록이 즉시 필터링됩니다.</p>
+          </div>
+        </div>
+        <div class="search-grid">
+          <div class="field">
+            <label for="searchName">학생 이름</label>
+            <input id="searchName" type="text" placeholder="예: 김도윤" />
+          </div>
+          <div class="field">
+            <label for="searchCode">학생 코드</label>
+            <input id="searchCode" type="text" placeholder="예: 101" inputmode="numeric" />
+          </div>
+          <div class="field">
+            <label for="gradeFilter">학년</label>
+            <select id="gradeFilter">
+              <option value="">전체</option>
+              <option value="M1">중1</option>
+              <option value="M2">중2</option>
+              <option value="M3">중3</option>
+              <option value="H1">고1</option>
+              <option value="H2">고2</option>
+              <option value="H3">고3</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="courseFilter">강좌명</label>
+            <input id="courseFilter" type="text" placeholder="예: 중3 내신반" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="sortSelect">정렬</label>
+          <select id="sortSelect">
+            <option value="created_desc">등록일 역순</option>
+            <option value="created_asc">등록일순</option>
+            <option value="grade_asc">학년순</option>
+            <option value="grade_desc">학년 역순</option>
+            <option value="name_asc">이름순</option>
+            <option value="name_desc">이름 역순</option>
+          </select>
+        </div>
+        <div class="toolbar">
+          <button id="refreshBtn" class="btn-soft" type="button">목록 새로고침</button>
+          <button id="deleteBtn" class="btn-danger" type="button">선택 삭제</button>
+          <button id="clearSearchBtn" class="btn-ghost" type="button">검색 초기화</button>
+        </div>
+        <div id="listStatus" class="status-box"></div>
+        <div class="list-wrap mobile-scroll">
+          <table class="student-table">
+            <thead>
+              <tr>
+                <th class="checkbox-cell"><input id="selectAll" type="checkbox" /></th>
+                <th>등록일</th>
+                <th>코드</th>
+                <th>이름</th>
+                <th>학년</th>
+                <th>수강 강좌</th>
+                <th>활성</th>
+              </tr>
+            </thead>
+            <tbody id="studentTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="detailPanel" class="panel" aria-label="학생 상세 정보">
+        <div id="emptyDetail" class="empty-detail">
+          <div>
+            <strong>학생을 선택하세요</strong>
+            <span>좌측 학생 목록에서 행을 클릭하면 이곳에 세부 정보가 표시됩니다.</span>
+          </div>
+        </div>
+        <div id="studentDetail" hidden>
+          <div class="detail-header">
+            <div>
+              <p id="detailName" class="detail-name">-</p>
+              <div id="detailSub" class="detail-sub">-</div>
+            </div>
+            <div class="detail-actions">
+              <button id="copyAchievementBtn" class="btn-soft" type="button">성취도 링크</button>
+              <button id="editMetaBtn" class="btn-primary" type="button">수정</button>
+              <button id="saveMetaBtn" class="btn-primary" type="button" hidden>완료</button>
+              <button id="cancelMetaBtn" class="btn-ghost" type="button" hidden>취소</button>
+            </div>
+          </div>
+          <div id="detailStatus" class="status-box" style="margin-bottom:8px"></div>
+
+          <section class="section">
+            <div class="panel-title-row">
+              <div>
+                <h3>학생 메타 정보</h3>
+                <p class="note">성취도 정보는 수정 대상에서 제외하고, 학생 기본 정보만 수정합니다.</p>
+              </div>
+            </div>
+            <div id="metaGrid" class="meta-grid"></div>
+          </section>
+
+          <section class="section">
+            <div class="panel-title-row">
+              <div>
+                <h3>성취도 정보</h3>
+                <p class="note">학생 개인 성취도 페이지의 핵심 정보를 관리 화면 안에서 요약해 보여주는 영역입니다.</p>
+              </div>
+            </div>
+            <div id="achievementGrid" class="achievement-grid"></div>
+            <div class="mobile-scroll">
+              <table class="history-table">
+                <thead>
+                  <tr>
+                    <th>응시일</th>
+                    <th>시험명</th>
+                    <th>문항수</th>
+                    <th>1차</th>
+                    <th>2차</th>
+                    <th>최종</th>
+                  </tr>
+                </thead>
+                <tbody id="historyBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="section">
+            <h3>출석부</h3>
+            <div class="placeholder">준비중입니다. 2차 개발에서 날짜 클릭 방식의 출석 입력·수정 UI를 연결할 예정입니다.</div>
+          </section>
+
+          <section class="section">
+            <h3>수강료 납부 관리</h3>
+            <table class="course-history">
+              <thead>
+                <tr>
+                  <th>등록일</th>
+                  <th>수강강좌명</th>
+                  <th>수강형태</th>
+                  <th>상태</th>
+                </tr>
+              </thead>
+              <tbody id="courseHistoryBody"></tbody>
+            </table>
+            <div class="placeholder">납부 장부는 준비중입니다. 2차 개발에서 월별 납부 여부, 금액, 납부일, 메모를 관리하는 영역으로 확장합니다.</div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ── 설정 ──────────────────────────────────────────────────────
+    const SUPABASE_URL      = 'https://gspsquuyqkydqphbcuel.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzcHNxdXV5cWt5ZHFwaGJjdWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTg5NDgsImV4cCI6MjA4ODA3NDk0OH0.9oqcUTNQpL9oFQ13hUkM5MN7KA2kW79RC3CPI4WZP7I';
+
+    // ── 상수 ──────────────────────────────────────────────────────
+    const GRADE_LABELS = { E1:'초1', E2:'초2', E3:'초3', E4:'초4', E5:'초5', E6:'초6', M1: '중1', M2: '중2', M3: '중3', H1: '고1', H2: '고2', H3: '고3' };
+    const GRADE_ORDER  = { E1:0, E2:1, E3:2, E4:3, E5:4, E6:5, M1: 6, M2: 7, M3: 8, H1: 9, H2: 10, H3: 11 };
+
+    // ── 상태 ──────────────────────────────────────────────────────
+    const state = {
+      supabase:   null,
+      students:   [],   // DB 전체 목록
+      filtered:   [],   // 필터/정렬 후
+      selectedId: null,
+      detail:     null, // teacher_get_student_detail 결과
+      stats:      null, // get_student_stats_by_code 결과
+      history:    [],   // get_student_assignment_history_by_code 결과
+      editing:    false,
+      draft:      null
+    };
+
+    // ── 유틸리티 ──────────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+
+    function gradeLabel(code) { return GRADE_LABELS[code] || code || '-'; }
+
+    function shortDate(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso);
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yy}-${mm}-${dd}`;
+    }
+
+    function escapeHtml(v) {
+      return String(v ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    function formatPct(v, dec = 1) {
+      return v == null ? '-' : `${Number(v).toFixed(dec)}%`;
+    }
+
+    function getScoreHighlight(pct, text) {
+      const p = Number(pct);
+      let color;
+      if (p === 100)    color = '#00ff00';
+      else if (p >= 80) color = '#ffa500';
+      else if (p >= 60) color = '#ffff00';
+      else              color = '#ff0000';
+      return `<span style="background:${color};padding:1px 5px;border-radius:3px;">${text}</span>`;
+    }
+
+    function getShieldIcon(count) {
+      if (count == null || count < 1) return '';
+      let lv;
+      if (count >= 1000)     lv = 5;
+      else if (count >= 500) lv = 4;
+      else if (count >= 150) lv = 3;
+      else if (count >= 50)  lv = 2;
+      else                   lv = 1;
+      return `<img src="assets/images/shield-l${lv}.png" alt="L${lv}" class="stat-icon">`;
+    }
+
+    function getRibbonIcon(pct) {
+      if (pct == null) return '';
+      const p = Number(pct);
+      if (p >= 95) return `<img src="assets/images/gold-ribbon-s.png"   alt="" class="stat-icon">`;
+      if (p >= 85) return `<img src="assets/images/silver-ribbon-s.png" alt="" class="stat-icon">`;
+      return '';
+    }
+
+    function normalizeError(err) {
+      return err?.message || String(err);
+    }
+
+    // ── 상태 표시 ─────────────────────────────────────────────────
+    function showStatus(msg, type = 'info') {
+      const el = $('listStatus');
+      el.className = `status-box ${type} show`;
+      el.textContent = msg;
+    }
+
+    function showDetailStatus(msg, type = 'info') {
+      const el = $('detailStatus');
+      el.className = `status-box ${type} show`;
+      el.textContent = msg;
+    }
+
+    function clearDetailStatus() {
+      const el = $('detailStatus');
+      el.className = 'status-box';
+      el.textContent = '';
+    }
+
+    // ── 초기화 ────────────────────────────────────────────────────
+    async function init() {
+      state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      await loadStudents();
+    }
+
+    // ── 학생 목록 로드 ────────────────────────────────────────────
+    async function loadStudents() {
+      showStatus('학생 목록을 불러오는 중...', 'info');
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_list_students_for_management');
+        if (error) throw error;
+        state.students = Array.isArray(data) ? data : (data ? [data] : []);
+        applyFilters();
+        const badge = $('connectionBadge');
+        badge.textContent = `연결됨 · ${state.students.length}명`;
+        badge.className = 'badge ok';
+        showStatus(`학생 ${state.students.length}명을 불러왔습니다.`, 'info');
+      } catch (err) {
+        showStatus(`목록 로드 실패: ${normalizeError(err)}`, 'error');
+        const badge = $('connectionBadge');
+        badge.textContent = '연결 오류';
+        badge.className = 'badge error';
+      }
+    }
+
+    // ── 필터/정렬 ─────────────────────────────────────────────────
+    function applyFilters() {
+      const name   = $('searchName').value.trim().toLowerCase();
+      const code   = $('searchCode').value.trim();
+      const grade  = $('gradeFilter').value;
+      const course = $('courseFilter').value.trim().toLowerCase();
+      const sort   = $('sortSelect').value;
+
+      let arr = state.students.filter(s => {
+        if (name   && !(s.name   || '').toLowerCase().includes(name))              return false;
+        if (code   && !(s.student_code || '').includes(code))                      return false;
+        if (grade  && s.grade_level !== grade)                                     return false;
+        if (course && !(s.course_names || '').toLowerCase().includes(course))      return false;
+        return true;
+      });
+
+      arr.sort((a, b) => {
+        switch (sort) {
+          case 'created_asc':  return (a.created_at || '').localeCompare(b.created_at || '');
+          case 'created_desc': return (b.created_at || '').localeCompare(a.created_at || '');
+          case 'grade_asc':    return ((GRADE_ORDER[a.grade_level] ?? 99) - (GRADE_ORDER[b.grade_level] ?? 99)) || (a.name || '').localeCompare(b.name || '', 'ko');
+          case 'grade_desc':   return ((GRADE_ORDER[b.grade_level] ?? 99) - (GRADE_ORDER[a.grade_level] ?? 99)) || (a.name || '').localeCompare(b.name || '', 'ko');
+          case 'name_asc':     return (a.name || '').localeCompare(b.name || '', 'ko');
+          case 'name_desc':    return (b.name || '').localeCompare(a.name || '', 'ko');
+          default: return 0;
+        }
+      });
+
+      state.filtered = arr;
+      renderList();
+    }
+
+    // ── 목록 렌더 ─────────────────────────────────────────────────
+    function renderList() {
+      const body = $('studentTableBody');
+      if (!state.filtered.length) {
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#6b7280;padding:18px">조건에 맞는 학생이 없습니다.</td></tr>';
+        return;
+      }
+      body.innerHTML = state.filtered.map(s => {
+        const sel      = s.id === state.selectedId;
+        const inactive = !s.is_active;
+        const courseTd = s.course_names
+          ? `<span class="course-chip">${escapeHtml(s.course_names)}</span>`
+          : '<span style="color:#9ca3af">-</span>';
+        return `
+          <tr data-id="${escapeHtml(s.id)}" class="${sel ? 'selected' : ''} ${inactive ? 'inactive' : ''}">
+            <td class="checkbox-cell"><input class="row-check" type="checkbox" data-id="${escapeHtml(s.id)}" onclick="event.stopPropagation()" /></td>
+            <td>${shortDate(s.created_at)}</td>
+            <td>${escapeHtml(s.student_code || '-')}</td>
+            <td class="student-name-cell">${escapeHtml(s.name || '-')}</td>
+            <td>${escapeHtml(gradeLabel(s.grade_level))}</td>
+            <td>${courseTd}</td>
+            <td onclick="event.stopPropagation()">
+              <label class="toggle" title="활성/휴원 전환">
+                <input type="checkbox" class="active-toggle" ${s.is_active ? 'checked' : ''} data-id="${escapeHtml(s.id)}" />
+                <span></span>
+              </label>
+            </td>
+          </tr>`;
+      }).join('');
+
+      body.querySelectorAll('tr[data-id]').forEach(row => {
+        row.addEventListener('click', () => selectStudent(row.dataset.id));
+      });
+      body.querySelectorAll('.active-toggle').forEach(input => {
+        input.addEventListener('change', () => toggleActive(input.dataset.id, input.checked));
+      });
+      $('selectAll').checked = false;
+    }
+
+    // ── 학생 선택 & 상세 로드 ─────────────────────────────────────
+    async function selectStudent(id) {
+      state.selectedId = id;
+      state.editing    = false;
+      state.draft      = null;
+      renderList();
+
+      $('emptyDetail').hidden   = true;
+      $('studentDetail').hidden = false;
+      showDetailStatus('상세 정보를 불러오는 중...', 'info');
+
+      const listRow = state.students.find(s => s.id === id);
+      if (!listRow) return;
+
+      // 빠른 연속 클릭 시 이전 응답이 늦게 도착해 덮어쓰는 race condition 방지
+      const requestId = Symbol();
+      state.lastRequestId = requestId;
+
+      try {
+        const [detailRes, statsRes, histRes] = await Promise.all([
+          state.supabase.schema('auto_grading').rpc('teacher_get_student_detail',                     { p_student_id:   id }),
+          state.supabase.schema('auto_grading').rpc('get_student_stats_by_code',                      { p_student_code: listRow.student_code }),
+          state.supabase.schema('auto_grading').rpc('get_student_assignment_history_by_code',         { p_student_code: listRow.student_code, p_limit: 50 })
+        ]);
+
+        // 응답이 돌아왔을 때 선택된 학생이 바뀌었으면 무시
+        if (state.lastRequestId !== requestId) return;
+
+        if (detailRes.error) throw detailRes.error;
+        if (detailRes.data?.ok === false) throw new Error(detailRes.data.error);
+
+        state.detail  = Array.isArray(detailRes.data) ? detailRes.data[0] : detailRes.data;
+        // 비활성 학생 등은 stats/history RPC가 실패할 수 있어 null 처리
+        state.stats   = statsRes.error   ? null : (Array.isArray(statsRes.data)  ? statsRes.data[0]  : statsRes.data);
+        state.history = histRes.error    ? []   : (histRes.data || []);
+
+        renderDetail();
+        clearDetailStatus();
+      } catch (err) {
+        if (state.lastRequestId !== requestId) return;
+        showDetailStatus(`상세 로드 실패: ${normalizeError(err)}`, 'error');
+      }
+    }
+
+    // ── 상세 렌더 ─────────────────────────────────────────────────
+    function renderDetail() {
+      const s = state.detail;
+      if (!s) return;
+
+      $('detailName').textContent = s.name || '-';
+      const activeCourses = (s.courses || []).filter(c => c.is_active).map(c => c.course_name).join(', ') || '-';
+      $('detailSub').textContent = `${s.student_code} · ${gradeLabel(s.grade_level)} · ${activeCourses} · ${s.is_active ? '활성' : '휴원/비활성'}`;
+
+      $('editMetaBtn').hidden   = state.editing;
+      $('saveMetaBtn').hidden   = !state.editing;
+      $('cancelMetaBtn').hidden = !state.editing;
+
+      renderMetaGrid();
+      renderAchievementSection();
+      renderCourseHistory();
+    }
+
+    function renderMetaGrid() {
+      const s   = state.detail;
+      const src = (state.editing && state.draft) ? state.draft : s;
+      const fields = [
+        { key: 'name',          label: '이름',          type: 'text' },
+        { key: 'student_code',  label: '학생코드',      type: 'readonly' },
+        { key: 'gender',        label: '성별',          type: 'select', options: [['남','남'],['여','여'],['기타/미입력','기타/미입력']] },
+        { key: 'grade_level',   label: '학년',          type: 'select', options: Object.entries(GRADE_LABELS) },
+        { key: 'student_phone', label: '학생 전화번호', type: 'text' },
+        { key: 'parent_phone',  label: '학부모 전화번호', type: 'text' },
+        { key: 'address',       label: '거주지역',      type: 'text' }
+      ];
+
+      $('metaGrid').innerHTML = fields.map(f => {
+        const val = src[f.key] ?? '';
+        if (!state.editing || f.type === 'readonly') {
+          const display = f.key === 'grade_level' ? gradeLabel(val) : (val || '-');
+          return `<div class="meta-item"><div class="k">${escapeHtml(f.label)}</div><div class="v">${escapeHtml(display)}</div></div>`;
+        }
+        if (f.type === 'select') {
+          const opts = f.options.map(([v, l]) =>
+            `<option value="${escapeHtml(v)}" ${val === v ? 'selected' : ''}>${escapeHtml(l)}</option>`
+          ).join('');
+          return `<div class="meta-item"><div class="k">${escapeHtml(f.label)}</div><select data-meta-key="${f.key}">${opts}</select></div>`;
+        }
+        return `<div class="meta-item"><div class="k">${escapeHtml(f.label)}</div><input data-meta-key="${f.key}" type="text" value="${escapeHtml(val)}" /></div>`;
+      }).join('');
+
+      document.querySelectorAll('[data-meta-key]').forEach(el => {
+        el.addEventListener('input',  () => { if (state.draft) state.draft[el.dataset.metaKey] = el.value; });
+        el.addEventListener('change', () => { if (state.draft) state.draft[el.dataset.metaKey] = el.value; });
+      });
+    }
+
+    function renderAchievementSection() {
+      const st = state.stats;
+      const totalSolved = st?.total_solved ?? null;
+      const r1  = st?.round1_accuracy ?? null;
+      const r2  = st?.round2_accuracy ?? null;
+      const rf  = st?.final_accuracy  ?? null;
+
+      const metrics = [
+        ['총 풀이 문항수',   totalSolved != null ? `${totalSolved}${getShieldIcon(totalSolved)}` : '-'],
+        ['누적 1차 성취도',  r1  != null ? `${Number(r1).toFixed(1)}%${getRibbonIcon(r1)}`  : '-'],
+        ['누적 2차 성취도',  r2  != null ? `${Number(r2).toFixed(1)}%${getRibbonIcon(r2)}`  : '-'],
+        ['누적 최종 성취도', rf  != null ? `${Number(rf).toFixed(1)}%${getRibbonIcon(rf)}`  : '-']
+      ];
+
+      $('achievementGrid').innerHTML = metrics.map(([label, value]) =>
+        `<div class="metric-card"><div class="label">${label}</div><div class="value">${value}</div></div>`
+      ).join('');
+
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const rows = state.history;
+      if (!rows.length) {
+        $('historyBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:12px">시험 기록이 없습니다.</td></tr>';
+        return;
+      }
+      $('historyBody').innerHTML = rows.map(h => {
+        const r1Pct    = h.round1_score_percent   != null ? Number(h.round1_score_percent)   : null;
+        const r2Pct    = h.round2_score_percent   != null ? Number(h.round2_score_percent)   : null;
+        const r1Perf   = r1Pct === 100;
+        const r2Perf   = r2Pct === 100;
+        let finalValue = null;
+        if (h.teacher_final_score_percent != null) finalValue = h.teacher_final_score_percent;
+        else if (r1Perf) finalValue = 100;
+        else if (r2Perf) finalValue = 100;
+
+        const r1Cell    = r1Pct != null ? getScoreHighlight(r1Pct, `${Math.round(r1Pct)}%`) : '-';
+        const r2Cell    = (!r1Perf && r2Pct != null) ? getScoreHighlight(r2Pct, `${Math.round(r2Pct)}%`) : '-';
+        const finalCell = finalValue != null ? getScoreHighlight(finalValue, `${Math.round(finalValue)}%`) : '-';
+
+        return `<tr>
+          <td>${shortDate(h.event_date)}</td>
+          <td class="title-cell">${escapeHtml(h.test_title || '-')}</td>
+          <td>${h.total_items != null ? h.total_items : ''}</td>
+          <td>${r1Cell}</td>
+          <td>${r2Cell}</td>
+          <td>${finalCell}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderCourseHistory() {
+      const courses = state.detail?.courses || [];
+      if (!courses.length) {
+        $('courseHistoryBody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:12px">수강 이력이 없습니다.</td></tr>';
+        return;
+      }
+      $('courseHistoryBody').innerHTML = courses.map(c => `
+        <tr>
+          <td>${shortDate(c.created_at)}</td>
+          <td>${escapeHtml(c.course_name || '-')}</td>
+          <td>${escapeHtml(c.student_course_type || '-')}</td>
+          <td>${c.is_active ? '수강중' : '종료'}</td>
+        </tr>`
+      ).join('');
+    }
+
+    // ── 활성/휴원 토글 ────────────────────────────────────────────
+    async function toggleActive(id, isActive) {
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_set_student_active_state', { p_student_id: id, p_is_active: isActive });
+        if (error) throw error;
+        if (data?.ok === false) throw new Error(data.error || '상태 변경 실패');
+
+        const student = state.students.find(s => s.id === id);
+        if (student) student.is_active = isActive;
+        applyFilters();
+
+        const name = student?.name || '학생';
+        showStatus(`${name} 학생을 ${isActive ? '활성' : '휴원/비활성'} 상태로 변경했습니다.`, 'info');
+
+        if (state.selectedId === id && state.detail) {
+          state.detail.is_active = isActive;
+          renderDetail();
+        }
+      } catch (err) {
+        showStatus(`상태 변경 실패: ${normalizeError(err)}`, 'error');
+        applyFilters(); // 토글 원복
+      }
+    }
+
+    // ── 메타정보 저장 ─────────────────────────────────────────────
+    async function saveMeta() {
+      const s = state.detail;
+      const d = state.draft;
+      if (!s || !d) return;
+
+      const btn = $('saveMetaBtn');
+      btn.disabled = true;
+
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_update_student_metadata', {
+            p_student_id:    s.id,
+            p_name:          d.name?.trim()         || s.name,
+            p_gender:        d.gender               ?? null,
+            p_grade_level:   d.grade_level          ?? null,
+            p_student_phone: d.student_phone        ?? null,
+            p_parent_phone:  d.parent_phone         ?? null,
+            p_address:       d.address              ?? null
+          });
+        if (error) throw error;
+        if (data?.ok === false) throw new Error(data.error || '저장 실패');
+
+        // 목록 캐시 업데이트
+        const listRow = state.students.find(r => r.id === s.id);
+        if (listRow) {
+          listRow.name        = d.name?.trim()    || s.name;
+          listRow.grade_level = d.grade_level     || s.grade_level;
+        }
+        applyFilters();
+
+        state.editing = false;
+        state.draft   = null;
+        // 상세 다시 로드 (최신 DB 값 반영)
+        await selectStudent(s.id);
+        showStatus(`${data?.name || s.name} 학생 정보를 저장했습니다.`, 'info');
+      } catch (err) {
+        showDetailStatus(`저장 실패: ${normalizeError(err)}`, 'error');
+      } finally {
+        btn.disabled = false;  // 텍스트는 변경하지 않음: 성공 시 renderDetail()이 버튼을 숨김
+      }
+    }
+
+    // ── 선택 삭제 ─────────────────────────────────────────────────
+    async function deleteSelected() {
+      const ids = Array.from(document.querySelectorAll('.row-check:checked'))
+        .map(el => el.dataset.id).filter(Boolean);
+      if (!ids.length) { showStatus('삭제할 학생을 먼저 선택해 주세요.', 'error'); return; }
+
+      const names = state.students
+        .filter(s => ids.includes(s.id))
+        .map(s => `${s.student_code} ${s.name}`)
+        .join('\n');
+      if (!confirm(`아래 학생을 완전히 삭제합니다. 이 작업은 되돌릴 수 없습니다.\n\n${names}\n\n관련 시험 데이터가 있으면 삭제가 차단됩니다.`)) return;
+
+      showStatus(`${ids.length}명 삭제 처리 중...`, 'info');
+
+      const results = [];
+      for (const id of ids) {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_delete_student_safely', { p_student_id: id });
+        if (error)                        results.push({ id, ok: false, error: error.message });
+        else if (data?.ok === false)      results.push({ id, ok: false, blocked: data.blocked, counts: data.counts, error: data.error });
+        else                              results.push({ id, ok: true, name: data?.name });
+      }
+
+      const succeeded = results.filter(r => r.ok);
+      const blocked   = results.filter(r => !r.ok && r.blocked);
+      const failed    = results.filter(r => !r.ok && !r.blocked);
+
+      let msg = '';
+      if (succeeded.length) msg += `${succeeded.length}명 삭제 완료.`;
+      if (blocked.length) {
+        const detail = blocked.map(r => {
+          const st = state.students.find(s => s.id === r.id);
+          const label = st ? `${st.student_code} ${st.name}` : r.id;
+          const c = r.counts || {};
+          return `  ${label}: 시험 ${c.attempts || 0}건·수강 ${c.courses || 0}건`;
+        }).join('\n');
+        msg += `\n\n${blocked.length}명은 연결 데이터로 차단:\n${detail}`;
+      }
+      if (failed.length) msg += `\n오류: ${failed.map(r => r.error).join(', ')}`;
+
+      await loadStudents();
+      if (state.selectedId && succeeded.some(r => r.id === state.selectedId)) {
+        state.selectedId = null;
+        $('emptyDetail').hidden   = false;
+        $('studentDetail').hidden = true;
+      }
+
+      const type = (blocked.length || failed.length) ? 'warn' : 'info';
+      showStatus(msg.trim(), type);
+    }
+
+    // ── 성취도 링크 복사 ──────────────────────────────────────────
+    async function copyAchievementLink() {
+      const s = state.detail;
+      if (!s) return;
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('get_or_create_student_public_token', { p_student_id: s.id });
+        if (error) throw error;
+        const token = data?.token || (Array.isArray(data) ? data[0]?.token : null);
+        if (!token) throw new Error('토큰을 가져오지 못했습니다.');
+
+        const base = location.href.substring(0, location.href.lastIndexOf('/') + 1);
+        const url  = `${base}student-achievement-v2.html?token=${token}`;
+        await navigator.clipboard.writeText(url);
+        showStatus(`${s.name} 학생의 성취도 링크를 복사했습니다.`, 'info');
+      } catch (err) {
+        showStatus(`링크 복사 실패: ${normalizeError(err)}`, 'error');
+      }
+    }
+
+    // ── 이벤트 연결 ───────────────────────────────────────────────
+    ['searchName', 'searchCode', 'gradeFilter', 'courseFilter', 'sortSelect'].forEach(id => {
+      $(id).addEventListener('input',  applyFilters);
+      $(id).addEventListener('change', applyFilters);
+    });
+
+    $('clearSearchBtn').addEventListener('click', () => {
+      $('searchName').value  = '';
+      $('searchCode').value  = '';
+      $('gradeFilter').value = '';
+      $('courseFilter').value = '';
+      $('sortSelect').value  = 'created_desc';
+      applyFilters();
+    });
+
+    $('refreshBtn').addEventListener('click', loadStudents);
+    $('deleteBtn').addEventListener('click', deleteSelected);
+
+    $('selectAll').addEventListener('change', e => {
+      document.querySelectorAll('.row-check').forEach(chk => chk.checked = e.target.checked);
+    });
+
+    $('editMetaBtn').addEventListener('click', () => {
+      if (!state.detail) return;
+      state.editing = true;
+      state.draft   = { ...state.detail };
+      renderDetail();
+    });
+    $('cancelMetaBtn').addEventListener('click', () => {
+      state.editing = false;
+      state.draft   = null;
+      renderDetail();
+    });
+    $('saveMetaBtn').addEventListener('click', saveMeta);
+    $('copyAchievementBtn').addEventListener('click', copyAchievementLink);
+
+    // ── 시작 ──────────────────────────────────────────────────────
+    init();
+
+  </script>
+</body>
+</html>
