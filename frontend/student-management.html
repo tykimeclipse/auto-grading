@@ -158,7 +158,7 @@
     .student-table tbody tr.inactive { color: #9ca3af; background: #fafafa; }
     .student-table tbody tr.inactive.selected { background: #f1f5f9; }
     .checkbox-cell { width: 34px; text-align: center !important; }
-    .student-name-cell { font-weight: 400; color: #111827; }
+    .student-name-cell { font-weight: 800; color: #111827; }
     .course-chip {
       display: inline-flex;
       align-items: center;
@@ -497,10 +497,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="admin-auth.js"></script>
   <script>
-    // ── 설정 ──────────────────────────────────────────────────────
-    const SUPABASE_URL      = 'https://gspsquuyqkydqphbcuel.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzcHNxdXV5cWt5ZHFwaGJjdWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTg5NDgsImV4cCI6MjA4ODA3NDk0OH0.9oqcUTNQpL9oFQ13hUkM5MN7KA2kW79RC3CPI4WZP7I';
 
     // ── 상수 ──────────────────────────────────────────────────────
     const GRADE_LABELS = { E1:'초1', E2:'초2', E3:'초3', E4:'초4', E5:'초5', E6:'초6', M1: '중1', M2: '중2', M3: '중3', H1: '고1', H2: '고2', H3: '고3' };
@@ -598,7 +596,12 @@
 
     // ── 초기화 ────────────────────────────────────────────────────
     async function init() {
-      state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      // 세션 + 관리자 이메일 검사 — 실패 시 admin.html로 리다이렉트
+      const authed = await requireAuth();
+      if (!authed) return;
+
+      // admin-auth.js가 생성한 공유 클라이언트 재사용
+      state.supabase = window.adminSupabase;
       await loadStudents();
     }
 
