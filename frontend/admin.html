@@ -294,6 +294,9 @@
     const SUPABASE_URL      = 'https://gspsquuyqkydqphbcuel.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzcHNxdXV5cWt5ZHFwaGJjdWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTg5NDgsImV4cCI6MjA4ODA3NDk0OH0.9oqcUTNQpL9oFQ13hUkM5MN7KA2kW79RC3CPI4WZP7I';
 
+    // admin-auth.js와 동일한 화이트리스트 (admin.html 자체에서도 검사)
+    const ALLOWED_ADMIN_EMAILS = ['tykimeclipse@gmail.com'];
+
     const sb  = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const $   = (id) => document.getElementById(id);
 
@@ -340,7 +343,14 @@
     async function init() {
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
-        showMenu(session.user.email);
+        const sessionEmail = session.user?.email || '';
+        if (!ALLOWED_ADMIN_EMAILS.includes(sessionEmail)) {
+          // 허용되지 않은 계정이 세션을 갖고 있으면 즉시 로그아웃
+          await sb.auth.signOut();
+          showLogin();
+        } else {
+          showMenu(sessionEmail);
+        }
       } else {
         showLogin();
       }
@@ -364,7 +374,16 @@
       try {
         const { data, error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        showMenu(data.session.user.email);
+
+        // 허용된 관리자 이메일인지 확인
+        const loggedEmail = data.session.user.email || '';
+        if (!ALLOWED_ADMIN_EMAILS.includes(loggedEmail)) {
+          await sb.auth.signOut();
+          setLoginStatus('관리자 권한이 없는 계정입니다.');
+          return;
+        }
+
+        showMenu(loggedEmail);
       } catch (err) {
         const msg = err.message || String(err);
         // Supabase 영문 메시지를 한국어로 변환

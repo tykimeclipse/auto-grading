@@ -14,6 +14,11 @@
 const ADMIN_SUPABASE_URL      = 'https://gspsquuyqkydqphbcuel.supabase.co';
 const ADMIN_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzcHNxdXV5cWt5ZHFwaGJjdWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTg5NDgsImV4cCI6MjA4ODA3NDk0OH0.9oqcUTNQpL9oFQ13hUkM5MN7KA2kW79RC3CPI4WZP7I';
 
+// 허용된 관리자 이메일 목록
+const ALLOWED_ADMIN_EMAILS = [
+  'tykimeclipse@gmail.com'
+];
+
 // 모듈 전체에서 공유하는 Supabase 클라이언트
 // admin-auth.js 로드 후 다른 스크립트에서 window.adminSupabase 로 접근 가능
 window.adminSupabase = window.supabase.createClient(
@@ -22,21 +27,36 @@ window.adminSupabase = window.supabase.createClient(
 );
 
 /**
- * 세션을 확인하고 미로그인이면 admin.html로 리다이렉트합니다.
+ * 세션을 확인하고, 미로그인이거나 허용되지 않은 계정이면 admin.html로 리다이렉트합니다.
  * 각 관리자 페이지 로드 직후 호출하세요.
  *
  * @param {string} [adminPath] - admin.html의 상대 경로 (기본값: 'admin.html')
+ * @returns {boolean} 인증 통과 시 true, 리다이렉트 시 false
  */
 async function requireAuth(adminPath = 'admin.html') {
   try {
     const { data: { session } } = await window.adminSupabase.auth.getSession();
+
+    // 1. 로그인 여부 확인
     if (!session) {
-      // 현재 페이지를 returnTo 파라미터로 전달해 로그인 후 복귀 가능하게 함
       const returnTo = encodeURIComponent(location.href);
       location.replace(`${adminPath}?returnTo=${returnTo}`);
+      return false;
     }
+
+    // 2. 허용된 관리자 이메일 확인
+    const email = session.user?.email || '';
+    if (!ALLOWED_ADMIN_EMAILS.includes(email)) {
+      await window.adminSupabase.auth.signOut();
+      alert('관리자 권한이 없는 계정입니다.');
+      location.replace(adminPath);
+      return false;
+    }
+
+    return true;
   } catch (err) {
     console.error('[admin-auth] getSession 실패:', err);
     location.replace(adminPath);
+    return false;
   }
 }
