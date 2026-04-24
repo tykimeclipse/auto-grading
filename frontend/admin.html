@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 패널</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --line: #d9deea;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-weak: #dbeafe;
+      --danger: #dc2626;
+      --danger-weak: #fef2f2;
+      --shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      min-height: 100vh;
+    }
+
+    /* ── 로그인 화면 ──────────────────────────────────────────── */
+    #loginView {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .login-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: var(--shadow);
+    }
+    .login-card h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+    .login-card p {
+      margin: 0 0 28px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: var(--primary); }
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.15s;
+    }
+    .btn-login:hover:not(:disabled) { background: var(--primary-dark); }
+    .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+    .login-status {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 9px;
+      font-size: 13px;
+      display: none;
+    }
+    .login-status.show { display: block; }
+    .login-status.error { background: var(--danger-weak); color: var(--danger); border: 1px solid #fecaca; }
+    .login-status.info  { background: #eff6ff; color: var(--primary); border: 1px solid #bfdbfe; }
+
+    /* ── 메뉴 화면 ────────────────────────────────────────────── */
+    #menuView { display: none; }
+    .top-bar {
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .top-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .top-bar h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+    .top-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-email {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .btn-logout {
+      padding: 6px 14px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--text);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-logout:hover { background: var(--bg); border-color: #bfcde0; }
+
+    .menu-wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin: 0 0 14px;
+    }
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 36px;
+    }
+    .menu-card {
+      display: block;
+      text-decoration: none;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px 20px;
+      transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+      cursor: pointer;
+    }
+    .menu-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.12);
+      transform: translateY(-2px);
+    }
+    .menu-card .icon {
+      font-size: 28px;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+    .menu-card .label {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .menu-card .desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    @media (max-width: 600px) {
+      .login-card { padding: 32px 20px; }
+      .menu-grid { grid-template-columns: 1fr 1fr; }
+      .top-bar { padding: 0 16px; }
+      .menu-wrap { padding: 20px 16px; }
+      .user-email { display: none; }
+    }
+    @media (max-width: 380px) {
+      .menu-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── 로그인 화면 ──────────────────────────────────────────── -->
+  <div id="loginView">
+    <div class="login-card">
+      <h1>🔐 관리자 로그인</h1>
+      <p>등록된 관리자 계정으로 로그인하세요.</p>
+      <div class="field">
+        <label for="emailInput">이메일</label>
+        <input id="emailInput" type="email" placeholder="admin@example.com" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="passwordInput">비밀번호</label>
+        <input id="passwordInput" type="password" placeholder="비밀번호 입력" autocomplete="current-password" />
+      </div>
+      <button id="loginBtn" class="btn-login" type="button">로그인</button>
+      <div id="loginStatus" class="login-status"></div>
+    </div>
+  </div>
+
+  <!-- ── 메뉴 화면 ───────────────────────────────────────────── -->
+  <div id="menuView">
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <h1>관리자 패널</h1>
+      </div>
+      <div class="top-bar-right">
+        <span id="userEmail" class="user-email"></span>
+        <button id="logoutBtn" class="btn-logout" type="button">로그아웃</button>
+      </div>
+    </header>
+
+    <div class="menu-wrap">
+
+      <p class="section-title">학생 관리</p>
+      <div class="menu-grid">
+        <a class="menu-card" href="student-management.html">
+          <div class="icon">👨‍🎓</div>
+          <div class="label">학생 종합관리</div>
+          <div class="desc">학생 정보 수정, 성취도 확인, 활성/휴원 관리</div>
+        </a>
+        <a class="menu-card" href="student-registration-v8-write-path-grade-labels.html">
+          <div class="icon">➕</div>
+          <div class="label">학생 등록</div>
+          <div class="desc">신규 학생 등록 및 수강 강좌 배정</div>
+        </a>
+      </div>
+
+      <p class="section-title">강좌 · 커리큘럼</p>
+      <div class="menu-grid">
+        <a class="menu-card" href="courses-registration-v3.html">
+          <div class="icon">📚</div>
+          <div class="label">강좌 관리</div>
+          <div class="desc">강좌 등록, 수정, 수강생 배정</div>
+        </a>
+        <a class="menu-card" href="curriculum-units-upload.html">
+          <div class="icon">🗂️</div>
+          <div class="label">커리큘럼 단원관리</div>
+          <div class="desc">단원·목차 업로드 및 수정</div>
+        </a>
+      </div>
+
+      <p class="section-title">문제지 · 과제</p>
+      <div class="menu-grid">
+        <a class="menu-card" href="testset-upload-v3.html">
+          <div class="icon">📝</div>
+          <div class="label">문제지 업로드</div>
+          <div class="desc">시험지 등록 및 정답 관리</div>
+        </a>
+        <a class="menu-card" href="teacher-assignment-management.html">
+          <div class="icon">📋</div>
+          <div class="label">과제 관리</div>
+          <div class="desc">과제 배정, 채점, 최종 성취도 확정</div>
+        </a>
+        <a class="menu-card" href="teacher-assignments-linked-v3-issue-only-compact.html">
+          <div class="icon">📊</div>
+          <div class="label">과제 현황</div>
+          <div class="desc">진행 중인 과제 컴팩트 뷰</div>
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL      = 'https://gspsquuyqkydqphbcuel.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzcHNxdXV5cWt5ZHFwaGJjdWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTg5NDgsImV4cCI6MjA4ODA3NDk0OH0.9oqcUTNQpL9oFQ13hUkM5MN7KA2kW79RC3CPI4WZP7I';
+
+    const sb  = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const $   = (id) => document.getElementById(id);
+
+    // ── 로그인 상태 메시지 ────────────────────────────────────────
+    function setLoginStatus(msg, type = 'error') {
+      const el = $('loginStatus');
+      el.textContent  = msg;
+      el.className    = `login-status show ${type}`;
+    }
+    function clearLoginStatus() {
+      const el = $('loginStatus');
+      el.textContent = '';
+      el.className   = 'login-status';
+    }
+
+    // ── 화면 전환 ─────────────────────────────────────────────────
+    function showLogin() {
+      $('loginView').style.display = 'flex';
+      $('menuView').style.display  = 'none';
+      clearLoginStatus();
+    }
+
+    function showMenu(email) {
+      $('loginView').style.display = 'none';
+      $('menuView').style.display  = 'block';
+      $('userEmail').textContent   = email || '';
+
+      // returnTo 파라미터가 있으면 원래 페이지로 이동
+      const params   = new URLSearchParams(location.search);
+      const returnTo = params.get('returnTo');
+      if (returnTo) {
+        try {
+          const target = new URL(decodeURIComponent(returnTo));
+          // 같은 origin일 때만 리다이렉트 (open-redirect 방지)
+          if (target.origin === location.origin) {
+            location.replace(target.href);
+            return;
+          }
+        } catch (_) { /* 무효한 URL 무시 */ }
+      }
+    }
+
+    // ── 초기 세션 확인 ────────────────────────────────────────────
+    async function init() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        showMenu(session.user.email);
+      } else {
+        showLogin();
+      }
+    }
+
+    // ── 로그인 ────────────────────────────────────────────────────
+    async function doLogin() {
+      const email    = $('emailInput').value.trim();
+      const password = $('passwordInput').value;
+
+      if (!email || !password) {
+        setLoginStatus('이메일과 비밀번호를 모두 입력해 주세요.');
+        return;
+      }
+
+      const btn = $('loginBtn');
+      btn.disabled   = true;
+      btn.textContent = '로그인 중...';
+      clearLoginStatus();
+
+      try {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        showMenu(data.session.user.email);
+      } catch (err) {
+        const msg = err.message || String(err);
+        // Supabase 영문 메시지를 한국어로 변환
+        if (msg.includes('Invalid login credentials')) {
+          setLoginStatus('이메일 또는 비밀번호가 올바르지 않습니다.');
+        } else if (msg.includes('Email not confirmed')) {
+          setLoginStatus('이메일 인증이 완료되지 않은 계정입니다.');
+        } else {
+          setLoginStatus(`로그인 실패: ${msg}`);
+        }
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = '로그인';
+      }
+    }
+
+    // ── 로그아웃 ──────────────────────────────────────────────────
+    async function doLogout() {
+      await sb.auth.signOut();
+      $('emailInput').value    = '';
+      $('passwordInput').value = '';
+      showLogin();
+    }
+
+    // ── 이벤트 연결 ───────────────────────────────────────────────
+    $('loginBtn').addEventListener('click', doLogin);
+
+    // Enter 키로 로그인
+    [$('emailInput'), $('passwordInput')].forEach(el => {
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    });
+
+    $('logoutBtn').addEventListener('click', doLogout);
+
+    // ── 시작 ──────────────────────────────────────────────────────
+    init();
+  </script>
+</body>
+</html>
