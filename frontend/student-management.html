@@ -211,6 +211,8 @@
     .status-box.info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
     .status-box.warn { background: var(--warn-weak); border: 1px solid #fde68a; color: var(--warn); }
     .status-box.error { background: var(--danger-weak); border: 1px solid #fecaca; color: #991b1b; }
+    /* hidden 속성이 display:grid/flex CSS에 덮어쓰이지 않도록 강제 */
+    [hidden] { display: none !important; }
     .empty-detail {
       min-height: 520px;
       display: grid;
@@ -427,7 +429,6 @@
               <div id="detailSub" class="detail-sub">-</div>
             </div>
             <div class="detail-actions">
-              <button id="copyAchievementBtn" class="btn-soft" type="button">성취도 링크</button>
               <button id="editMetaBtn" class="btn-primary" type="button">수정</button>
               <button id="saveMetaBtn" class="btn-primary" type="button" hidden>완료</button>
               <button id="cancelMetaBtn" class="btn-ghost" type="button" hidden>취소</button>
@@ -725,7 +726,12 @@
         if (detailRes.error) throw detailRes.error;
         if (detailRes.data?.ok === false) throw new Error(detailRes.data.error);
 
-        state.detail  = Array.isArray(detailRes.data) ? detailRes.data[0] : detailRes.data;
+        // teacher_get_student_detail은 {ok, student:{...}, courses:[...]} 구조로 반환
+        // 나머지 렌더 함수가 flat 객체(s.name, s.grade_level 등)를 기대하므로 병합
+        const raw = Array.isArray(detailRes.data) ? detailRes.data[0] : detailRes.data;
+        state.detail = raw?.student
+          ? { ...raw.student, courses: raw.courses ?? [] }
+          : raw;
         // 비활성 학생 등은 stats/history RPC가 실패할 수 있어 null 처리
         state.stats   = statsRes.error   ? null : (Array.isArray(statsRes.data)  ? statsRes.data[0]  : statsRes.data);
         state.history = histRes.error    ? []   : (histRes.data || []);
@@ -980,26 +986,6 @@
       showStatus(msg.trim(), type);
     }
 
-    // ── 성취도 링크 복사 ──────────────────────────────────────────
-    async function copyAchievementLink() {
-      const s = state.detail;
-      if (!s) return;
-      try {
-        const { data, error } = await state.supabase
-          .schema('auto_grading')
-          .rpc('get_or_create_student_public_token', { p_student_id: s.id });
-        if (error) throw error;
-        const token = data?.token || (Array.isArray(data) ? data[0]?.token : null);
-        if (!token) throw new Error('토큰을 가져오지 못했습니다.');
-
-        const base = location.href.substring(0, location.href.lastIndexOf('/') + 1);
-        const url  = `${base}student-achievement-v2.html?token=${token}`;
-        await navigator.clipboard.writeText(url);
-        showStatus(`${s.name} 학생의 성취도 링크를 복사했습니다.`, 'info');
-      } catch (err) {
-        showStatus(`링크 복사 실패: ${normalizeError(err)}`, 'error');
-      }
-    }
 
     // ── 이벤트 연결 ───────────────────────────────────────────────
     ['searchName', 'searchCode', 'gradeFilter', 'courseFilter', 'sortSelect'].forEach(id => {
@@ -1035,7 +1021,6 @@
       renderDetail();
     });
     $('saveMetaBtn').addEventListener('click', saveMeta);
-    $('copyAchievementBtn').addEventListener('click', copyAchievementLink);
 
     // ── 시작 ──────────────────────────────────────────────────────
     init();
