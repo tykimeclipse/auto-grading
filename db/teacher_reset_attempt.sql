@@ -45,6 +45,7 @@ as $function$
 declare
   v_attempt auto_grading.attempts%rowtype;
 begin
+  perform auto_grading.assert_admin();
   if p_assignment_id is null then
     raise exception 'p_assignment_id is required';
   end if;
@@ -161,6 +162,7 @@ as $function$
 declare
   v_attempt auto_grading.attempts%rowtype;
 begin
+  perform auto_grading.assert_admin();
   if p_assignment_id is null then
     raise exception 'p_assignment_id is required';
   end if;
@@ -250,8 +252,8 @@ end;
 $function$;
 
 
-grant execute on function auto_grading.teacher_reset_attempt_round2(uuid, uuid) to anon;
-grant execute on function auto_grading.teacher_reset_attempt_full(uuid, uuid) to anon;
+grant execute on function auto_grading.teacher_reset_attempt_round2(uuid, uuid) to authenticated, service_role;
+grant execute on function auto_grading.teacher_reset_attempt_full(uuid, uuid) to authenticated, service_role;
 
 comment on function auto_grading.teacher_reset_attempt_round2(uuid, uuid)
 is '교사용 2차 입력 초기화. assignment_id + reset_token 검증 후 2차 responses 삭제, awaiting_retry 복귀. teacher_final 동시 초기화. assignment 자동 재오픈.';

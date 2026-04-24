@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>학생 등록 v8</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="admin-auth.js"></script>
   <style>
     :root {
       --bg: #f6f7fb;
@@ -767,9 +768,12 @@ ${names.join('\n')}`);
       }
     });
 
-    loadConfig();
-    toggleStudentCourseTypeField();
-    renderTable();
+    (async () => {
+      if (!await requireAuth()) return;
+      loadConfig();
+      toggleStudentCourseTypeField();
+      renderTable();
+    })();
   </script>
 </body>
 </html>

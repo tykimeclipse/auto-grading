@@ -45,6 +45,7 @@ as $function$
 declare
   v_attempt auto_grading.attempts%rowtype;
 begin
+  perform auto_grading.assert_admin();
   -- 파라미터 검증
   if p_assignment_id is null then
     raise exception 'p_assignment_id is required';
@@ -129,7 +130,7 @@ end;
 $function$;
 
 grant execute on function auto_grading.teacher_finalize_attempt(uuid, uuid)
-  to anon, authenticated, service_role;
+  to authenticated, service_role;
 
 comment on function auto_grading.teacher_finalize_attempt(uuid, uuid)
   is '교사용. needs_review 상태의 attempt에서 2차 점수를 teacher_final로 복사하고 assignment를 닫는다. closed_reason = ''teacher_confirmed'' 은 트리거 auto-managed 사유가 아니므로 이후 자동 재오픈되지 않는다.';

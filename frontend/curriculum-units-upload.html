@@ -386,6 +386,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="admin-auth.js"></script>
     <script>
       const STORAGE_KEY = "ag_curriculum_units_upload_config_v1";
       const REQUIRED_HEADERS = ["단원번호", "대단원명", "중단원번호", "중단원명", "소단원번호", "소단원명"];
@@ -772,7 +773,8 @@
         });
       }
 
-      function init() {
+      async function init() {
+        if (!await requireAuth()) return;
         loadConfig();
         wireEvents();
         updateSummary();

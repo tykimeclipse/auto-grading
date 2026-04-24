@@ -269,6 +269,7 @@ declare
   v_result auto_grading.attempts%rowtype;
   v_score numeric(6,2);
 begin
+  perform auto_grading.assert_admin();
   if p_attempt_id is null then
     raise exception 'p_attempt_id is required';
   end if;
@@ -415,6 +416,7 @@ as $function$
 declare
   v_result auto_grading.assignments%rowtype;
 begin
+  perform auto_grading.assert_admin();
   if p_assignment_id is null then
     raise exception 'p_assignment_id is required';
   end if;

@@ -18,10 +18,15 @@ drop function if exists auto_grading.teacher_list_students_for_management();
 
 create or replace function auto_grading.teacher_list_students_for_management()
 returns jsonb
-language sql
+language plpgsql                  -- SQL → PL/pgSQL: PERFORM assert_admin() 삽입을 위해 변환
 security definer
 set search_path to 'auto_grading', 'public'
-as $$
+as $function$
+declare
+  v_result jsonb;
+begin
+  perform auto_grading.assert_admin();
+
   select coalesce(
     jsonb_agg(
       jsonb_build_object(
@@ -48,11 +53,19 @@ as $$
     ),
     '[]'::jsonb
   )
+    into v_result
   from auto_grading.students s;
-$$;
+
+  return v_result;
+
+exception
+  when others then
+    return jsonb_build_object('ok', false, 'error', sqlerrm);
+end;
+$function$;
 
 grant execute on function auto_grading.teacher_list_students_for_management()
-  to anon, authenticated, service_role;
+  to authenticated, service_role;
 
 comment on function auto_grading.teacher_list_students_for_management()
   is '학생 종합 관리용. 전체 학생 목록과 활성 수강강좌명을 jsonb 배열로 반환. 필터/정렬은 프론트에서 처리.';
@@ -77,6 +90,7 @@ declare
   v_student jsonb;
   v_courses jsonb;
 begin
+  perform auto_grading.assert_admin();
   if p_student_id is null then
     raise exception 'p_student_id is required';
   end if;
@@ -134,7 +148,7 @@ end;
 $function$;
 
 grant execute on function auto_grading.teacher_get_student_detail(uuid)
-  to anon, authenticated, service_role;
+  to authenticated, service_role;
 
 comment on function auto_grading.teacher_get_student_detail(uuid)
   is '학생 기본정보 + 수강이력(전체) 반환. 성취도/시험이력은 기존 RPC를 프론트에서 별도 호출.';
@@ -163,6 +177,7 @@ as $function$
 declare
   v_name text;
 begin
+  perform auto_grading.assert_admin();
   if p_student_id is null then
     raise exception 'p_student_id is required';
   end if;
@@ -201,7 +216,7 @@ end;
 $function$;
 
 grant execute on function auto_grading.teacher_update_student_metadata(uuid, text, text, text, text, text, text)
-  to anon, authenticated, service_role;
+  to authenticated, service_role;
 
 comment on function auto_grading.teacher_update_student_metadata(uuid, text, text, text, text, text, text)
   is '학생 메타정보 수정. student_code는 변경 불가. phone·address는 null 저장 가능(지움 반영).';
@@ -223,6 +238,7 @@ security definer
 set search_path to 'auto_grading', 'public'
 as $function$
 begin
+  perform auto_grading.assert_admin();
   if p_student_id is null or p_is_active is null then
     raise exception 'p_student_id and p_is_active are required';
   end if;
@@ -250,7 +266,7 @@ end;
 $function$;
 
 grant execute on function auto_grading.teacher_set_student_active_state(uuid, boolean)
-  to anon, authenticated, service_role;
+  to authenticated, service_role;
 
 comment on function auto_grading.teacher_set_student_active_state(uuid, boolean)
   is '학생 활성/휴원 전환. is_active=false는 휴원/일시정지. 완전 삭제는 teacher_delete_student_safely 사용.';
@@ -277,6 +293,7 @@ declare
   v_token_count     integer;
   v_student_name    text;
 begin
+  perform auto_grading.assert_admin();
   if p_student_id is null then
     raise exception 'p_student_id is required';
   end if;
@@ -337,7 +354,7 @@ end;
 $function$;
 
 grant execute on function auto_grading.teacher_delete_student_safely(uuid)
-  to anon, authenticated, service_role;
+  to authenticated, service_role;
 
 comment on function auto_grading.teacher_delete_student_safely(uuid)
   is '완전 퇴원/오등록 삭제용. attempts·student_courses·public_links 데이터 존재 시 삭제 차단. 연결 데이터 없을 때만 삭제.';

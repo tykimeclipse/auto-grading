@@ -22,6 +22,7 @@ declare
   v_skipped_not_in_course_count integer := 0;
   v_items jsonb := '[]'::jsonb;
 begin
+  perform auto_grading.assert_admin();
   if p_test_set_id is null then
     raise exception 'p_test_set_id is required';
   end if;

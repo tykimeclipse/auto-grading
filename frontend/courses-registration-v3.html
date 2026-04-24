@@ -393,6 +393,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="admin-auth.js"></script>
   <script>
     const STORAGE_KEY = "ag_course_supabase_config_v5";
     const $ = (id) => document.getElementById(id);
@@ -736,7 +737,8 @@
       });
     }
 
-    function init() {
+    async function init() {
+      if (!await requireAuth()) return;
       loadConfig();
       wireEvents();
       updateSummary();

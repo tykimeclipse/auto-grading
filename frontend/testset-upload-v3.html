@@ -511,7 +511,7 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-    
+    <script src="admin-auth.js"></script>
     <script>
       const STORAGE_KEY = "ag_testset_supabase_config_v2";
       const $ = (id) => document.getElementById(id);
@@ -1332,7 +1332,8 @@
         });
       }
 
-      function init() {
+      async function init() {
+        if (!await requireAuth()) return;
         loadConfig();
         populateFallbackSubjects();
         refreshUnitSelectors();

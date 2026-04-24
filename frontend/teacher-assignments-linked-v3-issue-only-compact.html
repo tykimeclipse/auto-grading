@@ -390,6 +390,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="admin-auth.js"></script>
   <script>
     const STORAGE_KEY = 'ag_assignment_supabase_config_v2';
     const $ = (id) => document.getElementById(id);
@@ -979,7 +980,8 @@
       $('testTitleFilter').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadTestSets(); });
     }
 
-    function init() {
+    async function init() {
+      if (!await requireAuth()) return;
       loadConfig();
       wireEvents();
       updateSelectionUi();

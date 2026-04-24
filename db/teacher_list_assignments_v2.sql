@@ -255,4 +255,4 @@ $function$;
 
 grant execute on function auto_grading.teacher_list_assignments(
   uuid, uuid, uuid, boolean, text, text, text, integer, integer
-) to authenticated, anon, service_role;
+) to authenticated, service_role;
