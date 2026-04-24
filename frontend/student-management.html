@@ -254,7 +254,7 @@
       min-height: 64px;
     }
     .meta-item .k { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-    .meta-item .v { font-size: 15px; font-weight: 800; word-break: break-word; }
+    .meta-item .v { font-size: 15px; font-weight: 400; word-break: break-word; }
     .meta-item input, .meta-item select {
       width: 100%;
       border: 1px solid var(--line);
@@ -768,7 +768,7 @@
       const fields = [
         { key: 'name',          label: '이름',          type: 'text' },
         { key: 'student_code',  label: '학생코드',      type: 'readonly' },
-        { key: 'gender',        label: '성별',          type: 'select', options: [['남','남'],['여','여'],['기타/미입력','기타/미입력']] },
+        { key: 'gender',        label: '성별',          type: 'select', options: [['','미선택'],['남','남'],['여','여']] },
         { key: 'grade_level',   label: '학년',          type: 'select', options: Object.entries(GRADE_LABELS) },
         { key: 'student_phone', label: '학생 전화번호', type: 'text' },
         { key: 'parent_phone',  label: '학부모 전화번호', type: 'text' },
@@ -783,7 +783,7 @@
         }
         if (f.type === 'select') {
           const opts = f.options.map(([v, l]) =>
-            `<option value="${escapeHtml(v)}" ${val === v ? 'selected' : ''}>${escapeHtml(l)}</option>`
+            `<option value="${escapeHtml(v)}" ${val === v || (val === '' && v === '') ? 'selected' : ''}>${escapeHtml(l)}</option>`
           ).join('');
           return `<div class="meta-item"><div class="k">${escapeHtml(f.label)}</div><select data-meta-key="${f.key}">${opts}</select></div>`;
         }
@@ -893,8 +893,13 @@
     // ── 메타정보 저장 ─────────────────────────────────────────────
     async function saveMeta() {
       const s = state.detail;
-      const d = state.draft;
-      if (!s || !d) return;
+      if (!s || !state.draft) return;
+
+      // change 이벤트 동기화에 의존하지 않고 DOM에서 직접 읽어 신뢰성 확보
+      const form = {};
+      document.querySelectorAll('#metaGrid [data-meta-key]').forEach(el => {
+        form[el.dataset.metaKey] = el.value || null;
+      });
 
       const btn = $('saveMetaBtn');
       btn.disabled = true;
@@ -904,12 +909,12 @@
           .schema('auto_grading')
           .rpc('teacher_update_student_metadata', {
             p_student_id:    s.id,
-            p_name:          d.name?.trim()         || s.name,
-            p_gender:        d.gender               ?? null,
-            p_grade_level:   d.grade_level          ?? null,
-            p_student_phone: d.student_phone        ?? null,
-            p_parent_phone:  d.parent_phone         ?? null,
-            p_address:       d.address              ?? null
+            p_name:          form.name?.trim()      || s.name,
+            p_gender:        form.gender            ?? null,
+            p_grade_level:   form.grade_level       ?? null,
+            p_student_phone: form.student_phone     ?? null,
+            p_parent_phone:  form.parent_phone      ?? null,
+            p_address:       form.address           ?? null
           });
         if (error) throw error;
         if (data?.ok === false) throw new Error(data.error || '저장 실패');
@@ -917,8 +922,8 @@
         // 목록 캐시 업데이트
         const listRow = state.students.find(r => r.id === s.id);
         if (listRow) {
-          listRow.name        = d.name?.trim()    || s.name;
-          listRow.grade_level = d.grade_level     || s.grade_level;
+          listRow.name        = form.name?.trim() || s.name;
+          listRow.grade_level = form.grade_level  || s.grade_level;
         }
         applyFilters();
 
