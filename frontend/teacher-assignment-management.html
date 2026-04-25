@@ -98,29 +98,6 @@
 </head>
 <body>
   <div class="page">
-    <details>
-      <summary>Supabase 연결 설정</summary>
-      <section class="panel" style="margin-top:12px;">
-        <div class="panel-body">
-          <div class="search-grid" style="grid-template-columns:1fr 1fr;">
-            <div class="field" style="grid-column:1/-1;">
-              <label for="supabaseUrl">Supabase URL</label>
-              <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
-            </div>
-            <div class="field" style="grid-column:1/-1;">
-              <label for="supabaseAnonKey">Supabase Anon Key</label>
-              <textarea id="supabaseAnonKey" placeholder="eyJ..."></textarea>
-            </div>
-          </div>
-          <div class="toolbar">
-            <button id="saveConfigBtn" class="btn-secondary" type="button">연결정보 저장</button>
-            <button id="connectBtn" class="btn-primary" type="button">DB 연결 확인</button>
-          </div>
-          <div id="connectStatus" class="status info"></div>
-        </div>
-      </section>
-    </details>
-
     <div class="page-header">
       <div class="title-wrap">
         <h1>교사용 발행상황 관리 페이지</h1>
@@ -207,7 +184,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin-auth.js"></script>
   <script>
-    const STORAGE_KEY = 'ag_assignment_supabase_config_v2';
     const $ = (id) => document.getElementById(id);
     const state = { supabase:null, courses:[], testSets:[], assignments:[], editingAssignmentId:null, resetingAssignmentId:null };
     const GRADE_LABELS = { E1:'초1', E2:'초2', E3:'초3', E4:'초4', E5:'초5', E6:'초6', M1:'중1', M2:'중2', M3:'중3', H1:'고1', H2:'고2', H3:'고3' };
@@ -222,9 +198,6 @@
     function gradeLabel(v){ return GRADE_LABELS[String(v)] || (v || '-'); }
     function fmtDate(v){ if(!v) return '-'; const d=new Date(v); if(Number.isNaN(d.getTime())) return v; return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
     function fmtDateTime(v){ if(!v) return ''; const d=new Date(v); if(Number.isNaN(d.getTime())) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
-    function saveConfig(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({ url:$('supabaseUrl').value.trim(), anonKey:$('supabaseAnonKey').value.trim() })); setStatus('connectStatus','연결정보를 저장했습니다.','ok'); }
-    function loadConfig(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return; const cfg=JSON.parse(raw); $('supabaseUrl').value=cfg.url||''; $('supabaseAnonKey').value=cfg.anonKey||''; }catch(_){}}
-    function createClientOrThrow(){ const url=$('supabaseUrl').value.trim(); const anonKey=$('supabaseAnonKey').value.trim(); if(!url||!anonKey) throw new Error('Supabase URL과 Anon Key를 먼저 입력해 주세요.'); return window.supabase.createClient(url, anonKey); }
     function buildStudentAssignmentLink(assignmentId){ if(!assignmentId) return ''; const url=new URL(window.location.href); const basePath=url.pathname.replace(/[^/]+$/, 'student-answer-omr-v3.html'); return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`; }
     async function copyText(text){ if(!text) throw new Error('복사할 내용이 없습니다.'); if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return true; } const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.focus(); ta.select(); const ok=document.execCommand('copy'); ta.remove(); return ok; }
 
@@ -537,7 +510,6 @@
 
     async function loadAssignments(){
       try {
-        if (!state.supabase) state.supabase = createClientOrThrow();
         const params = {
           p_course_id: $('courseSelect').value || null,
           p_test_set_id: $('testSetSelect').value || null,
@@ -570,32 +542,15 @@
       $('sumSelectedTest').textContent = selectedText;
     }
 
-    async function connectAndBootstrap(){
-      try {
-        saveConfig();
-        state.supabase = createClientOrThrow();
-        setStatus('connectStatus','DB 연결과 기본 목록 로딩을 진행 중입니다.','info');
-        await Promise.all([loadCourses(), loadTestSets()]);
-        setStatus('connectStatus','DB 연결 완료. 조회 조건을 불러왔습니다.','ok');
-        await loadAssignments();
-      } catch (err) {
-        setStatus('connectStatus', normalizeError(err), 'error');
-      }
-    }
-
     function resetFilters(){ $('courseSelect').value=''; $('testSetSelect').value=''; $('studentSearch').value=''; $('purposeSelect').value=''; $('filterOpenOnly').checked=true; }
     function wireEvents(){
-      $('saveConfigBtn').addEventListener('click', saveConfig);
-      $('connectBtn').addEventListener('click', connectAndBootstrap);
       $('loadAssignmentsBtn').addEventListener('click', loadAssignments);
       $('resetFiltersBtn').addEventListener('click', async () => {
         resetFilters();
-        if (state.supabase) {
-          await loadTestSets();
-          await loadAssignments();
-        }
+        await loadTestSets();
+        await loadAssignments();
       });
-      $('purposeSelect').addEventListener('change', async () => { if (state.supabase) { await loadTestSets(); await loadAssignments(); } });
+      $('purposeSelect').addEventListener('change', async () => { await loadTestSets(); await loadAssignments(); });
       $('studentSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadAssignments(); });
       $('courseSelect').addEventListener('change', updateSummary);
       $('testSetSelect').addEventListener('change', updateSummary);
@@ -603,7 +558,15 @@
 
     (async () => {
       if (!await requireAuth()) return;
-      loadConfig(); wireEvents(); updateSummary();
+      state.supabase = window.adminSupabase;
+      wireEvents();
+      updateSummary();
+      try {
+        await Promise.all([loadCourses(), loadTestSets()]);
+        await loadAssignments();
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
     })();
   </script>
 </body>
