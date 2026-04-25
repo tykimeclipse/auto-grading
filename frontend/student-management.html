@@ -277,7 +277,7 @@
       min-height: 82px;
     }
     .metric-card .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-    .metric-card .value { font-size: 22px; font-weight: 900; color: #111827; }
+    .metric-card .value { font-size: 22px; font-weight: 400; color: #111827; }
     .history-table {
       width: 100%;
       border-collapse: collapse;
@@ -593,6 +593,21 @@
       return err?.message || String(err);
     }
 
+    function formatPhone(raw) {
+      const d = raw.replace(/\D/g, '').slice(0, 11);
+      if (!d) return '';
+      if (d.startsWith('02')) {
+        if (d.length <= 2) return d;
+        if (d.length <= 5) return `${d.slice(0,2)}-${d.slice(2)}`;
+        if (d.length <= 9) return `${d.slice(0,2)}-${d.slice(2,5)}-${d.slice(5)}`;
+        return `${d.slice(0,2)}-${d.slice(2,6)}-${d.slice(6)}`;
+      }
+      if (d.length <= 3) return d;
+      if (d.length <= 6) return `${d.slice(0,3)}-${d.slice(3)}`;
+      if (d.length <= 10) return `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`;
+      return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`;
+    }
+
     // ── 상태 표시 ─────────────────────────────────────────────────
     function showStatus(msg, type = 'info') {
       const el = $('listStatus');
@@ -791,8 +806,8 @@
         { key: 'student_code',   label: '학생코드',        type: 'readonly' },
         { key: 'gender',         label: '성별',            type: 'select', options: [['','미선택'],['남','남'],['여','여']] },
         { key: 'grade_level',    label: '학년',            type: 'select', options: Object.entries(GRADE_LABELS) },
-        { key: 'student_phone',  label: '학생 전화번호',   type: 'text' },
-        { key: 'parent_phone',   label: '학부모 전화번호', type: 'text' },
+        { key: 'student_phone',  label: '학생 전화번호',   type: 'text', phone: true },
+        { key: 'parent_phone',   label: '학부모 전화번호', type: 'text', phone: true },
         { key: 'address',        label: '주소',            type: 'address', full: true },
         { key: 'address_detail', label: '상세주소',        type: 'text',    full: true }
       ];
@@ -824,12 +839,20 @@
         }
 
         const placeholder = f.key === 'address_detail' ? '아파트 동·호수, 상가 층 등 (선택 입력)' : '';
-        return `<div class="meta-item${fullClass}"><div class="k">${escapeHtml(f.label)}</div><input data-meta-key="${f.key}" type="text" value="${escapeHtml(val)}"${placeholder ? ` placeholder="${placeholder}"` : ''} /></div>`;
+        const phoneAttrs  = f.phone ? ' inputmode="numeric"' : '';
+        return `<div class="meta-item${fullClass}"><div class="k">${escapeHtml(f.label)}</div><input data-meta-key="${f.key}" type="text" value="${escapeHtml(val)}"${phoneAttrs}${placeholder ? ` placeholder="${placeholder}"` : ''} /></div>`;
       }).join('');
 
       document.querySelectorAll('#metaGrid [data-meta-key]').forEach(el => {
-        el.addEventListener('input',  () => { if (state.draft) state.draft[el.dataset.metaKey] = el.value; });
-        el.addEventListener('change', () => { if (state.draft) state.draft[el.dataset.metaKey] = el.value; });
+        const key     = el.dataset.metaKey;
+        const isPhone = key === 'student_phone' || key === 'parent_phone';
+        el.addEventListener('input', () => {
+          if (isPhone) el.value = formatPhone(el.value);
+          if (state.draft) state.draft[key] = el.value || null;
+        });
+        el.addEventListener('change', () => {
+          if (state.draft) state.draft[key] = el.value || null;
+        });
       });
 
       const addrSearchBtn = document.getElementById('addrSearchBtn');
