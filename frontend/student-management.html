@@ -351,52 +351,6 @@
       font-weight: 700;
     }
     .btn-addr-search:hover { background: #bfdbfe; }
-    /* 주소 검색 모달 */
-    dialog#addrModal {
-      border: none;
-      border-radius: 16px;
-      padding: 0;
-      max-width: 520px;
-      width: 95vw;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.20);
-    }
-    dialog#addrModal::backdrop { background: rgba(0,0,0,0.35); }
-    .addr-modal-inner { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-    .addr-modal-header { display: flex; justify-content: space-between; align-items: center; }
-    .addr-modal-header h3 { margin: 0; font-size: 17px; }
-    .addr-search-bar { display: flex; gap: 8px; }
-    .addr-search-bar input {
-      flex: 1;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px 11px;
-      font-size: 14px;
-      outline: none;
-    }
-    .addr-search-bar input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.09); }
-    #addrResultList {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      max-height: 340px;
-      overflow-y: auto;
-      border: 1px solid var(--line-soft);
-      border-radius: 10px;
-    }
-    #addrResultList li {
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--line-soft);
-      cursor: pointer;
-      font-size: 13px;
-      line-height: 1.55;
-    }
-    #addrResultList li:last-child { border-bottom: none; }
-    #addrResultList li[data-road]:hover { background: #f0f7ff; }
-    #addrResultList li .addr-road { font-weight: 700; color: #1f2937; }
-    #addrResultList li .addr-bldnm { color: var(--primary); margin-left: 4px; }
-    #addrResultList li .addr-jibun { color: var(--muted); font-size: 12px; margin-top: 2px; }
-    .addr-empty { text-align: center; padding: 24px; color: var(--muted); font-size: 14px; cursor: default !important; }
-    .addr-pager { display: flex; justify-content: center; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
   </style>
 </head>
 <body>
@@ -559,21 +513,7 @@
     </main>
   </div>
 
-  <dialog id="addrModal" aria-label="주소 검색">
-    <div class="addr-modal-inner">
-      <div class="addr-modal-header">
-        <h3>주소 검색</h3>
-        <button type="button" id="addrModalClose" class="btn-ghost btn-small">✕ 닫기</button>
-      </div>
-      <div class="addr-search-bar">
-        <input id="addrKeyword" type="text" placeholder="도로명, 지번, 건물명으로 검색 후 Enter" autocomplete="off" />
-        <button type="button" id="addrSearchGo" class="btn-primary">검색</button>
-      </div>
-      <ul id="addrResultList"><li class="addr-empty">위에서 주소를 검색하세요.</li></ul>
-      <div class="addr-pager" id="addrPager" hidden></div>
-    </div>
-  </dialog>
-
+  <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin-auth.js"></script>
   <script>
@@ -1093,78 +1033,13 @@
     }
 
 
-    // ── 주소 검색 모달 ────────────────────────────────────────────
-    const addrState = { keyword: '', page: 1, totalCount: 0, countPerPage: 10 };
-
+    // ── 주소 검색 (Kakao 우편번호 서비스) ────────────────────────
     function openAddrModal() {
-      addrState.keyword = '';
-      addrState.page    = 1;
-      $('addrKeyword').value = '';
-      $('addrResultList').innerHTML = '<li class="addr-empty">위에서 주소를 검색하세요.</li>';
-      $('addrPager').hidden = true;
-      $('addrModal').showModal();
-      $('addrKeyword').focus();
-    }
-
-    async function runAddrSearch(keyword, page = 1) {
-      if (!keyword?.trim()) return;
-      $('addrResultList').innerHTML = '<li class="addr-empty">검색 중...</li>';
-      $('addrPager').hidden = true;
-      try {
-        const { data, error } = await window.adminSupabase.functions.invoke('search-address', {
-          body: { keyword: keyword.trim(), page }
-        });
-        if (error) {
-          let detail = error.message || String(error);
-          try {
-            if (error.context) {
-              const body = await error.context.json();
-              detail = body.error || body.message || JSON.stringify(body);
-            }
-          } catch (_) {}
-          throw new Error(detail);
+      new daum.Postcode({
+        oncomplete(data) {
+          selectAddress(data.roadAddress || data.autoRoadAddress || data.jibunAddress);
         }
-        if (data?.error) throw new Error(data.error);
-        addrState.keyword      = keyword.trim();
-        addrState.page         = page;
-        addrState.totalCount   = data.totalCount;
-        addrState.countPerPage = data.countPerPage || 10;
-        renderAddrResults(data);
-      } catch (err) {
-        $('addrResultList').innerHTML =
-          `<li class="addr-empty" style="color:var(--danger)">검색 실패: ${escapeHtml(normalizeError(err))}</li>`;
-      }
-    }
-
-    function renderAddrResults(data) {
-      if (!data.list?.length) {
-        $('addrResultList').innerHTML = '<li class="addr-empty">검색 결과가 없습니다.</li>';
-        return;
-      }
-      $('addrResultList').innerHTML = data.list.map(item => `
-        <li data-road="${escapeHtml(item.roadAddr)}">
-          <div class="addr-road">${escapeHtml(item.roadAddr)}${item.bdNm
-            ? `<span class="addr-bldnm">(${escapeHtml(item.bdNm)})</span>` : ''}</div>
-          <div class="addr-jibun">${escapeHtml(item.jibunAddr)}</div>
-        </li>`).join('');
-
-      $('addrResultList').querySelectorAll('li[data-road]').forEach(li => {
-        li.addEventListener('click', () => selectAddress(li.dataset.road));
-      });
-
-      const totalPages = Math.ceil(addrState.totalCount / addrState.countPerPage);
-      const pager = $('addrPager');
-      if (totalPages > 1) {
-        pager.hidden = false;
-        pager.innerHTML = `
-          <button type="button" id="addrPrevBtn" class="btn-ghost btn-small" ${addrState.page <= 1 ? 'disabled' : ''}>◀ 이전</button>
-          <span>${addrState.page} / ${totalPages} (총 ${addrState.totalCount}건)</span>
-          <button type="button" id="addrNextBtn" class="btn-ghost btn-small" ${addrState.page >= totalPages ? 'disabled' : ''}>다음 ▶</button>`;
-        $('addrPrevBtn').addEventListener('click', () => runAddrSearch(addrState.keyword, addrState.page - 1));
-        $('addrNextBtn').addEventListener('click', () => runAddrSearch(addrState.keyword, addrState.page + 1));
-      } else {
-        pager.hidden = true;
-      }
+      }).open();
     }
 
     function selectAddress(roadAddr) {
@@ -1173,7 +1048,6 @@
         input.value = roadAddr;
         if (state.draft) state.draft.address = roadAddr;
       }
-      $('addrModal').close();
       const detailInput = document.querySelector('[data-meta-key="address_detail"]');
       if (detailInput) detailInput.focus();
     }
@@ -1212,12 +1086,6 @@
       renderDetail();
     });
     $('saveMetaBtn').addEventListener('click', saveMeta);
-
-    // 주소 검색 모달
-    $('addrModalClose').addEventListener('click', () => $('addrModal').close());
-    $('addrSearchGo').addEventListener('click',   () => runAddrSearch($('addrKeyword').value));
-    $('addrKeyword').addEventListener('keydown',  e => { if (e.key === 'Enter') runAddrSearch($('addrKeyword').value); });
-    // ESC 키로 모달 닫기는 <dialog> 기본 동작으로 처리됨
 
     // ── 시작 ──────────────────────────────────────────────────────
     init();
