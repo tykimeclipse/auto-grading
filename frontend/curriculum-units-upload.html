@@ -266,16 +266,8 @@
 
       <div class="grid">
         <div class="panel">
-          <h2>연결 및 업로드</h2>
+          <h2>업로드</h2>
           <div class="form-grid">
-            <div class="field wide">
-              <label for="supabaseUrl">Supabase URL</label>
-              <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
-            </div>
-            <div class="field wide">
-              <label for="supabaseAnonKey">Supabase Anon Key</label>
-              <textarea id="supabaseAnonKey" rows="3" placeholder="eyJ..."></textarea>
-            </div>
             <div class="field">
               <label for="curriculumVersion">교육과정</label>
               <select id="curriculumVersion">
@@ -316,14 +308,11 @@
           </div>
 
           <div class="toolbar">
-            <button id="saveConfigBtn" type="button">연결정보 저장</button>
-            <button id="connectBtn" class="soft" type="button">DB 연결 확인</button>
             <button id="validateBtn" class="soft" type="button">CSV 해석 미리보기</button>
             <button id="uploadBtn" class="primary" type="button">DB 업로드 실행</button>
             <button id="resetBtn" type="button">초기화</button>
           </div>
 
-          <div id="connectStatus" class="status info"></div>
           <div id="statusBox" class="status info"></div>
           <pre id="resultBox" class="result-box"></pre>
 
@@ -388,7 +377,6 @@
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="admin-auth.js"></script>
     <script>
-      const STORAGE_KEY = "ag_curriculum_units_upload_config_v1";
       const REQUIRED_HEADERS = ["단원번호", "대단원명", "중단원번호", "중단원명", "소단원번호", "소단원명"];
       const $ = (id) => document.getElementById(id);
 
@@ -442,60 +430,6 @@
           .replaceAll(">", "&gt;")
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#39;");
-      }
-
-      function loadConfig() {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if (!raw) return;
-          const saved = JSON.parse(raw);
-          $("supabaseUrl").value = saved.url || "";
-          $("supabaseAnonKey").value = saved.anonKey || "";
-          $("curriculumVersion").value = saved.curriculumVersion || "2015";
-          $("gradeLevel").value = saved.gradeLevel || "M3";
-          $("subject").value = saved.subject || "중3과학";
-        } catch (_) {}
-      }
-
-      function saveConfig() {
-        const payload = {
-          url: $("supabaseUrl").value.trim(),
-          anonKey: $("supabaseAnonKey").value.trim(),
-          curriculumVersion: $("curriculumVersion").value,
-          gradeLevel: $("gradeLevel").value,
-          subject: $("subject").value.trim(),
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-        setStatus("연결정보를 저장했습니다.", "ok", "connectStatus");
-      }
-
-      function createClientOrThrow() {
-        const url = $("supabaseUrl").value.trim();
-        const anonKey = $("supabaseAnonKey").value.trim();
-        if (!url || !anonKey) throw new Error("Supabase URL과 Anon Key를 먼저 입력해 주세요.");
-        return window.supabase.createClient(url, anonKey);
-      }
-
-      async function connect() {
-        try {
-          saveConfig();
-          state.supabase = createClientOrThrow();
-          const { count, error } = await state.supabase
-            .schema("auto_grading")
-            .from("curriculum_units")
-            .select("*", { head: true, count: "exact" });
-          if (error) {
-            setStatus(
-              `클라이언트는 생성됐지만 curriculum_units 조회는 실패했습니다.\n${normalizeError(error)}\n테이블 조회 권한이 없어도 RPC 업로드는 동작할 수 있습니다.`,
-              "info",
-              "connectStatus"
-            );
-            return;
-          }
-          setStatus(`DB 연결 확인 완료. 현재 curriculum_units ${count ?? 0}건`, "ok", "connectStatus");
-        } catch (err) {
-          setStatus(normalizeError(err), "error", "connectStatus");
-        }
       }
 
       function updateSummary() {
@@ -684,8 +618,6 @@
 
       async function uploadUnits() {
         try {
-          saveConfig();
-          if (!state.supabase) state.supabase = createClientOrThrow();
           if (!state.parsedRows.length) {
             await validateCsv();
           }
@@ -753,8 +685,6 @@
       }
 
       function wireEvents() {
-        $("saveConfigBtn").addEventListener("click", saveConfig);
-        $("connectBtn").addEventListener("click", connect);
         $("validateBtn").addEventListener("click", async () => {
           try {
             await validateCsv();
@@ -775,7 +705,7 @@
 
       async function init() {
         if (!await requireAuth()) return;
-        loadConfig();
+        state.supabase = window.adminSupabase;
         wireEvents();
         updateSummary();
       }
