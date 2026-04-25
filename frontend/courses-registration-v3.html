@@ -236,14 +236,6 @@
       color: var(--muted);
       font-size: 12px;
     }
-    details {
-      margin-bottom: 16px;
-    }
-    details summary {
-      cursor: pointer;
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
     @media (max-width: 960px) {
       .grid, .form-grid {
         grid-template-columns: 1fr;
@@ -260,28 +252,6 @@
       </div>
       <div class="badge">courses 등록용 v3</div>
     </div>
-
-    <details>
-      <summary>Supabase 연결 설정</summary>
-      <div class="panel">
-        <div class="form-grid">
-          <div class="field wide">
-            <label for="supabaseUrl">Supabase URL</label>
-            <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
-          </div>
-          <div class="field wide">
-            <label for="supabaseAnonKey">Supabase Anon Key</label>
-            <textarea id="supabaseAnonKey" placeholder="eyJ..."></textarea>
-          </div>
-        </div>
-        <div class="toolbar">
-          <button id="saveConfigBtn" type="button">연결정보 저장</button>
-          <button id="connectBtn" class="soft" type="button">DB 연결 확인</button>
-          <button id="reloadBtn" type="button">목록 새로고침</button>
-        </div>
-        <div id="connectStatus" class="status info"></div>
-      </div>
-    </details>
 
     <div class="grid">
       <div class="panel">
@@ -395,7 +365,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin-auth.js"></script>
   <script>
-    const STORAGE_KEY = "ag_course_supabase_config_v5";
     const $ = (id) => document.getElementById(id);
 
     const state = {
@@ -439,34 +408,6 @@
         .replaceAll("'", "&#39;");
     }
 
-    function loadConfig() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const saved = JSON.parse(raw);
-        $("supabaseUrl").value = saved.url || "";
-        $("supabaseAnonKey").value = saved.anonKey || "";
-      } catch (_) {}
-    }
-
-    function saveConfig() {
-      const payload = {
-        url: $("supabaseUrl").value.trim(),
-        anonKey: $("supabaseAnonKey").value.trim()
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      setStatus("connectStatus", "연결정보를 저장했습니다.", "ok");
-    }
-
-    function createClientOrThrow() {
-      const url = $("supabaseUrl").value.trim();
-      const anonKey = $("supabaseAnonKey").value.trim();
-      if (!url || !anonKey) {
-        throw new Error("Supabase URL과 Anon Key를 먼저 입력해 주세요.");
-      }
-      return window.supabase.createClient(url, anonKey);
-    }
-
     function updateSummary() {
       const courseName = $("courseName").value.trim() || "-";
       const openYear = $("openYear").value.trim() || "-";
@@ -498,25 +439,12 @@
     }
 
     async function loadNextCourseNoPreview() {
-      if (!state.supabase) return;
       const { data, error } = await state.supabase
         .schema("auto_grading")
         .rpc("teacher_get_next_course_no");
       if (error) throw error;
       $("courseNoPreview").value = data ? `예상 ${data}` : "";
       updateSummary();
-    }
-
-    async function connectAndInit() {
-      try {
-        saveConfig();
-        state.supabase = createClientOrThrow();
-        setStatus("connectStatus", "DB 연결 및 초기 데이터를 불러오는 중입니다.", "info");
-        await Promise.all([loadNextCourseNoPreview(), loadCourseList()]);
-        setStatus("connectStatus", "DB 연결 완료.", "ok");
-      } catch (err) {
-        setStatus("connectStatus", normalizeError(err), "error");
-      }
     }
 
     function buildCreatePayload() {
@@ -546,8 +474,6 @@
       const prevText = btn.textContent;
 
       try {
-        if (!state.supabase) state.supabase = createClientOrThrow();
-
         state.isCreating = true;
         btn.disabled = true;
         btn.textContent = "등록 중...";
@@ -593,7 +519,6 @@
 
     async function loadCourseList() {
       try {
-        if (!state.supabase) state.supabase = createClientOrThrow();
         setStatus("listStatus", "수강과정 목록을 불러오는 중입니다.", "info");
 
         const { data, error } = await state.supabase
@@ -646,8 +571,6 @@
 
     async function deleteSelectedCourses() {
       try {
-        if (!state.supabase) state.supabase = createClientOrThrow();
-
         const ids = [...state.selectedCourseIds];
         if (!ids.length) {
           throw new Error("삭제할 수강과정을 1개 이상 선택해 주세요.");
@@ -699,21 +622,7 @@
       updateSummary();
     }
 
-    async function reloadAll() {
-      try {
-        if (!state.supabase) state.supabase = createClientOrThrow();
-        setStatus("connectStatus", "목록과 예상 번호를 새로고침하는 중입니다.", "info");
-        await Promise.all([loadNextCourseNoPreview(), loadCourseList()]);
-        setStatus("connectStatus", "새로고침 완료.", "ok");
-      } catch (err) {
-        setStatus("connectStatus", normalizeError(err), "error");
-      }
-    }
-
     function wireEvents() {
-      $("saveConfigBtn").addEventListener("click", saveConfig);
-      $("connectBtn").addEventListener("click", connectAndInit);
-      $("reloadBtn").addEventListener("click", reloadAll);
       $("createBtn").addEventListener("click", createCourse);
       $("resetBtn").addEventListener("click", () => resetForm(true));
       $("deleteSelectedBtn").addEventListener("click", deleteSelectedCourses);
@@ -739,9 +648,14 @@
 
     async function init() {
       if (!await requireAuth()) return;
-      loadConfig();
+      state.supabase = window.adminSupabase;
       wireEvents();
       updateSummary();
+      try {
+        await Promise.all([loadNextCourseNoPreview(), loadCourseList()]);
+      } catch (err) {
+        setStatus("listStatus", normalizeError(err), "error");
+      }
     }
 
     init();
