@@ -98,8 +98,6 @@
     .status.error { display:block; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
     .status.info { display:block; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
     .code-box { border:1px dashed #93c5fd; background:#eff6ff; border-radius:12px; padding:12px; font-size:14px; color:#1e3a8a; line-height:1.55; }
-    details { margin-bottom: 16px; }
-    summary { cursor:pointer; font-weight:700; }
     .result-box { margin-top:12px; border:1px solid var(--line); background:#f8fafc; border-radius:10px; padding:12px; font-size:12px; overflow:auto; white-space:pre-wrap; max-height:280px; }
     @media (max-width:1280px) {
       .layout,.subgrid { grid-template-columns:1fr; }
@@ -116,30 +114,6 @@
 </head>
 <body>
   <div class="page">
-    <details>
-      <summary>Supabase 연결 설정</summary>
-      <section class="panel" style="margin-top:12px;">
-        <div class="panel-body">
-          <div class="search-grid">
-            <div class="field" style="grid-column:1/-1;">
-              <label for="supabaseUrl">Supabase URL</label>
-              <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
-            </div>
-            <div class="field" style="grid-column:1/-1;">
-              <label for="supabaseAnonKey">Supabase Anon Key</label>
-              <textarea id="supabaseAnonKey" placeholder="eyJ..."></textarea>
-            </div>
-          </div>
-          <div class="toolbar">
-            <button id="saveConfigBtn" class="btn-secondary" type="button">연결정보 저장</button>
-            <button id="connectBtn" class="btn-primary" type="button">DB 연결 확인</button>
-            <button id="reloadAllBtn" class="btn-ghost" type="button">전체 새로고침</button>
-          </div>
-          <div id="connectStatus" class="status info"></div>
-        </div>
-      </section>
-    </details>
-
     <div class="page-header">
       <div class="title-wrap">
         <h1>교사용 시험 발행 페이지</h1>
@@ -392,7 +366,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin-auth.js"></script>
   <script>
-    const STORAGE_KEY = 'ag_assignment_supabase_config_v2';
     const $ = (id) => document.getElementById(id);
     const state = {
       supabase: null,
@@ -428,28 +401,6 @@
       if (typeof err === 'string') return err;
       if (err.message) return err.message;
       try { return JSON.stringify(err, null, 2); } catch (_) { return '알 수 없는 오류가 발생했습니다.'; }
-    }
-
-    function saveConfig() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ url: $('supabaseUrl').value.trim(), anonKey: $('supabaseAnonKey').value.trim() }));
-      setStatus('connectStatus', '연결정보를 저장했습니다.', 'ok');
-    }
-
-    function loadConfig() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const cfg = JSON.parse(raw);
-        $('supabaseUrl').value = cfg.url || '';
-        $('supabaseAnonKey').value = cfg.anonKey || '';
-      } catch (_) {}
-    }
-
-    function createClientOrThrow() {
-      const url = $('supabaseUrl').value.trim();
-      const anonKey = $('supabaseAnonKey').value.trim();
-      if (!url || !anonKey) throw new Error('Supabase URL과 Anon Key를 먼저 입력해 주세요.');
-      return window.supabase.createClient(url, anonKey);
     }
 
     function fmtDate(v) {
@@ -516,18 +467,6 @@
       });
     }
 
-    async function connectAndBootstrap() {
-      try {
-        saveConfig();
-        state.supabase = createClientOrThrow();
-        setStatus('connectStatus', 'DB 연결과 기본 데이터 로딩을 진행 중입니다.', 'info');
-        await Promise.all([loadCourses(), loadTestSets(), loadStudentFilterOptions()]);
-        setStatus('connectStatus', 'DB 연결 완료. 시험/과정/학생 필터를 불러왔습니다.', 'ok');
-      } catch (err) {
-        setStatus('connectStatus', normalizeError(err), 'error');
-      }
-    }
-
     async function loadCourses() {
       const { data, error } = await state.supabase
         .schema('auto_grading')
@@ -574,7 +513,6 @@
 
     async function loadTestSets() {
       try {
-        if (!state.supabase) state.supabase = createClientOrThrow();
         setStatus('assignmentStatus', '시험 목록을 불러오는 중입니다.', 'info');
         const { data, error } = await state.supabase
           .schema('auto_grading')
@@ -711,7 +649,6 @@
 
     async function loadStudents() {
       try {
-        if (!state.supabase) state.supabase = createClientOrThrow();
         const nameSearch = $('studentNameSearch').value.trim();
         const codeSearch = $('studentCodeSearch').value.trim();
         const params = {
@@ -816,7 +753,6 @@
 
     async function loadAssignments() {
       try {
-        if (!state.supabase) state.supabase = createClientOrThrow();
         const params = {
           p_course_id: currentCourseId(),
           p_test_set_id: $('filterCurrentTestOnly').checked ? state.selectedTestSetId : null,
@@ -902,7 +838,6 @@
 
     async function issueAssignments() {
       try {
-        if (!state.supabase) state.supabase = createClientOrThrow();
         if (!state.selectedTestSetId) throw new Error('먼저 시험을 선택해 주세요.');
         const studentIds = [...state.selectedStudentIds];
         if (!studentIds.length) throw new Error('발행할 학생을 1명 이상 선택해 주세요.');
@@ -945,12 +880,6 @@
     }
 
     function wireEvents() {
-      $('saveConfigBtn').addEventListener('click', saveConfig);
-      $('connectBtn').addEventListener('click', connectAndBootstrap);
-      $('reloadAllBtn').addEventListener('click', async () => {
-        await connectAndBootstrap();
-        await Promise.all([loadStudents(), loadAssignments()]);
-      });
       $('searchTestsBtn').addEventListener('click', loadTestSets);
       $('resetTestSearchBtn').addEventListener('click', resetTestSearch);
       $('searchStudentsBtn').addEventListener('click', loadStudents);
@@ -982,12 +911,17 @@
 
     async function init() {
       if (!await requireAuth()) return;
-      loadConfig();
+      state.supabase = window.adminSupabase;
       wireEvents();
       updateSelectionUi();
       updateSummaryCards();
       updateFooter();
       renderSelectedTest();
+      try {
+        await Promise.all([loadCourses(), loadTestSets(), loadStudentFilterOptions()]);
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
     }
 
     init();
