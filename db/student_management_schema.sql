@@ -12,13 +12,19 @@ alter table auto_grading.students
 alter table auto_grading.students
   add column if not exists student_phone text;
 
--- address : 거주지역 (상세 주소가 아닌 지역명 수준, 예: 상계동)
+-- address : 도로명/지번 기본 주소 (주소 검색으로 선택)
 alter table auto_grading.students
   add column if not exists address text;
+
+-- address_detail : 상세 주소 (아파트 동·호수 등, 직접 입력, 선택)
+alter table auto_grading.students
+  add column if not exists address_detail text;
 
 comment on column auto_grading.students.gender
   is '성별 (남 / 여 / 기타/미입력)';
 comment on column auto_grading.students.student_phone
   is '학생 전화번호';
 comment on column auto_grading.students.address
-  is '거주지역 (예: 상계동, 중계동). student-management 페이지에서 관리.';
+  is '기본 주소. 도로명/지번 주소 검색으로 자동 입력. 예: 경기 성남시 분당구 판교역로 235';
+comment on column auto_grading.students.address_detail
+  is '상세 주소. 직접 입력. 예: ○○아파트 101동 1203호. 과외 학생에게 주로 사용. null 허용.';

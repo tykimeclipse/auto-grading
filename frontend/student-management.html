@@ -334,6 +334,69 @@
       .search-grid, .meta-grid, .achievement-grid { grid-template-columns: 1fr; }
       .detail-name { font-size: 21px; }
     }
+    /* 주소 필드 전체 너비 */
+    .meta-item--full { grid-column: 1 / -1; }
+    /* 주소 입력란 + 검색 버튼 가로 배치 */
+    .addr-input-row { display: flex; gap: 6px; align-items: center; }
+    .addr-input-row input { flex: 1; min-width: 0; }
+    .btn-addr-search {
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 8px 10px;
+      font-size: 12px;
+      border-radius: 9px;
+      background: var(--primary-weak);
+      color: var(--primary-dark);
+      border-color: #bfdbfe;
+      font-weight: 700;
+    }
+    .btn-addr-search:hover { background: #bfdbfe; }
+    /* 주소 검색 모달 */
+    dialog#addrModal {
+      border: none;
+      border-radius: 16px;
+      padding: 0;
+      max-width: 520px;
+      width: 95vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.20);
+    }
+    dialog#addrModal::backdrop { background: rgba(0,0,0,0.35); }
+    .addr-modal-inner { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .addr-modal-header { display: flex; justify-content: space-between; align-items: center; }
+    .addr-modal-header h3 { margin: 0; font-size: 17px; }
+    .addr-search-bar { display: flex; gap: 8px; }
+    .addr-search-bar input {
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 11px;
+      font-size: 14px;
+      outline: none;
+    }
+    .addr-search-bar input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.09); }
+    #addrResultList {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 340px;
+      overflow-y: auto;
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+    }
+    #addrResultList li {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line-soft);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    #addrResultList li:last-child { border-bottom: none; }
+    #addrResultList li[data-road]:hover { background: #f0f7ff; }
+    #addrResultList li .addr-road { font-weight: 700; color: #1f2937; }
+    #addrResultList li .addr-bldnm { color: var(--primary); margin-left: 4px; }
+    #addrResultList li .addr-jibun { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .addr-empty { text-align: center; padding: 24px; color: var(--muted); font-size: 14px; cursor: default !important; }
+    .addr-pager { display: flex; justify-content: center; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
   </style>
 </head>
 <body>
@@ -495,6 +558,21 @@
       </section>
     </main>
   </div>
+
+  <dialog id="addrModal" aria-label="주소 검색">
+    <div class="addr-modal-inner">
+      <div class="addr-modal-header">
+        <h3>주소 검색</h3>
+        <button type="button" id="addrModalClose" class="btn-ghost btn-small">✕ 닫기</button>
+      </div>
+      <div class="addr-search-bar">
+        <input id="addrKeyword" type="text" placeholder="도로명, 지번, 건물명으로 검색 후 Enter" autocomplete="off" />
+        <button type="button" id="addrSearchGo" class="btn-primary">검색</button>
+      </div>
+      <ul id="addrResultList"><li class="addr-empty">위에서 주소를 검색하세요.</li></ul>
+      <div class="addr-pager" id="addrPager" hidden></div>
+    </div>
+  </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin-auth.js"></script>
@@ -769,34 +847,53 @@
       const s   = state.detail;
       const src = (state.editing && state.draft) ? state.draft : s;
       const fields = [
-        { key: 'name',          label: '이름',          type: 'text' },
-        { key: 'student_code',  label: '학생코드',      type: 'readonly' },
-        { key: 'gender',        label: '성별',          type: 'select', options: [['','미선택'],['남','남'],['여','여']] },
-        { key: 'grade_level',   label: '학년',          type: 'select', options: Object.entries(GRADE_LABELS) },
-        { key: 'student_phone', label: '학생 전화번호', type: 'text' },
-        { key: 'parent_phone',  label: '학부모 전화번호', type: 'text' },
-        { key: 'address',       label: '거주지역',      type: 'text' }
+        { key: 'name',           label: '이름',            type: 'text' },
+        { key: 'student_code',   label: '학생코드',        type: 'readonly' },
+        { key: 'gender',         label: '성별',            type: 'select', options: [['','미선택'],['남','남'],['여','여']] },
+        { key: 'grade_level',    label: '학년',            type: 'select', options: Object.entries(GRADE_LABELS) },
+        { key: 'student_phone',  label: '학생 전화번호',   type: 'text' },
+        { key: 'parent_phone',   label: '학부모 전화번호', type: 'text' },
+        { key: 'address',        label: '주소',            type: 'address', full: true },
+        { key: 'address_detail', label: '상세주소',        type: 'text',    full: true }
       ];
 
       $('metaGrid').innerHTML = fields.map(f => {
-        const val = src[f.key] ?? '';
+        const val       = src[f.key] ?? '';
+        const fullClass = f.full ? ' meta-item--full' : '';
+
         if (!state.editing || f.type === 'readonly') {
           const display = f.key === 'grade_level' ? gradeLabel(val) : (val || '-');
-          return `<div class="meta-item"><div class="k">${escapeHtml(f.label)}</div><div class="v">${escapeHtml(display)}</div></div>`;
+          return `<div class="meta-item${fullClass}"><div class="k">${escapeHtml(f.label)}</div><div class="v">${escapeHtml(display)}</div></div>`;
         }
+
+        if (f.type === 'address') {
+          return `<div class="meta-item meta-item--full">
+            <div class="k">${escapeHtml(f.label)}</div>
+            <div class="addr-input-row">
+              <input data-meta-key="address" type="text" value="${escapeHtml(val)}" readonly placeholder="주소 검색 버튼을 눌러 선택하세요" />
+              <button type="button" id="addrSearchBtn" class="btn-addr-search">주소 검색</button>
+            </div>
+          </div>`;
+        }
+
         if (f.type === 'select') {
           const opts = f.options.map(([v, l]) =>
             `<option value="${escapeHtml(v)}" ${val === v || (val === '' && v === '') ? 'selected' : ''}>${escapeHtml(l)}</option>`
           ).join('');
-          return `<div class="meta-item"><div class="k">${escapeHtml(f.label)}</div><select data-meta-key="${f.key}">${opts}</select></div>`;
+          return `<div class="meta-item${fullClass}"><div class="k">${escapeHtml(f.label)}</div><select data-meta-key="${f.key}">${opts}</select></div>`;
         }
-        return `<div class="meta-item"><div class="k">${escapeHtml(f.label)}</div><input data-meta-key="${f.key}" type="text" value="${escapeHtml(val)}" /></div>`;
+
+        const placeholder = f.key === 'address_detail' ? '아파트 동·호수, 상가 층 등 (선택 입력)' : '';
+        return `<div class="meta-item${fullClass}"><div class="k">${escapeHtml(f.label)}</div><input data-meta-key="${f.key}" type="text" value="${escapeHtml(val)}"${placeholder ? ` placeholder="${placeholder}"` : ''} /></div>`;
       }).join('');
 
-      document.querySelectorAll('[data-meta-key]').forEach(el => {
+      document.querySelectorAll('#metaGrid [data-meta-key]').forEach(el => {
         el.addEventListener('input',  () => { if (state.draft) state.draft[el.dataset.metaKey] = el.value; });
         el.addEventListener('change', () => { if (state.draft) state.draft[el.dataset.metaKey] = el.value; });
       });
+
+      const addrSearchBtn = document.getElementById('addrSearchBtn');
+      if (addrSearchBtn) addrSearchBtn.addEventListener('click', openAddrModal);
     }
 
     function renderAchievementSection() {
@@ -915,9 +1012,10 @@
             p_name:          form.name?.trim()      || s.name,
             p_gender:        form.gender            ?? null,
             p_grade_level:   form.grade_level       ?? null,
-            p_student_phone: form.student_phone     ?? null,
-            p_parent_phone:  form.parent_phone      ?? null,
-            p_address:       form.address           ?? null
+            p_student_phone:  form.student_phone     ?? null,
+            p_parent_phone:   form.parent_phone      ?? null,
+            p_address:        form.address           ?? null,
+            p_address_detail: form.address_detail    ?? null
           });
         if (error) throw error;
         if (data?.ok === false) throw new Error(data.error || '저장 실패');
@@ -995,6 +1093,82 @@
     }
 
 
+    // ── 주소 검색 모달 ────────────────────────────────────────────
+    const addrState = { keyword: '', page: 1, totalCount: 0, countPerPage: 10 };
+
+    function openAddrModal() {
+      addrState.keyword = '';
+      addrState.page    = 1;
+      $('addrKeyword').value = '';
+      $('addrResultList').innerHTML = '<li class="addr-empty">위에서 주소를 검색하세요.</li>';
+      $('addrPager').hidden = true;
+      $('addrModal').showModal();
+      $('addrKeyword').focus();
+    }
+
+    async function runAddrSearch(keyword, page = 1) {
+      if (!keyword?.trim()) return;
+      $('addrResultList').innerHTML = '<li class="addr-empty">검색 중...</li>';
+      $('addrPager').hidden = true;
+      try {
+        const { data, error } = await state.supabase.functions.invoke('search-address', {
+          body: { keyword: keyword.trim(), page }
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        addrState.keyword    = keyword.trim();
+        addrState.page       = page;
+        addrState.totalCount = data.totalCount;
+        addrState.countPerPage = data.countPerPage || 10;
+        renderAddrResults(data);
+      } catch (err) {
+        $('addrResultList').innerHTML =
+          `<li class="addr-empty" style="color:var(--danger)">검색 실패: ${escapeHtml(normalizeError(err))}</li>`;
+      }
+    }
+
+    function renderAddrResults(data) {
+      if (!data.list?.length) {
+        $('addrResultList').innerHTML = '<li class="addr-empty">검색 결과가 없습니다.</li>';
+        return;
+      }
+      $('addrResultList').innerHTML = data.list.map(item => `
+        <li data-road="${escapeHtml(item.roadAddr)}">
+          <div class="addr-road">${escapeHtml(item.roadAddr)}${item.bdNm
+            ? `<span class="addr-bldnm">(${escapeHtml(item.bdNm)})</span>` : ''}</div>
+          <div class="addr-jibun">${escapeHtml(item.jibunAddr)}</div>
+        </li>`).join('');
+
+      $('addrResultList').querySelectorAll('li[data-road]').forEach(li => {
+        li.addEventListener('click', () => selectAddress(li.dataset.road));
+      });
+
+      const totalPages = Math.ceil(addrState.totalCount / addrState.countPerPage);
+      const pager = $('addrPager');
+      if (totalPages > 1) {
+        pager.hidden = false;
+        pager.innerHTML = `
+          <button type="button" id="addrPrevBtn" class="btn-ghost btn-small" ${addrState.page <= 1 ? 'disabled' : ''}>◀ 이전</button>
+          <span>${addrState.page} / ${totalPages} (총 ${addrState.totalCount}건)</span>
+          <button type="button" id="addrNextBtn" class="btn-ghost btn-small" ${addrState.page >= totalPages ? 'disabled' : ''}>다음 ▶</button>`;
+        $('addrPrevBtn').addEventListener('click', () => runAddrSearch(addrState.keyword, addrState.page - 1));
+        $('addrNextBtn').addEventListener('click', () => runAddrSearch(addrState.keyword, addrState.page + 1));
+      } else {
+        pager.hidden = true;
+      }
+    }
+
+    function selectAddress(roadAddr) {
+      const input = document.querySelector('[data-meta-key="address"]');
+      if (input) {
+        input.value = roadAddr;
+        if (state.draft) state.draft.address = roadAddr;
+      }
+      $('addrModal').close();
+      const detailInput = document.querySelector('[data-meta-key="address_detail"]');
+      if (detailInput) detailInput.focus();
+    }
+
     // ── 이벤트 연결 ───────────────────────────────────────────────
     ['searchName', 'searchCode', 'gradeFilter', 'courseFilter', 'sortSelect'].forEach(id => {
       $(id).addEventListener('input',  applyFilters);
@@ -1029,6 +1203,12 @@
       renderDetail();
     });
     $('saveMetaBtn').addEventListener('click', saveMeta);
+
+    // 주소 검색 모달
+    $('addrModalClose').addEventListener('click', () => $('addrModal').close());
+    $('addrSearchGo').addEventListener('click',   () => runAddrSearch($('addrKeyword').value));
+    $('addrKeyword').addEventListener('keydown',  e => { if (e.key === 'Enter') runAddrSearch($('addrKeyword').value); });
+    // ESC 키로 모달 닫기는 <dialog> 기본 동작으로 처리됨
 
     // ── 시작 ──────────────────────────────────────────────────────
     init();

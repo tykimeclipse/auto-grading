@@ -38,7 +38,8 @@ begin
         'is_active',    s.is_active,
         'student_phone',s.student_phone,
         'parent_phone', s.parent_phone,
-        'address',      s.address,
+        'address',        s.address,
+        'address_detail', s.address_detail,
         'created_at',   s.created_at,
         'updated_at',   s.updated_at,
         'course_names', (
@@ -102,11 +103,12 @@ begin
     'gender',        s.gender,
     'grade_level',   s.grade_level,
     'is_active',     s.is_active,
-    'student_phone', s.student_phone,
-    'parent_phone',  s.parent_phone,
-    'address',       s.address,
-    'created_at',    s.created_at,
-    'updated_at',    s.updated_at
+    'student_phone',  s.student_phone,
+    'parent_phone',   s.parent_phone,
+    'address',        s.address,
+    'address_detail', s.address_detail,
+    'created_at',     s.created_at,
+    'updated_at',     s.updated_at
   )
     into v_student
   from auto_grading.students s
@@ -156,18 +158,21 @@ comment on function auto_grading.teacher_get_student_detail(uuid)
 
 -- ----------------------------------------------------------------
 -- 3. teacher_update_student_metadata
---    이름·성별·학년·전화번호·거주지역 수정
+--    이름·성별·학년·전화번호·주소 수정
 -- ----------------------------------------------------------------
+-- 구 시그니처(address_detail 없는 버전) 제거
 drop function if exists auto_grading.teacher_update_student_metadata(uuid, text, text, text, text, text, text);
+drop function if exists auto_grading.teacher_update_student_metadata(uuid, text, text, text, text, text, text, text);
 
 create or replace function auto_grading.teacher_update_student_metadata(
-  p_student_id   uuid,
-  p_name         text         default null,
-  p_gender       text         default null,
-  p_grade_level  text         default null,
-  p_student_phone text        default null,
-  p_parent_phone  text        default null,
-  p_address       text        default null
+  p_student_id     uuid,
+  p_name           text  default null,
+  p_gender         text  default null,
+  p_grade_level    text  default null,
+  p_student_phone  text  default null,
+  p_parent_phone   text  default null,
+  p_address        text  default null,
+  p_address_detail text  default null
 )
 returns jsonb
 language plpgsql
@@ -194,13 +199,14 @@ begin
 
   update auto_grading.students
   set
-    name          = v_name,
-    gender        = p_gender,                            -- null 허용: null = 미입력/모름으로 되돌리기
-    grade_level   = coalesce(p_grade_level,   grade_level), -- 필수 성격 강함: null이면 기존값 유지
-    student_phone = p_student_phone,   -- null 허용: null 전달 시 DB도 null (값 삭제)
-    parent_phone  = p_parent_phone,    -- null 허용: student_phone과 동일 정책 (null = 삭제)
-    address       = p_address,         -- null 허용
-    updated_at    = now()
+    name           = v_name,
+    gender         = p_gender,                              -- null 허용: null = 미입력/모름으로 되돌리기
+    grade_level    = coalesce(p_grade_level, grade_level),  -- 필수 성격 강함: null이면 기존값 유지
+    student_phone  = p_student_phone,    -- null 허용: null 전달 시 DB도 null (값 삭제)
+    parent_phone   = p_parent_phone,     -- null 허용
+    address        = p_address,          -- null 허용
+    address_detail = p_address_detail,   -- null 허용
+    updated_at     = now()
   where id = p_student_id;
 
   return jsonb_build_object(
@@ -215,11 +221,11 @@ exception
 end;
 $function$;
 
-grant execute on function auto_grading.teacher_update_student_metadata(uuid, text, text, text, text, text, text)
+grant execute on function auto_grading.teacher_update_student_metadata(uuid, text, text, text, text, text, text, text)
   to authenticated, service_role;
 
-comment on function auto_grading.teacher_update_student_metadata(uuid, text, text, text, text, text, text)
-  is '학생 메타정보 수정. student_code는 변경 불가. phone·address는 null 저장 가능(지움 반영).';
+comment on function auto_grading.teacher_update_student_metadata(uuid, text, text, text, text, text, text, text)
+  is '학생 메타정보 수정. student_code는 변경 불가. phone·address·address_detail은 null 저장 가능(지움 반영).';
 
 
 -- ----------------------------------------------------------------
