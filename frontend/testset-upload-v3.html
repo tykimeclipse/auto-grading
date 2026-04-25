@@ -231,14 +231,6 @@
         color: var(--muted);
         line-height: 1.5;
       }
-      details {
-        margin-bottom: 16px;
-      }
-      details summary {
-        cursor: pointer;
-        font-weight: 700;
-        margin-bottom: 12px;
-      }
       .result-box {
         margin-top: 12px;
         border: 1px solid var(--line);
@@ -295,40 +287,6 @@
         </div>
         <div class="badge">실작동 버전</div>
       </div>
-      <details>
-        <summary>Supabase 연결 설정</summary>
-        <div class="panel">
-          <div class="form-grid">
-            <div class="field wide">
-              <label for="supabaseUrl">Supabase URL</label
-              ><input
-                id="supabaseUrl"
-                type="text"
-                placeholder="https://xxxxx.supabase.co"
-              />
-            </div>
-            <div class="field wide">
-              <label for="supabaseAnonKey">Supabase Anon Key</label
-              ><textarea
-                id="supabaseAnonKey"
-                rows="3"
-                placeholder="eyJ..."
-              ></textarea>
-            </div>
-          </div>
-          <div class="toolbar">
-            <button id="saveConfigBtn" type="button">연결정보 저장</button>
-            <button id="connectBtn" class="soft" type="button">DB 연결 확인</button>
-            <button id="reloadUnitsBtn" type="button">단원 다시 불러오기</button>
-          </div>
-          <div id="connectStatus" class="status info"></div>
-          <div class="mini">
-            브라우저 localStorage에 저장됩니다. 현재 페이지는
-            auto_grading.curriculum_units 조회와
-            auto_grading.create_test_set_from_json RPC 호출을 사용합니다.
-          </div>
-        </div>
-      </details>
       <div class="grid">
         <div class="panel">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -513,7 +471,6 @@
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="admin-auth.js"></script>
     <script>
-      const STORAGE_KEY = "ag_testset_supabase_config_v2";
       const $ = (id) => document.getElementById(id);
 
       const state = {
@@ -599,39 +556,6 @@
       function formatGradeLabel(code) {
         const map = { M1: "중1", M2: "중2", M3: "중3", H1: "고1", H2: "고2", H3: "고3" };
         return map[code] || code || "-";
-      }
-
-      function loadConfig() {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if (!raw) return;
-          const saved = JSON.parse(raw);
-          $("supabaseUrl").value = saved.url || "";
-          $("supabaseAnonKey").value = saved.anonKey || "";
-        } catch (err) {
-          console.warn("saved config load failed", err);
-        }
-      }
-
-      function saveConfig() {
-        const payload = {
-          url: $("supabaseUrl").value.trim(),
-          anonKey: $("supabaseAnonKey").value.trim(),
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-        setStatus("연결정보를 저장했습니다.", "ok", "connectStatus");
-      }
-
-      function createClientOrThrow() {
-        const url = $("supabaseUrl").value.trim();
-        const anonKey = $("supabaseAnonKey").value.trim();
-        if (!url || !anonKey) {
-          throw new Error("Supabase URL과 Anon Key를 먼저 입력해 주세요.");
-        }
-        if (!/^https?:\/\//i.test(url)) {
-          throw new Error("Supabase URL 형식이 올바르지 않습니다.");
-        }
-        return window.supabase.createClient(url, anonKey);
       }
 
       function normalizeUnitCode(value) {
@@ -875,30 +799,6 @@
         updateSummary();
       }
 
-      async function connectAndLoadUnits() {
-        try {
-          saveConfig();
-          state.supabase = createClientOrThrow();
-          setStatus("curriculum_units를 불러오는 중입니다.", "info", "connectStatus");
-          const { data, error } = await state.supabase
-            .schema("auto_grading")
-            .from("curriculum_units")
-            .select("curriculum_version,grade_level,subject,unit_code,unit_level,major_unit_code,major_unit_name,minor_unit_code,minor_unit_name,nano_unit_code,nano_unit_name,is_active")
-            .eq("is_active", true)
-            .order("grade_level", { ascending: true })
-            .order("curriculum_version", { ascending: false })
-            .order("subject", { ascending: true })
-            .order("unit_code", { ascending: true });
-          if (error) throw error;
-          state.units = Array.isArray(data) ? data : [];
-          refreshSubjectOptionsFromUnits();
-          syncSelectorsFromUnitCode();
-          setStatus(`DB 연결 완료. curriculum_units ${state.units.length}건을 불러왔습니다.`, "ok", "connectStatus");
-        } catch (err) {
-          setStatus(normalizeError(err), "error", "connectStatus");
-        }
-      }
-
       function buildSummaryRegistrationKey() {
         const title = $("title").value.trim() || "(제목 없음)";
         const curriculumVersion = $("curriculumVersion").value || "-";
@@ -1019,9 +919,6 @@
 
       async function uploadTestSet() {
         try {
-          if (!state.supabase) {
-            state.supabase = createClientOrThrow();
-          }
           const rows = await validateCsvOnly();
           const payload = buildRpcPayload();
           const btn = $("uploadBtn");
@@ -1068,7 +965,6 @@
         $("resultBox").style.display = "none";
         $("resultBox").textContent = "";
         setStatus("", "info");
-        setStatus("", "info", "connectStatus");
         if (state.units.length) {
           refreshSubjectOptionsFromUnits();
           syncSelectorsFromUnitCode();
@@ -1134,10 +1030,6 @@
       }
 
       async function searchTestSet() {
-        if (!state.supabase) {
-          try { state.supabase = createClientOrThrow(); }
-          catch (err) { setStatus(normalizeError(err), "error"); return; }
-        }
         const unitCode = normalizeUnitCode($("unitCode").value);
         if (!/^\d{3}$/.test(unitCode)) {
           setStatus("단원 코드는 3자리 숫자로 입력해 주세요.", "error");
@@ -1278,9 +1170,6 @@
       // ───────────────────────────────────────────────────────────────
 
       function wireEvents() {
-        $("saveConfigBtn").addEventListener("click", saveConfig);
-        $("connectBtn").addEventListener("click", connectAndLoadUnits);
-        $("reloadUnitsBtn").addEventListener("click", connectAndLoadUnits);
         $("resetBtn").addEventListener("click", () => { resetForm(); setMode("register"); });
         $("uploadBtn").addEventListener("click", uploadTestSet);
 
@@ -1334,12 +1223,28 @@
 
       async function init() {
         if (!await requireAuth()) return;
-        loadConfig();
+        state.supabase = window.adminSupabase;
         populateFallbackSubjects();
         refreshUnitSelectors();
-        syncSelectorsFromUnitCode();
         wireEvents();
         setMode("register");
+        try {
+          const { data, error } = await state.supabase
+            .schema("auto_grading")
+            .from("curriculum_units")
+            .select("curriculum_version,grade_level,subject,unit_code,unit_level,major_unit_code,major_unit_name,minor_unit_code,minor_unit_name,nano_unit_code,nano_unit_name,is_active")
+            .eq("is_active", true)
+            .order("grade_level", { ascending: true })
+            .order("curriculum_version", { ascending: false })
+            .order("subject", { ascending: true })
+            .order("unit_code", { ascending: true });
+          if (error) throw error;
+          state.units = Array.isArray(data) ? data : [];
+          refreshSubjectOptionsFromUnits();
+        } catch (err) {
+          setStatus(normalizeError(err), "error");
+        }
+        syncSelectorsFromUnitCode();
       }
 
       init();
