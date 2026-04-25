@@ -190,15 +190,6 @@
         <h2>등록</h2>
         <p class="section-note">필수 입력은 학생이름, 학년뿐입니다. 학생코드는 목록 기준으로 다음 번호가 자동 제안됩니다.</p>
 
-        <div class="field">
-          <label for="supabaseUrl">Supabase URL</label>
-          <input id="supabaseUrl" type="text" placeholder="https://xxxxx.supabase.co" />
-        </div>
-        <div class="field">
-          <label for="supabaseKey">Supabase Anon Key</label>
-          <input id="supabaseKey" type="password" placeholder="eyJ..." />
-        </div>
-
         <div class="row">
           <div class="field">
             <label for="studentCode">student_code</label>
@@ -251,7 +242,6 @@
         </div>
 
         <div class="toolbar">
-          <button id="connectBtn" class="btn-secondary">연결 및 목록 불러오기</button>
           <button id="createBtn" class="btn-primary">학생 등록</button>
           <button id="clearBtn" class="btn-ghost">입력 초기화</button>
         </div>
@@ -323,7 +313,7 @@
             </tr>
           </thead>
           <tbody id="studentTableBody">
-            <tr><td colspan="7" class="muted">연결 후 목록을 불러오세요.</td></tr>
+            <tr><td colspan="7" class="muted">불러오는 중...</td></tr>
           </tbody>
         </table>
       </section>
@@ -331,7 +321,6 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'ag_student_registration_v5_config';
     const state = {
       supabase: null,
       students: [],
@@ -342,23 +331,6 @@
 
     const $ = (id) => document.getElementById(id);
 
-    function saveConfig() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        url: $('supabaseUrl').value.trim(),
-        key: $('supabaseKey').value.trim()
-      }));
-    }
-
-    function loadConfig() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const cfg = JSON.parse(raw);
-        $('supabaseUrl').value = cfg.url || '';
-        $('supabaseKey').value = cfg.key || '';
-      } catch (e) {}
-    }
-
     function showStatus(el, type, message) {
       el.className = `status show ${type}`;
       el.textContent = message;
@@ -367,17 +339,6 @@
     function clearStatus(el) {
       el.className = 'status';
       el.textContent = '';
-    }
-
-    function makeClient() {
-      const url = $('supabaseUrl').value.trim();
-      const key = $('supabaseKey').value.trim();
-      if (!url || !key) {
-        throw new Error('Supabase URL과 Anon Key를 입력해 주세요.');
-      }
-      saveConfig();
-      state.supabase = window.supabase.createClient(url, key);
-      return state.supabase;
     }
 
     function calcNextCode(students) {
@@ -474,7 +435,7 @@
     }
 
     async function loadCourses() {
-      const client = state.supabase || makeClient();
+      const client = state.supabase;
       const { data, error } = await client
         .schema('auto_grading')
         .rpc('teacher_list_course_catalog', {
@@ -490,7 +451,7 @@
     }
 
     async function loadStudents() {
-      const client = state.supabase || makeClient();
+      const client = state.supabase;
       clearStatus($('listStatus'));
       showStatus($('listStatus'), 'info', '학생 목록을 불러오는 중입니다...');
 
@@ -535,7 +496,7 @@
     }
 
     async function deleteSelectedStudents() {
-      const client = state.supabase || makeClient();
+      const client = state.supabase;
       clearStatus($('listStatus'));
 
       const ids = getSelectedIds();
@@ -564,7 +525,7 @@ ${names.join('\n')}`);
     }
 
     async function createStudent() {
-      const client = state.supabase || makeClient();
+      const client = state.supabase;
       clearStatus($('formStatus'));
 
       const student_code = $('studentCode').value.trim();
@@ -667,10 +628,6 @@ ${names.join('\n')}`);
 
     async function copyAchievementLink(studentId, reissue = false) {
       const client = state.supabase;
-      if (!client) {
-        showStatus($('listStatus'), 'error', 'DB 연결 후 사용해 주세요.');
-        return;
-      }
       const rpcName = reissue
         ? 'revoke_and_reissue_student_public_token'
         : 'get_or_create_student_public_token';
@@ -697,15 +654,6 @@ ${names.join('\n')}`);
       clearStatus($('formStatus'));
       $('studentName').focus();
     }
-
-    $('connectBtn').addEventListener('click', async () => {
-      try {
-        makeClient();
-        await Promise.all([loadCourses(), loadStudents()]);
-      } catch (e) {
-        showStatus($('listStatus'), 'error', e.message || String(e));
-      }
-    });
 
     $('createBtn').addEventListener('click', async () => {
       try {
@@ -770,9 +718,13 @@ ${names.join('\n')}`);
 
     (async () => {
       if (!await requireAuth()) return;
-      loadConfig();
+      state.supabase = window.adminSupabase;
       toggleStudentCourseTypeField();
-      renderTable();
+      try {
+        await Promise.all([loadCourses(), loadStudents()]);
+      } catch (e) {
+        showStatus($('listStatus'), 'error', e.message || String(e));
+      }
     })();
   </script>
 </body>
