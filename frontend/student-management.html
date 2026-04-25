@@ -1111,14 +1111,23 @@
       $('addrResultList').innerHTML = '<li class="addr-empty">검색 중...</li>';
       $('addrPager').hidden = true;
       try {
-        const { data, error } = await state.supabase.functions.invoke('search-address', {
+        const { data, error } = await window.adminSupabase.functions.invoke('search-address', {
           body: { keyword: keyword.trim(), page }
         });
-        if (error) throw error;
+        if (error) {
+          let detail = error.message || String(error);
+          try {
+            if (error.context) {
+              const body = await error.context.json();
+              detail = body.error || body.message || JSON.stringify(body);
+            }
+          } catch (_) {}
+          throw new Error(detail);
+        }
         if (data?.error) throw new Error(data.error);
-        addrState.keyword    = keyword.trim();
-        addrState.page       = page;
-        addrState.totalCount = data.totalCount;
+        addrState.keyword      = keyword.trim();
+        addrState.page         = page;
+        addrState.totalCount   = data.totalCount;
         addrState.countPerPage = data.countPerPage || 10;
         renderAddrResults(data);
       } catch (err) {
