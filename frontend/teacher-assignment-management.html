@@ -85,7 +85,6 @@
     .editor-box{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
     .editor-box input{min-height:34px;padding:6px 8px}
     .editor-box .mini-note{font-size:11px;color:var(--muted)}
-    .result-box{margin-top:12px;border:1px solid var(--line);background:#f8fafc;border-radius:10px;padding:12px;font-size:12px;overflow:auto;white-space:pre-wrap;max-height:260px}
     @media (max-width:1400px){
       .list-head,.list-row{min-width:1700px}
       .list-card{overflow-x:auto}
@@ -176,7 +175,6 @@
           </div>
           <div id="assignmentListBody"></div>
         </div>
-        <pre id="debugBox" class="result-box" style="display:none;"></pre>
       </div>
     </section>
   </div>
@@ -385,8 +383,6 @@
           closeMessage = ' 숙제를 닫았습니다.';
         }
         state.editingAssignmentId = null;
-        $('debugBox').style.display = 'block';
-        $('debugBox').textContent = JSON.stringify({ payload, response: data }, null, 2);
         const percentText = total > 0 ? Math.round((correct / total) * 100) : 0;
         setStatus('assignmentStatus', `최종점수를 저장했습니다. (${correct}/${total} · ${percentText}%)${closeMessage}`, 'ok');
         await loadAssignments();
@@ -412,8 +408,6 @@
         });
         if (error) throw error;
         ensureRpcOk(data, '확정 처리에 실패했습니다.');
-        $('debugBox').style.display = 'block';
-        $('debugBox').textContent = JSON.stringify(data, null, 2);
         setStatus('assignmentStatus', `최종 성취도를 확정하고 종료했습니다. (${r2Correct}/${r2Total}문항 · ${r2Pct}%)`, 'ok');
         await loadAssignments();
       } catch (err) {
@@ -438,8 +432,6 @@
         if (error) throw error;
         ensureRpcOk(data, '2차 초기화에 실패했습니다.');
         state.resetingAssignmentId = null;
-        $('debugBox').style.display = 'block';
-        $('debugBox').textContent = JSON.stringify(data, null, 2);
         setStatus('assignmentStatus', '2차 입력 초기화 완료. 학생이 OMR 화면을 새로고침하도록 안내하세요.', 'ok');
         await loadAssignments();
       } catch (err) {
@@ -466,8 +458,6 @@
         if (error) throw error;
         ensureRpcOk(data, '전체 초기화에 실패했습니다.');
         state.resetingAssignmentId = null;
-        $('debugBox').style.display = 'block';
-        $('debugBox').textContent = JSON.stringify(data, null, 2);
         setStatus('assignmentStatus', '전체 초기화 완료. 학생이 OMR 화면을 새로고침하도록 안내하세요.', 'ok');
         await loadAssignments();
       } catch (err) {
@@ -483,8 +473,6 @@
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_set_assignment_open_state', payload);
         if (error) throw error;
         ensureRpcOk(data, 'assignment 상태 변경에 실패했습니다.');
-        $('debugBox').style.display = 'block';
-        $('debugBox').textContent = JSON.stringify({ payload, response: data }, null, 2);
         setStatus('assignmentStatus', `assignment를 ${isOpen ? '열림' : '닫힘'} 상태로 변경했습니다.`, 'ok');
         await loadAssignments();
       } catch (err) {
@@ -525,8 +513,6 @@
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_assignments', params);
         if (error) throw error;
         state.assignments = Array.isArray(data) ? data : [];
-        $('debugBox').style.display = 'block';
-        $('debugBox').textContent = JSON.stringify({ request: params, rows: state.assignments.slice(0,3) }, null, 2);
         renderAssignmentList();
         setStatus('assignmentStatus', `assignment ${state.assignments.length}건을 불러왔습니다.`, 'ok');
       } catch (err) {
