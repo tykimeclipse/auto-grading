@@ -98,7 +98,6 @@
     .status.error { display:block; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
     .status.info { display:block; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
     .code-box { border:1px dashed #93c5fd; background:#eff6ff; border-radius:12px; padding:12px; font-size:14px; color:#1e3a8a; line-height:1.55; }
-    .result-box { margin-top:12px; border:1px solid var(--line); background:#f8fafc; border-radius:10px; padding:12px; font-size:12px; overflow:auto; white-space:pre-wrap; max-height:280px; }
     @media (max-width:1280px) {
       .layout,.subgrid { grid-template-columns:1fr; }
       .list-head,.list-row { grid-template-columns:76px minmax(0,2fr) 70px 50px minmax(180px,1.35fr) 56px; gap:6px; padding:12px 8px; font-size:12px; }
@@ -355,7 +354,6 @@
               <button id="clearSelectedStudentsBtn" class="btn-secondary" type="button">선택 해제</button>
             </div>
             <div id="issueStatus" class="status info"></div>
-            <pre id="issueResultBox" class="result-box" style="display:none;"></pre>
           </div>
         </section>
       </div>
@@ -852,14 +850,10 @@
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_issue_assignments', payload);
         if (error) throw error;
         setStatus('issueStatus', `발행 처리 완료\ncreated: ${data?.created_count ?? 0}\nreopened: ${data?.reopened_count ?? 0}\nskipped_existing_open: ${data?.skipped_existing_open_count ?? 0}\nskipped_existing_closed: ${data?.skipped_existing_closed_count ?? 0}`, 'ok');
-        $('issueResultBox').style.display = 'block';
-        $('issueResultBox').textContent = JSON.stringify({ payload, response: data }, null, 2);
         await Promise.all([loadStudents(), loadAssignments(), loadTestOverview(state.selectedTestSetId)]);
         renderSelectedTest();
       } catch (err) {
         setStatus('issueStatus', normalizeError(err), 'error');
-        $('issueResultBox').style.display = 'block';
-        $('issueResultBox').textContent = JSON.stringify({ error: normalizeError(err) }, null, 2);
       }
     }
 
