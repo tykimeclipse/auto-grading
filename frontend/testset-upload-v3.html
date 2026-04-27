@@ -231,17 +231,6 @@
         color: var(--muted);
         line-height: 1.5;
       }
-      .result-box {
-        margin-top: 12px;
-        border: 1px solid var(--line);
-        background: #f8fafc;
-        border-radius: 10px;
-        padding: 12px;
-        font-size: 12px;
-        overflow: auto;
-        white-space: pre-wrap;
-        display: none;
-      }
       .mode-banner {
         padding: 10px 14px;
         border-radius: 10px;
@@ -407,7 +396,6 @@
             <button id="searchExecBtn" class="primary" type="button" style="display:none">검색 실행</button>
           </div>
           <div id="statusBox" class="status info"></div>
-          <pre id="resultBox" class="result-box"></pre>
         </div>
         <div class="panel">
           <h2 id="rightPanelTitle">등록 요약</h2>
@@ -936,14 +924,10 @@
             if (data.message) parts.push(`message: ${data.message}`);
           }
           setStatus(parts.join("\n"), "ok");
-          $("resultBox").style.display = "block";
-          $("resultBox").textContent = JSON.stringify({ payload, response: data }, null, 2);
           btn.disabled = false;
           btn.textContent = prev;
         } catch (err) {
           setStatus(normalizeError(err), "error");
-          $("resultBox").style.display = "block";
-          $("resultBox").textContent = JSON.stringify({ error: normalizeError(err) }, null, 2);
           $("uploadBtn").disabled = false;
           $("uploadBtn").textContent = "문제지 등록";
         }
@@ -962,8 +946,6 @@
         $("csvFile").value = "";
         state.csvRows = [];
         state.csvFileName = "";
-        $("resultBox").style.display = "none";
-        $("resultBox").textContent = "";
         setStatus("", "info");
         if (state.units.length) {
           refreshSubjectOptionsFromUnits();
@@ -1146,8 +1128,6 @@
           if (data && data.ok === false) throw new Error(data.error || "저장 실패");
           success = true;
           setStatus(`저장 완료: ${data.title || title}`, "ok");
-          $("resultBox").style.display = "block";
-          $("resultBox").textContent = JSON.stringify(data, null, 2);
           state.foundTestSet = null;
           btn.textContent = "저장 완료";
           btn.disabled = true;
