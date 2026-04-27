@@ -225,17 +225,6 @@
         border: 1px solid #dbe3f0;
         background: #f8fafc;
       }
-      .result-box {
-        margin-top: 12px;
-        border: 1px solid var(--line);
-        background: #f8fafc;
-        border-radius: 10px;
-        padding: 12px;
-        font-size: 12px;
-        overflow: auto;
-        white-space: pre-wrap;
-        display: none;
-      }
       @media (max-width: 980px) {
         .grid {
           grid-template-columns: 1fr;
@@ -314,7 +303,6 @@
           </div>
 
           <div id="statusBox" class="status info"></div>
-          <pre id="resultBox" class="result-box"></pre>
 
           <div class="table-wrap">
             <table>
@@ -656,20 +644,8 @@
             `업로드 완료\n입력 호출 ${state.parsedRows.length}건\n예상 계층 row ${state.stats?.totalCount || 0}건`,
             "ok"
           );
-          $("resultBox").style.display = "block";
-          $("resultBox").textContent = JSON.stringify({
-            meta: {
-              grade_level: gradeLevel,
-              curriculum_version: curriculumVersion,
-              subject,
-            },
-            stats: state.stats,
-            sample_responses: responses.slice(0, 10),
-          }, null, 2);
         } catch (err) {
           setStatus(normalizeError(err), "error");
-          $("resultBox").style.display = "block";
-          $("resultBox").textContent = JSON.stringify({ error: normalizeError(err) }, null, 2);
         }
       }
 
@@ -678,8 +654,6 @@
         state.parsedRows = [];
         state.stats = null;
         $("previewBody").innerHTML = '<tr><td colspan="6" class="mini">CSV를 선택하고 `CSV 해석 미리보기`를 눌러 주세요.</td></tr>';
-        $("resultBox").style.display = "none";
-        $("resultBox").textContent = "";
         setStatus("", "info");
         updateSummary();
       }
