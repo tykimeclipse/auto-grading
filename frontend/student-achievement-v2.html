@@ -324,11 +324,11 @@
         return row ?? null;
       }
 
-      async function fetchStats(studentCode) {
+      async function fetchStats(token) {
         const { data, error } = await supabase
           .schema("auto_grading")
-          .rpc("get_student_stats_by_code", {
-            p_student_code: studentCode,
+          .rpc("get_student_stats_by_token", {
+            p_token: token,
           });
 
         if (error) throw error;
@@ -340,11 +340,11 @@
         return data ?? null;
       }
 
-      async function fetchHistory(studentCode) {
+      async function fetchHistory(token) {
         const { data, error } = await supabase
           .schema("auto_grading")
-          .rpc("get_student_assignment_history_by_code", {
-            p_student_code: studentCode,
+          .rpc("get_student_assignment_history_by_token", {
+            p_token: token,
             p_limit: 200,
           });
 
@@ -418,6 +418,9 @@
 
       function normalizeErrorMessage(err) {
         const msg = err?.message || "";
+        if (msg.includes("unauthorized")) {
+          return "유효하지 않은 링크입니다. 선생님께 새 링크를 요청해 주세요.";
+        }
         if (msg.includes("등록되지 않은 학생 코드")) {
           return "조회 중 오류가 발생했습니다.";
         }
@@ -446,12 +449,10 @@
             return;
           }
 
-          const studentCode = studentInfo.student_code;
-
-          // 2단계: 학생코드로 통계·기록 조회 (기존 RPC 재활용)
+          // 2단계: 토큰으로 통계·기록 조회 (RPC 내부에서 토큰 재검증)
           const [stats, history] = await Promise.all([
-            fetchStats(studentCode),
-            fetchHistory(studentCode),
+            fetchStats(token),
+            fetchHistory(token),
           ]);
 
           studentNameEl.textContent = studentInfo.name || "이름 없음";

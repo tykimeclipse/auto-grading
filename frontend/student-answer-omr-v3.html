@@ -711,7 +711,9 @@
                 roundBadge.classList.remove('hidden');
 
                 gateInline.classList.add('hidden');
-                statsRow.classList.remove('hidden');
+                // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 패널 임시 숨김.
+                // statsRow.classList.remove('hidden');
+                statsRow.classList.add('hidden');
             } else {
                 studentNameEl.classList.add('hidden');
                 studentNameEl.textContent = '';
@@ -735,7 +737,8 @@
 
         function hideGateInline() {
             document.getElementById('gateInline').classList.add('hidden');
-            document.getElementById('studentStats').classList.remove('hidden');
+            // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 패널 임시 숨김.
+            // document.getElementById('studentStats').classList.remove('hidden');
             document.getElementById('roundBadge').classList.remove('hidden');
             document.getElementById('examShell').classList.remove('hidden');
         }
@@ -1384,7 +1387,8 @@
                     applyRound1Result(result);
                 }
 
-                await loadStudentStats();
+                // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 조회 임시 비활성화.
+                // await loadStudentStats();
                 success = true;
                 logDebug('submit result', result);
             } catch (err) {
@@ -1421,7 +1425,8 @@
             try {
                 await startAttempt();
                 restoreLocalAnswers();
-                await loadStudentStats();
+                // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 조회 임시 비활성화.
+                // await loadStudentStats();
                 hideGateInline();
                 renderPage();
             } catch (err) {
@@ -1471,7 +1476,8 @@
                 try {
                     await startAttempt();
                     restoreLocalAnswers();
-                    await loadStudentStats();
+                    // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 조회 임시 비활성화.
+                    // await loadStudentStats();
                     hideGateInline();
                     renderPage();
                 } catch (err) {

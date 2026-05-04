@@ -1,6 +1,8 @@
 ﻿# environment
 .env
 .env.local
+docs/handoff*.md
+
 
 # node
 node_modules/
