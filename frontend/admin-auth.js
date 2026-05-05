@@ -12,7 +12,7 @@
 // ================================================================
 
 const ADMIN_SUPABASE_URL      = 'https://gspsquuyqkydqphbcuel.supabase.co';
-const ADMIN_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzcHNxdXV5cWt5ZHFwaGJjdWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTg5NDgsImV4cCI6MjA4ODA3NDk0OH0.9oqcUTNQpL9oFQ13hUkM5MN7KA2kW79RC3CPI4WZP7I';
+const ADMIN_SUPABASE_ANON_KEY = 'sb_publishable_osq8Sjog7qDEiZ3A8toJ6Q_TQ3ATAt6';
 
 // 허용된 관리자 이메일 목록
 const ALLOWED_ADMIN_EMAILS = [
