@@ -372,6 +372,13 @@
       return course.course_name || course.course_code || '-';
     }
 
+    function getSelectedCourseFilterLabel() {
+      const courseId = $('courseFilter').value;
+      if (!courseId) return '';
+      const course = state.courses.find(c => String(c.course_id) === String(courseId));
+      return courseLabel(course).toLowerCase();
+    }
+
     function toggleStudentCourseTypeField() {
       const hasCourse = Boolean($('courseId').value);
       $('studentCourseType').disabled = !hasCourse;
@@ -425,10 +432,13 @@
       const q = $('searchInput').value.trim().toLowerCase();
       const grade = $('gradeFilter').value;
       const courseId = $('courseFilter').value;
+      const courseName = getSelectedCourseFilterLabel();
       state.filtered = state.students.filter(s => {
         const hitQ = !q || String(s.student_code || '').toLowerCase().includes(q) || String(s.name || '').toLowerCase().includes(q);
         const hitGrade = !grade || s.grade_level === grade;
-        const hitCourse = !courseId || (Array.isArray(s.active_course_ids) && s.active_course_ids.includes(courseId));
+        const hitCourse = !courseId
+          || (Array.isArray(s.active_course_ids) && s.active_course_ids.includes(courseId))
+          || (courseName && String(s.course_names || '').toLowerCase().includes(courseName));
         return hitQ && hitGrade && hitCourse;
       });
       renderTable();
@@ -457,35 +467,26 @@
 
       const { data, error } = await client
         .schema('auto_grading')
-        .from('students')
-        .select('id, student_code, name, grade_level, is_active, created_at, updated_at, student_no')
-        .order('student_code', { ascending: true });
+        .rpc('teacher_list_students_for_management');
 
       if (error) throw error;
-      const { data: links, error: linksError } = await client
-        .schema('auto_grading')
-        .from('student_courses')
-        .select('student_id, course_id, student_course_type, is_active, courses(course_name, course_code)')
-        .eq('is_active', true);
+      if (data?.ok === false) throw new Error(data.error || '학생 목록 로드 실패');
 
-      if (linksError) throw linksError;
-
-      const byStudent = new Map();
-      (links || []).forEach(link => {
-        const list = byStudent.get(link.student_id) || [];
-        list.push(link);
-        byStudent.set(link.student_id, list);
-      });
-
-      state.students = (data || []).map(student => {
-        const activeLinks = byStudent.get(student.id) || [];
-        return {
-          ...student,
-          active_course_ids: activeLinks.map(link => link.course_id).filter(Boolean),
-          course_names: activeLinks.map(link => courseLabel(link.courses)).filter(Boolean).join(', '),
-          student_course_types: [...new Set(activeLinks.map(link => link.student_course_type).filter(Boolean))].join(', ')
-        };
-      });
+      const rows = Array.isArray(data) ? data : (data ? [data] : []);
+      state.students = rows
+        .filter(row => row && row.ok !== false)
+        .map(student => {
+          const activeCourseIds = Array.isArray(student.active_course_ids)
+            ? student.active_course_ids.map(String)
+            : [];
+          return {
+            ...student,
+            active_course_ids: activeCourseIds,
+            course_names: student.course_names || '-',
+            student_course_types: student.student_course_types || ''
+          };
+        });
+      state.students.sort((a, b) => String(a.student_code || '').localeCompare(String(b.student_code || ''), undefined, { numeric: true }));
       state.nextCode = calcNextCode(state.students);
       applyFilters();
       showStatus($('listStatus'), 'ok', `학생 ${state.students.length}명을 불러왔습니다.`);
@@ -512,15 +513,21 @@ ${names.join('\n')}`);
 
       showStatus($('listStatus'), 'info', `학생 ${ids.length}명을 삭제하는 중입니다...`);
 
-      const { error } = await client
-        .schema('auto_grading')
-        .from('students')
-        .delete()
-        .in('id', ids);
-
-      if (error) throw error;
+      const results = [];
+      for (const id of ids) {
+        const { data, error } = await client
+          .schema('auto_grading')
+          .rpc('teacher_delete_student_safely', { p_student_id: id });
+        if (error) results.push({ id, ok: false, error: error.message });
+        else if (data?.ok === false) results.push({ id, ok: false, error: data.error || '삭제 실패' });
+        else results.push({ id, ok: true });
+      }
 
       await loadStudents();
+      const failed = results.filter(r => !r.ok);
+      if (failed.length) {
+        throw new Error(`일부 학생 삭제가 차단/실패했습니다.\n${failed.map(r => `- ${r.error}`).join('\n')}`);
+      }
       showStatus($('listStatus'), 'ok', `학생 ${ids.length}명을 삭제했습니다.`);
     }
 
@@ -580,17 +587,16 @@ ${names.join('\n')}`);
 
       try {
         if (course_id) {
-          const { error: courseLinkError } = await client
+          const { data: courseLinkData, error: courseLinkError } = await client
             .schema('auto_grading')
-            .from('student_courses')
-            .insert({
-              student_id: data.id,
-              course_id,
-              student_course_type,
-              is_active: true
+            .rpc('teacher_attach_student_to_course', {
+              p_student_id: data.id,
+              p_course_id: course_id,
+              p_service_type: student_course_type
             });
 
           if (courseLinkError) throw courseLinkError;
+          if (courseLinkData?.ok === false) throw new Error(courseLinkData.error || '강좌 연결에 실패했습니다.');
         }
       } catch (linkErr) {
         await client.schema('auto_grading').from('students').delete().eq('id', data.id);
