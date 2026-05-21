@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>오답노트 보기</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --brand: #5b3df0;
+      --brand-soft: #f3f0ff;
+      --brand-line: #c7bfff;
+      --danger: #b42318;
+      --ok: #18794e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      --footer-h: 84px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.4;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 14px 14px calc(var(--footer-h) + 18px);
+    }
+    .topbar { margin-bottom: 14px; }
+    .title { font-size: 20px; font-weight: 800; margin: 0 0 8px; }
+    .meta {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+    }
+    .meta-line { color: var(--muted); margin: 2px 0; }
+    .meta-line strong { color: var(--text); font-weight: 700; }
+
+    .status-chip {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-left: 6px;
+    }
+    .status-draft     { background: #fff8e6; color: #946800; }
+    .status-submitted { background: #e6f4ec; color: var(--ok); }
+    .status-archived  { background: #eeeeee; color: #555; }
+
+    #messageArea { margin-bottom: 12px; }
+    .alert-box, .info-box, .loading-box {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      text-align: center;
+    }
+    .alert-box  { color: var(--danger); border: 1px solid #f4b8b0; }
+    .info-box   { color: var(--muted); }
+    .loading-box{ color: var(--muted); }
+
+    .content { margin-top: 12px; }
+    .section-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--muted);
+      margin: 4px 2px 8px;
+    }
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 380px) {
+      .image-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .img-card {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #eee;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+    }
+    .img-card img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .img-card .order-badge {
+      position: absolute;
+      top: 6px; left: 6px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .empty-hint {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 22px 14px;
+      box-shadow: var(--shadow);
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: var(--footer-h);
+      background: var(--panel);
+      border-top: 1px solid var(--line);
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      z-index: 20;
+    }
+    .footer .inner {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      gap: 10px;
+    }
+    .btn-secondary, .btn-primary {
+      flex: 1;
+      height: 52px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-secondary { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--brand-line); }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:disabled { background: #c0b7f4; cursor: default; }
+
+    .lightbox {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 50;
+      padding: 20px;
+    }
+    .lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <h1 class="title">오답노트 보기</h1>
+      <div class="meta">
+        <div id="studentLine" class="meta-line">-</div>
+        <div id="testLine"    class="meta-line">-</div>
+        <div id="unitLine"    class="meta-line">-</div>
+        <div id="statusLine"  class="meta-line">-</div>
+        <div id="dateLine"    class="meta-line">-</div>
+      </div>
+    </header>
+
+    <div id="messageArea"></div>
+
+    <main id="contentArea" class="content" style="display:none;">
+      <div class="section-label">촬영한 사진</div>
+      <div id="imageGrid" class="image-grid"></div>
+      <div id="emptyHint" class="empty-hint" style="display:none;">
+        등록된 사진이 없습니다.
+      </div>
+    </main>
+  </div>
+
+  <footer id="footer" class="footer" style="display:none;">
+    <div class="inner">
+      <button type="button" id="listBtn"    class="btn-secondary">목록으로</button>
+      <button type="button" id="actionBtn"  class="btn-primary"></button>
+    </div>
+  </footer>
+
+  <div id="lightbox" class="lightbox hidden">
+    <img id="lightboxImg" src="" alt="" />
+  </div>
+
+  <script src="app-config.js"></script>
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+    const SUPABASE_URL      = "https://gspsquuyqkydqphbcuel.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_osq8Sjog7qDEiZ3A8toJ6Q_TQ3ATAt6";
+
+    // 파일서버 주소는 app-config.js (window.APP_CONFIG) 에서 주입.
+    const FILE_SERVER_URL = window.APP_CONFIG?.FILE_SERVER_URL || "http://localhost:8787";
+    if (!window.APP_CONFIG) {
+      console.error("[app-config] app-config.js 미로드 — localhost 로 fallback 되었습니다.");
+    } else {
+      window.APP_CONFIG.warnIfMisconfigured?.();
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    const state = { token: null, noteId: null, note: null, images: [] };
+
+    const params = new URLSearchParams(location.search);
+    state.token  = (params.get('token')   || '').trim();
+    state.noteId = (params.get('note_id') || '').trim();
+
+    const messageArea = document.getElementById('messageArea');
+    const contentArea = document.getElementById('contentArea');
+    const footer      = document.getElementById('footer');
+    const imageGrid   = document.getElementById('imageGrid');
+    const emptyHint   = document.getElementById('emptyHint');
+    const studentLine = document.getElementById('studentLine');
+    const testLine    = document.getElementById('testLine');
+    const unitLine    = document.getElementById('unitLine');
+    const statusLine  = document.getElementById('statusLine');
+    const dateLine    = document.getElementById('dateLine');
+    const listBtn     = document.getElementById('listBtn');
+    const actionBtn   = document.getElementById('actionBtn');
+    const lightbox    = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+
+    if (!UUID_RE.test(state.token) || !UUID_RE.test(state.noteId)) {
+      showAlert('유효하지 않은 링크입니다. 선생님께 새 링크를 요청해 주세요.');
+    } else {
+      init();
+    }
+
+    async function init() {
+      showLoading('불러오는 중입니다...');
+      try {
+        await loadNote();
+        clearMessage();
+        contentArea.style.display = 'block';
+        footer.style.display = 'flex';
+        render();
+        listBtn.addEventListener('click', goToList);
+        lightbox.addEventListener('click', closeLightbox);
+      } catch (err) {
+        console.error(err);
+        showAlert(err?.message || '오답노트를 불러오지 못했습니다.');
+      }
+    }
+
+    async function loadNote() {
+      const { data, error } = await supabase
+        .schema('auto_grading')
+        .rpc('get_mistake_note_detail_by_token', {
+          p_token:   state.token,
+          p_note_id: state.noteId,
+        });
+      if (error) throw error;
+      const result = unwrap(data);
+      if (!result || result.ok !== true) {
+        throw new Error(errorToMessage(result && result.error)
+          || '오답노트를 불러오지 못했습니다.');
+      }
+      state.note   = result.note;
+      state.images = Array.isArray(result.images) ? result.images : [];
+    }
+
+    function render() {
+      const n = state.note;
+      studentLine.innerHTML = `<strong>학생</strong> ${escapeHtml(n.student_name || '-')} (${escapeHtml(n.student_code || '-')})`;
+      testLine.innerHTML    = `<strong>시험</strong> ${escapeHtml(n.test_title || '-')}`;
+      unitLine.innerHTML    = `<strong>단원</strong> ${escapeHtml(n.unit_title_snapshot || '-')}`;
+      statusLine.innerHTML  = `<strong>상태</strong> ${statusChip(n.status)} 사진 ${state.images.length}장`;
+      dateLine.innerHTML    = `<strong>작성일</strong> ${formatDate(n.created_at)}`;
+
+      imageGrid.replaceChildren();
+      if (!state.images.length) {
+        emptyHint.style.display = 'block';
+        imageGrid.style.display = 'none';
+      } else {
+        emptyHint.style.display = 'none';
+        imageGrid.style.display = 'grid';
+        state.images.forEach((img, idx) => {
+          imageGrid.appendChild(buildImageCard(img, idx));
+        });
+      }
+
+      // 상태별 주 액션 버튼
+      if (n.status === 'draft') {
+        actionBtn.textContent = '작성 계속하기';
+        actionBtn.disabled = false;
+        actionBtn.onclick = goToWrite;
+      } else if (n.status === 'submitted') {
+        actionBtn.textContent = 'PDF 다운로드';
+        actionBtn.disabled = false;
+        actionBtn.onclick = handleDownloadPdf;
+      } else {
+        // archived
+        actionBtn.textContent = '보관된 노트';
+        actionBtn.disabled = true;
+        actionBtn.onclick = null;
+      }
+    }
+
+    function buildImageCard(img, idx) {
+      const card = document.createElement('div');
+      card.className = 'img-card';
+
+      const im = document.createElement('img');
+      im.src = fileUrl(img.thumbnail_key || img.file_key);
+      im.alt = `사진 ${idx + 1}`;
+      im.loading = 'lazy';
+      card.appendChild(im);
+
+      const order = document.createElement('div');
+      order.className = 'order-badge';
+      order.textContent = `${idx + 1}`;
+      card.appendChild(order);
+
+      card.addEventListener('click', () => openLightbox(fileUrl(img.file_key)));
+      return card;
+    }
+
+    function fileUrl(key) {
+      return `${FILE_SERVER_URL}/file/${key}?token=${encodeURIComponent(state.token)}`;
+    }
+
+    function goToList() {
+      const url = new URL(location.href);
+      const base = url.pathname.replace(/[^/]+$/, 'mistake-note-list-v1.html');
+      location.href = `${url.origin}${base}?token=${encodeURIComponent(state.token)}`;
+    }
+
+    function goToWrite() {
+      const url = new URL(location.href);
+      const base = url.pathname.replace(/[^/]+$/, 'mistake-note-write-v1.html');
+      location.href = `${url.origin}${base}`
+        + `?token=${encodeURIComponent(state.token)}`
+        + `&note_id=${encodeURIComponent(state.noteId)}`;
+    }
+
+    async function handleDownloadPdf() {
+      const prev = actionBtn.textContent;
+      actionBtn.disabled = true;
+      actionBtn.textContent = 'PDF 생성 중...';
+      try {
+        const res = await fetch(`${FILE_SERVER_URL}/pdf`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${state.token}`,
+            'Content-Type':  'application/json',
+          },
+          body: JSON.stringify({ note_id: state.noteId }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(pdfErrorToMessage(body && body.error));
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `오답노트_${state.note.test_title || 'note'}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(err);
+        alert(err?.message || 'PDF 생성에 실패했습니다.');
+      } finally {
+        actionBtn.disabled = false;
+        actionBtn.textContent = prev;
+      }
+    }
+
+    function pdfErrorToMessage(code) {
+      switch (code) {
+        case 'forbidden':          return '인증이 만료되었습니다. 선생님께 새 링크를 요청해 주세요.';
+        case 'note_not_submitted': return '제출된 오답노트만 PDF로 만들 수 있습니다.';
+        case 'no_images':          return '사진이 없어 PDF를 만들 수 없습니다.';
+        case 'invalid_note_id':    return '노트 정보가 올바르지 않습니다.';
+        case 'pdf_failed':         return 'PDF 생성 중 오류가 발생했습니다.';
+        case 'upstream_error':     return '서버 통신 오류입니다. 잠시 후 다시 시도해 주세요.';
+        default:                   return 'PDF 생성에 실패했습니다.';
+      }
+    }
+
+    function openLightbox(url) {
+      lightboxImg.src = url;
+      lightbox.classList.remove('hidden');
+    }
+    function closeLightbox() {
+      lightbox.classList.add('hidden');
+      lightboxImg.src = '';
+    }
+
+    function statusChip(status) {
+      const label = ({ draft: '작성중', submitted: '제출됨', archived: '보관' })[status] || status;
+      return `<span class="status-chip status-${status}">${label}</span>`;
+    }
+
+    function formatDate(value) {
+      if (!value) return '-';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function unwrap(data) {
+      if (Array.isArray(data)) return data[0] ?? null;
+      return data ?? null;
+    }
+
+    function showLoading(text) {
+      contentArea.style.display = 'none';
+      footer.style.display = 'none';
+      messageArea.innerHTML = `<div class="loading-box">${escapeHtml(text)}</div>`;
+    }
+    function showAlert(text) {
+      contentArea.style.display = 'none';
+      footer.style.display = 'none';
+      messageArea.innerHTML = `<div class="alert-box">${escapeHtml(text)}</div>`;
+    }
+    function clearMessage() { messageArea.innerHTML = ''; }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    function errorToMessage(code) {
+      switch (code) {
+        case 'unauthorized':   return '인증이 만료되었습니다. 선생님께 새 링크를 요청해 주세요.';
+        case 'note_not_owned': return '본인의 오답노트만 열 수 있습니다.';
+        default:               return null;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>student-answer-omr-testset</title>
+    <title>학생 답안 입력폼</title>
     <style>
         :root {
             --bg: #f5f6f8;
@@ -53,15 +53,15 @@
         .topbar {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
             margin-bottom: 12px;
         }
 
-        .title-row {
+        .hero-row {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
-            gap: 8px;
+            gap: 12px;
         }
 
         .title-wrap {
@@ -69,6 +69,7 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
+            flex: 1;
         }
 
         .test-title {
@@ -83,21 +84,100 @@
             font-size: 12px;
         }
 
+        .student-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #374151;
+        }
+
         .round-badge {
+            display: inline-flex;
+            align-items: center;
             border: 1px solid #c6d2ff;
             background: var(--brand-soft);
             color: #16327f;
-            padding: 5px 10px;
+            padding: 8px 12px;
             border-radius: 999px;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 700;
             white-space: nowrap;
+            box-shadow: var(--shadow);
+            margin: 0 0 10px 0;
+        }
+
+        .gate-inline {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            width: 100%;
+            max-width: 420px;
+            justify-content: flex-end;
+        }
+
+        .gate-inline-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .gate-inline-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #374151;
+            text-align: left;
+        }
+
+        .gate-inline-input {
+            width: 100%;
+            min-height: 42px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 0 12px;
+            font-size: 15px;
+            background: #fff;
+            color: var(--text);
+            outline: none;
+        }
+
+        .gate-inline-input:focus {
+            border-color: var(--brand);
+            box-shadow: 0 0 0 3px rgba(31, 58, 138, 0.08);
+        }
+
+        .gate-inline-btn {
+            min-width: 96px;
+            min-height: 42px;
+            border: none;
+            border-radius: 12px;
+            background: #111827;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 800;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            padding: 0 14px;
+        }
+
+        .gate-inline-btn[disabled] {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .gate-inline-error {
+            background: #fff0f0;
+            border: 1px solid #f0b7b7;
+            color: #8b1e1e;
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 13px;
             box-shadow: var(--shadow);
         }
 
         .stats-row {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 8px;
         }
 
@@ -120,84 +200,12 @@
             font-size: 16px;
             font-weight: 800;
         }
-
-        .gate-card {
-            background: var(--panel);
-            border: 1px solid var(--line);
-            border-radius: 14px;
-            padding: 18px 16px;
-            box-shadow: var(--shadow);
-            margin-bottom: 12px;
-        }
-
-        .gate-title {
-            font-size: 18px;
-            font-weight: 800;
-            margin: 0 0 6px 0;
-        }
-
-        .gate-desc {
-            font-size: 13px;
-            color: var(--muted);
-            margin-bottom: 14px;
-        }
-
-        .gate-field {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            margin-bottom: 12px;
-        }
-
-        .gate-label {
-            font-size: 13px;
-            font-weight: 700;
-            color: #374151;
-        }
-
-        .gate-input {
-            width: 100%;
-            min-height: 46px;
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            padding: 0 14px;
-            font-size: 16px;
-            background: #fff;
-            color: var(--text);
-            outline: none;
-        }
-
-        .gate-input:focus {
-            border-color: var(--brand);
-            box-shadow: 0 0 0 3px rgba(31, 58, 138, 0.08);
-        }
-
-        .gate-btn {
-            width: 100%;
-            min-height: 48px;
-            border: none;
-            border-radius: 12px;
-            background: #111827;
-            color: #fff;
-            font-size: 16px;
-            font-weight: 800;
-            box-shadow: var(--shadow);
-            cursor: pointer;
-        }
-
-        .gate-btn[disabled] {
-            background: #9ca3af;
-            cursor: not-allowed;
-        }
-
-        .gate-error {
-            margin-top: 10px;
-            background: #fff0f0;
-            border: 1px solid #f0b7b7;
-            color: #8b1e1e;
-            border-radius: 12px;
-            padding: 10px 12px;
-            font-size: 13px;
+        .stat-icon {
+            width: 1em;
+            height: 1em;
+            margin-left: 0.18em;
+            vertical-align: -0.08em;
+            object-fit: contain;
         }
 
         .result-summary {
@@ -220,14 +228,53 @@
         }
 
         .result-title {
-            font-size: 14px;
+            font-size: 17px;
             font-weight: 800;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
 
         .result-line {
+            font-size: 14px;
+            margin-top: 4px;
+            line-height: 1.5;
+        }
+
+        .result-score-line {
+            font-size: 15px;
+        }
+
+        .result-line strong {
+            font-weight: 800;
+            color: inherit;
+        }
+
+        .mistake-note-cta {
+            margin-top: 14px;
+            padding: 14px;
+            background: #f3f0ff;
+            border: 1px solid #c7bfff;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .btn-mistake-note {
+            background: #5b3df0;
+            color: #ffffff;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-mistake-note:hover { background: #4a2fe0; }
+        .btn-mistake-note:disabled { background: #9b91d0; cursor: default; }
+
+        .mistake-note-hint {
+            margin-top: 8px;
             font-size: 13px;
-            margin-top: 2px;
+            color: #5b5b8a;
         }
 
         .result-line.negative {
@@ -378,18 +425,52 @@
             line-height: 1.45;
         }
 
+        @media (max-width: 760px) {
+            .hero-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .gate-inline {
+                max-width: none;
+            }
+            .stats-row { 
+                grid-template-columns: repeat(2, minmax(0, 1fr)); 
+            }
+        }
+
         @media (max-width: 420px) {
             .page {
                 padding-left: 10px;
                 padding-right: 10px;
             }
 
+            .result-title {
+                font-size: 16px;
+            }
+
+            .result-line {
+                font-size: 14px;
+            }
+
+            .result-score-line {
+                font-size: 15px;
+            }
+
             .stats-row {
-                gap: 6px;
+                gap: 5px;
             }
 
             .stat-card {
-                padding: 8px;
+                padding: 6px 5px;
+            }
+
+            .stat-label {
+                font-size: 9px;
+            }
+
+            .stat-value {
+                font-size: 13px;
             }
 
             .omr-row {
@@ -406,6 +487,15 @@
                 min-height: 31px;
                 font-size: 13px;
             }
+
+            .gate-inline {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .gate-inline-btn {
+                width: 100%;
+            }
         }
 
         @media (min-width: 820px) {
@@ -420,45 +510,48 @@
 <body>
     <div id="app" class="page">
         <header class="topbar">
-            <div class="title-row">
+            <div class="hero-row">
                 <div class="title-wrap">
                     <h1 id="testTitle" class="test-title">OMR 입력</h1>
-                    <div id="subline" class="subline">문제지는 종이로 보고, 이 화면에는 답만 입력합니다.</div>
+                    <div id="subline" class="subline">문제를 먼저 풀고, 정답을 입력합니다.</div>
+                    <div id="studentName" class="student-name hidden"></div>
                 </div>
-                <div id="roundBadge" class="round-badge" aria-label="현재 상태: 1차 입력">1차 입력</div>
+
+                <div id="gateInline" class="gate-inline">
+                    <div class="gate-inline-field">
+                        <label for="studentCodeInput" class="gate-inline-label">학생 코드</label>
+                        <input id="studentCodeInput" class="gate-inline-input" type="text" inputmode="text"
+                            autocomplete="off" autocapitalize="characters" placeholder="예: S004" />
+                    </div>
+                    <button id="startExamBtn" class="gate-inline-btn" type="button">시작</button>
+                </div>
+
             </div>
 
-            <div id="studentStats" class="stats-row">
+            <div id="gateError" class="gate-inline-error hidden"></div>
+
+            <div id="studentStats" class="stats-row hidden">
                 <div class="stat-card">
-                    <div class="stat-label">총 문제 수</div>
-                    <div id="statTotalItems" class="stat-value">-</div>
+                    <div class="stat-label">총 풀이 문항수</div>
+                    <div id="statTotalSolved" class="stat-value">-</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">1차 정답률</div>
+                    <div class="stat-label">누적 1차 성취도</div>
                     <div id="statRound1Accuracy" class="stat-value">-</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">최종 정답률</div>
+                    <div class="stat-label">누적 2차 성취도</div>
+                    <div id="statRound2Accuracy" class="stat-value">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">누적 최종 성취도</div>
                     <div id="statFinalAccuracy" class="stat-value">-</div>
                 </div>
             </div>
         </header>
 
-        <section id="studentGate" class="gate-card hidden">
-            <h2 class="gate-title">학생 코드 입력</h2>
-            <div class="gate-desc">시험 시작 전에 학생 코드를 입력해 주세요.</div>
-
-            <div class="gate-field">
-                <label for="studentCodeInput" class="gate-label">학생 코드</label>
-                <input id="studentCodeInput" class="gate-input" type="text" inputmode="text" autocomplete="off"
-                    autocapitalize="characters" placeholder="예: S004" />
-            </div>
-
-            <button id="startExamBtn" class="gate-btn" type="button">시험 시작</button>
-            <div id="gateError" class="gate-error hidden"></div>
-        </section>
-
         <div id="examShell" class="hidden">
+            <div id="roundBadge" class="round-badge hidden" aria-label="현재 상태: 1차 입력">1차 입력</div>
             <section id="resultSummary" class="result-summary hidden" aria-live="polite"></section>
             <main id="omrRoot" class="omr-layout" aria-label="OMR 답안 입력 영역"></main>
 
@@ -475,6 +568,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app-config.js"></script>
     <script>
         const isLocalhost = ['localhost', '127.0.0.1'].includes(location.hostname);
         const forceMock = new URLSearchParams(location.search).get('mock') === '1';
@@ -493,6 +587,7 @@
             testSetId: null,
             assignmentId: null,
             studentCode: '',
+            studentName: '',
             attemptId: null,
             testTitle: 'OMR 입력',
             currentRound: 1,
@@ -538,7 +633,10 @@
             state.testSetId = params.get('test_set_id') || null;
             state.assignmentId = params.get('assignment_id') || null;
             state.studentCode = params.get('student_code') || '';
-            state.debug = params.get('debug') === '1';
+            // debug 패널은 학생 코드·attempt·답안 payload 를 DOM 에 누적하므로
+            // localhost 에서만 활성화한다 (운영/외부에서는 ?debug=1 이어도 비활성).
+            const isLocalhost = ['localhost', '127.0.0.1'].includes(location.hostname);
+            state.debug = isLocalhost && params.get('debug') === '1';
             document.getElementById('debugPanel').classList.toggle('hidden', !state.debug);
         }
 
@@ -565,6 +663,58 @@
             return `${Math.round(Number(v))}%`;
         }
 
+        function formatPercentDecimal(v) {
+            if (v == null || Number.isNaN(v)) return '-';
+            return `${Number(v).toFixed(1)}%`;
+        }
+
+        function getShieldIcon(count) {
+            if (count == null || count < 1) return '';
+            let level;
+            if (count >= 1000)     level = 5;
+            else if (count >= 500) level = 4;
+            else if (count >= 150) level = 3;
+            else if (count >= 50)  level = 2;
+            else                   level = 1;
+            return `<img src="assets/images/shield-l${level}.png" alt="L${level}" class="stat-icon">`;
+        }
+
+        function getRibbonIcon(percent) {
+            if (percent == null || Number.isNaN(Number(percent))) return '';
+            const p = Number(percent);
+            if (p >= 95) return `<img src="assets/images/gold-ribbon-s.png"   alt="" class="stat-icon">`;
+            if (p >= 85) return `<img src="assets/images/silver-ribbon-s.png" alt="" class="stat-icon">`;
+            return '';
+        }
+
+        function buildFinishedResultSummaryFromAttempt(result) {
+            const totalItems = Number(result?.total_items || 0);
+            const firstScorePercent = Number(result?.first_score_percent || 0);
+            const finalScorePercent = Number(result?.final_score_percent || 0);
+
+            const round1CorrectCount = totalItems > 0
+                ? Math.round((firstScorePercent / 100) * totalItems)
+                : 0;
+
+            const finalCorrectCount = totalItems > 0
+                ? Math.round((finalScorePercent / 100) * totalItems)
+                : 0;
+
+            const round2CorrectCount = Math.max(0, finalCorrectCount - round1CorrectCount);
+
+            return {
+                type: 'round2',
+                finalCorrectCount,
+                totalItems,
+                finalScorePercent,
+                round1CorrectCount,
+                round2CorrectCount,
+                remainingItemNos: Array.isArray(result?.retry_item_nos)
+                    ? result.retry_item_nos.map(n => String(n))
+                    : []
+            };
+        }
+
         function getRoundBadgeText() {
             if (state.status === 'completed') return '제출 완료';
             if (state.status === 'needs_review') return '검토 필요';
@@ -574,33 +724,71 @@
 
         function renderHeader() {
             document.getElementById('testTitle').textContent = state.testTitle || 'OMR 입력';
-            const badge = document.getElementById('roundBadge');
-            const badgeText = getRoundBadgeText();
-            badge.textContent = badgeText;
-            badge.setAttribute('aria-label', `현재 상태: ${badgeText}`);
+            document.getElementById('subline').textContent = '문제를 먼저 풀고, 정답을 입력합니다.';
 
-            document.getElementById('statTotalItems').textContent = formatCount(state.totalItems);
-            document.getElementById('statRound1Accuracy').textContent = formatPercent(state.studentStats.round1Accuracy);
-            document.getElementById('statFinalAccuracy').textContent = formatPercent(state.studentStats.finalAccuracy);
+            const hasStudent = Boolean(state.studentCode);
+            const studentNameEl = document.getElementById('studentName');
+            const roundBadge = document.getElementById('roundBadge');
+            const gateInline = document.getElementById('gateInline');
+            const statsRow = document.getElementById('studentStats');
+
+            if (hasStudent) {
+                studentNameEl.classList.remove('hidden');
+                studentNameEl.textContent = state.studentName
+                    ? `${state.studentName} (학생코드 ${state.studentCode})`
+                    : `학생 코드: ${state.studentCode}`;
+
+                const badgeText = getRoundBadgeText();
+                roundBadge.textContent = badgeText;
+                roundBadge.setAttribute('aria-label', `현재 상태: ${badgeText}`);
+                roundBadge.classList.remove('hidden');
+
+                gateInline.classList.add('hidden');
+                // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 패널 임시 숨김.
+                // statsRow.classList.remove('hidden');
+                statsRow.classList.add('hidden');
+            } else {
+                studentNameEl.classList.add('hidden');
+                studentNameEl.textContent = '';
+
+                roundBadge.classList.add('hidden');
+                gateInline.classList.remove('hidden');
+                statsRow.classList.add('hidden');
+            }
+
+            const totalSolved = state.studentStats.totalSolved;
+            document.getElementById('statTotalSolved').innerHTML =
+                formatCount(totalSolved) + (totalSolved != null && totalSolved !== '-' ? getShieldIcon(totalSolved) : '');
+
+            const r1Acc = state.studentStats.round1Accuracy;
+            const r2Acc = state.studentStats.round2Accuracy;
+            const rfAcc = state.studentStats.finalAccuracy;
+            document.getElementById('statRound1Accuracy').innerHTML = formatPercentDecimal(r1Acc) + getRibbonIcon(r1Acc);
+            document.getElementById('statRound2Accuracy').innerHTML = formatPercentDecimal(r2Acc) + getRibbonIcon(r2Acc);
+            document.getElementById('statFinalAccuracy').innerHTML  = formatPercentDecimal(rfAcc) + getRibbonIcon(rfAcc);
         }
 
-        function showGate() {
-            document.getElementById('studentGate').classList.remove('hidden');
-            document.getElementById('examShell').classList.add('hidden');
-        }
-
-        function hideGate() {
-            document.getElementById('studentGate').classList.add('hidden');
+        function hideGateInline() {
+            document.getElementById('gateInline').classList.add('hidden');
+            // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 패널 임시 숨김.
+            // document.getElementById('studentStats').classList.remove('hidden');
+            document.getElementById('roundBadge').classList.remove('hidden');
             document.getElementById('examShell').classList.remove('hidden');
+        }
+
+        function showGateInline() {
+            document.getElementById('gateInline').classList.remove('hidden');
+            document.getElementById('studentStats').classList.add('hidden');
+            document.getElementById('roundBadge').classList.add('hidden');
+            document.getElementById('examShell').classList.add('hidden');
         }
 
         function setGateBusy(isBusy) {
             state.gateSubmitting = isBusy;
             const btn = document.getElementById('startExamBtn');
             const input = document.getElementById('studentCodeInput');
-
             btn.disabled = isBusy;
-            btn.textContent = isBusy ? '시험 불러오는 중...' : '시험 시작';
+            btn.textContent = isBusy ? '불러오는 중...' : '시작';
             input.disabled = isBusy;
         }
 
@@ -630,6 +818,21 @@
             container.appendChild(div);
         }
 
+        function appendSummaryScoreLine(container, label, correctCount, totalItems, percent, cls = '') {
+            const div = document.createElement('div');
+            div.className = cls ? `result-line result-score-line ${cls}` : 'result-line result-score-line';
+
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = `${label}: `;
+
+            const valueStrong = document.createElement('strong');
+            valueStrong.textContent = `${correctCount} / ${totalItems} (${Math.round(percent)}%)`;
+
+            div.appendChild(labelSpan);
+            div.appendChild(valueStrong);
+            container.appendChild(div);
+        }
+
         function focusResultSummary() {
             const el = document.getElementById('resultSummary');
             if (!el || el.classList.contains('hidden')) return;
@@ -653,43 +856,149 @@
             title.className = 'result-title';
 
             if (s.type === 'round1') {
-                title.textContent = `1차 결과: ${s.totalItems}문항 중 ${s.correctCount}문항 정답 (${s.scorePercent}%)`;
+                title.textContent = `1차 결과: ${s.totalItems}문항 중 ${s.correctCount}문항 정답 (${Math.round(s.scorePercent)}%)`;
                 el.appendChild(title);
 
                 if (Array.isArray(s.retryItemNos) && s.retryItemNos.length) {
                     appendSummaryLine(el, `다시 풀 문제: ${s.retryItemNos.join(', ')}`, 'negative');
                 } else {
-                    appendSummaryLine(el, '모든 문항이 정답 처리되었습니다.', 'positive');
+                    appendSummaryLine(el, '모든 문항이 정답 처리되었습니다.');
                 }
                 return;
             }
 
-            title.textContent = `최종 결과: ${s.totalItems}문항 중 ${s.finalCorrectCount}문항 정답 (${s.finalScorePercent}%)`;
+            title.textContent = `최종 결과: ${s.totalItems}문항 중 ${s.finalCorrectCount}문항 정답 (${Math.round(s.finalScorePercent)}%)`;
             el.appendChild(title);
-            appendSummaryLine(el, `1차 정답 ${s.round1CorrectCount}문항, 수정 정답 ${s.round2CorrectCount}문항`);
+
+            const round1Percent = s.totalItems
+                ? Math.round((s.round1CorrectCount / s.totalItems) * 100)
+                : 0;
+
+            const finalPercent = s.totalItems
+                ? Math.round((s.finalCorrectCount / s.totalItems) * 100)
+                : 0;
+
+            appendSummaryScoreLine(el, '1차 정답', s.round1CorrectCount, s.totalItems, round1Percent);
+            appendSummaryScoreLine(el, '2차 정답', s.finalCorrectCount, s.totalItems, finalPercent);
 
             if (Array.isArray(s.remainingItemNos) && s.remainingItemNos.length) {
                 appendSummaryLine(el, `남은 문항: ${s.remainingItemNos.join(', ')}`, 'negative');
             } else {
-                appendSummaryLine(el, '모든 문항의 처리가 끝났습니다.', 'positive');
+                appendSummaryLine(el, '1차,2차 정답처리가 끝났습니다.');
+            }
+            // 2차 채점이 끝나면 오답 유무와 관계없이 항상 표시.
+            // 만점이어도 헷갈렸던 문제를 스스로 오답노트에 남길 수 있도록.
+            appendMistakeNoteCta(el);
+        }
+
+        function appendMistakeNoteCta(el) {
+            // 운영 배포 게이트: create_mistake_note_via_omr_bridge RPC 는 운영 DB
+            // 에서 revoke 상태다. app-config 플래그가 켜진 환경(로컬/테스트)에서만
+            // 버튼을 노출해 '눌렀는데 실패' UX 를 막는다.
+            if (window.APP_CONFIG?.ENABLE_OMR_MISTAKE_NOTE_BRIDGE !== true) {
+                return;
+            }
+            // 2차 후에도 남은 오답이 있는 경우에만 표시.
+            // assignment_id / student_code / attempt_id 가 모두 있어야 RPC 호출 가능.
+            if (!state.assignmentId || !state.studentCode || !state.attemptId) {
+                return;
+            }
+            const wrap = document.createElement('div');
+            wrap.className = 'mistake-note-cta';
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.id = 'createMistakeNoteBtn';
+            btn.className = 'btn-mistake-note';
+            btn.textContent = '오답노트 만들기';
+            btn.addEventListener('click', handleCreateMistakeNote);
+            wrap.appendChild(btn);
+
+            const hint = document.createElement('div');
+            hint.className = 'mistake-note-hint';
+            hint.textContent = '틀린 문제나 헷갈렸던 문제를 사진으로 찍어 오답노트에 저장합니다.';
+            wrap.appendChild(hint);
+
+            el.appendChild(wrap);
+        }
+
+        async function handleCreateMistakeNote() {
+            const btn = document.getElementById('createMistakeNoteBtn');
+            const setBusy = (busy) => {
+                if (!btn) return;
+                btn.disabled = busy;
+                btn.textContent = busy ? '준비 중...' : '오답노트 만들기';
+            };
+
+            setBusy(true);
+            try {
+                const { data, error } = await sbClient
+                    .schema('auto_grading')
+                    .rpc('create_mistake_note_via_omr_bridge', {
+                        p_assignment_id: state.assignmentId,
+                        p_student_code:  state.studentCode,
+                        p_attempt_id:    state.attemptId,
+                    });
+                if (error) throw error;
+
+                const result = unwrapRpcData(data, 'create_mistake_note_via_omr_bridge');
+                if (!result || result.ok !== true) {
+                    alert(mistakeNoteErrorMessage(result && result.error));
+                    setBusy(false);
+                    return;
+                }
+
+                // 같은 탭으로 작성 페이지 이동 (back 으로 OMR 결과 복귀 가능)
+                const url = new URL(location.href);
+                const base = url.pathname.replace(/[^/]+$/, 'mistake-note-write-v1.html');
+                const next = `${url.origin}${base}`
+                    + `?token=${encodeURIComponent(result.token)}`
+                    + `&note_id=${encodeURIComponent(result.note_id)}`;
+                location.href = next;
+            } catch (err) {
+                console.error(err);
+                alert('오답노트 작성 준비 중 오류가 발생했습니다.');
+                setBusy(false);
+            }
+        }
+
+        function mistakeNoteErrorMessage(code) {
+            switch (code) {
+                case 'invalid_input':         return '필수 정보가 누락되었습니다. 페이지를 새로고침 후 다시 시도해 주세요.';
+                case 'assignment_not_owned':  return '학생 정보가 일치하지 않습니다. 학생 코드를 확인해 주세요.';
+                case 'attempt_not_found':
+                case 'attempt_not_owned':     return '시험 기록을 찾을 수 없습니다.';
+                case 'attempt_not_eligible':  return '2차 채점이 끝난 시험에서만 오답노트를 만들 수 있습니다.';
+                case 'already_submitted':     return '이미 제출된 오답노트가 있습니다.';
+                case 'token_issue_failed':    return '인증 토큰 발급에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+                case 'conflict':              return '다른 창에서 동시에 진행 중인 작업이 있습니다. 잠시 후 다시 시도해 주세요.';
+                default:                      return '오답노트 작성을 시작할 수 없습니다.';
             }
         }
 
         function renderFooter() {
+            const footer = document.getElementById('footerActions');
             const btn = document.getElementById('submitBtn');
+            const note = footer.querySelector('.tiny-note');
 
             if (state.submitting) {
+                footer.classList.remove('hidden');
+                if (note) note.classList.remove('hidden');
                 btn.disabled = true;
                 btn.textContent = '제출 중...';
                 return;
             }
 
             if (state.status === 'completed' || state.status === 'needs_review') {
+                footer.classList.remove('hidden');
+                if (note) note.classList.add('hidden');
                 btn.disabled = true;
                 btn.textContent = state.status === 'completed' ? '제출 완료' : '검토 필요';
                 return;
             }
 
+            footer.classList.remove('hidden');
+            if (note) note.classList.remove('hidden');
             btn.disabled = false;
             btn.textContent = state.currentRound === 2 ? '수정 제출' : '제출';
         }
@@ -833,6 +1142,14 @@
         function renderOMRGrid() {
             const root = document.getElementById('omrRoot');
             root.replaceChildren();
+
+            if (!state.activeItems.length) {
+                root.className = 'omr-layout';
+                root.classList.add('hidden');
+                return;
+            }
+
+            root.classList.remove('hidden');
 
             const isWide = currentWideMq ? currentWideMq.matches : window.matchMedia('(min-width: 820px)').matches;
             root.className = isWide ? 'omr-layout two-col' : 'omr-layout';
@@ -1001,6 +1318,40 @@
                 round1Accuracy: null,
                 finalAccuracy: null
             };
+
+            if (!state.studentCode) {
+                return;
+            }
+
+            logDebug('rpc get_student_stats_by_code request', {
+                p_student_code: state.studentCode
+            });
+
+            const { data, error } = await sbClient.rpc('get_student_stats_by_code', {
+                p_student_code: state.studentCode
+            });
+
+            if (error) {
+                logDebug('rpc get_student_stats_by_code error', error);
+
+                if (error.message === 'STUDENT_NOT_FOUND') {
+                    throw error;
+                }
+
+                return;
+            }
+
+            logDebug('rpc get_student_stats_by_code raw response', data);
+
+            const unwrapped = unwrapRpcData(data, 'get_student_stats_by_code');
+            logDebug('rpc get_student_stats_by_code normalized response', unwrapped);
+
+            state.studentStats = {
+                totalSolved: unwrapped?.total_solved ?? 0,
+                round1Accuracy: unwrapped?.round1_accuracy ?? null,
+                round2Accuracy: unwrapped?.round2_accuracy ?? null,
+                finalAccuracy: unwrapped?.final_accuracy ?? null
+            };
         }
 
         function applyRound1Result(result) {
@@ -1024,6 +1375,7 @@
 
         function applyRound2Result(result) {
             state.status = result.status;
+            state.retryItemNos = (result.remaining_item_nos || []).map(n => String(n));
 
             state.resultSummary = {
                 type: 'round2',
@@ -1077,6 +1429,7 @@
                 selected_answer: item.selected_answer == null ? '' : String(item.selected_answer)
             })) : [];
             state.testTitle = result.title || result.test_title || 'OMR 입력';
+            state.studentName = result.student_name || '';
 
             state.answers = {};
             state.items.forEach(item => {
@@ -1088,13 +1441,20 @@
 
             state.activeItems = getVisibleItems();
 
+            if (state.status === 'completed' || state.status === 'needs_review') {
+                state.resultSummary = buildFinishedResultSummaryFromAttempt(result);
+            } else {
+                state.resultSummary = null;
+            }
+
             logDebug('startAttempt parsed state', {
                 attemptId: state.attemptId,
                 status: state.status,
                 currentRound: state.currentRound,
                 totalItems: state.totalItems,
                 retryItemNos: state.retryItemNos,
-                items: state.items
+                items: state.items,
+                resultSummary: state.resultSummary
             });
         }
 
@@ -1148,7 +1508,8 @@
                     applyRound1Result(result);
                 }
 
-                await loadStudentStats();
+                // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 조회 임시 비활성화.
+                // await loadStudentStats();
                 success = true;
                 logDebug('submit result', result);
             } catch (err) {
@@ -1185,8 +1546,9 @@
             try {
                 await startAttempt();
                 restoreLocalAnswers();
-                await loadStudentStats();
-                hideGate();
+                // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 조회 임시 비활성화.
+                // await loadStudentStats();
+                hideGateInline();
                 renderPage();
             } catch (err) {
                 console.error(err);
@@ -1235,8 +1597,9 @@
                 try {
                     await startAttempt();
                     restoreLocalAnswers();
-                    await loadStudentStats();
-                    hideGate();
+                    // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 조회 임시 비활성화.
+                    // await loadStudentStats();
+                    hideGateInline();
                     renderPage();
                 } catch (err) {
                     console.error(err);
@@ -1244,19 +1607,21 @@
                     if (err?.message === 'STUDENT_NOT_FOUND') {
                         state.studentCode = '';
                         input.value = '';
-                        showGate();
+                        showGateInline();
                         clearGateError();
                         showGateError('등록되지 않은 학생 코드입니다. 올바른 코드를 다시 입력해 주세요.');
+                        renderHeader();
                         input.focus();
                     } else {
-                        hideGate();
+                        hideGateInline();
                         showLoadError('시험을 불러오는 데 실패했습니다. 페이지를 새로 고침해 주세요.');
                     }
                 }
                 return;
             }
 
-            showGate();
+            showGateInline();
+            renderHeader();
             input.focus();
         }
 
@@ -1283,6 +1648,7 @@
                 total_items: items.length,
                 retry_item_nos: [],
                 title: '중3 과학 OMR 입력 테스트',
+                student_name: '테스트학생',
                 items
             };
         }

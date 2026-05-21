@@ -1,0 +1,26 @@
+{
+  "name": "auto-grading-file-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "자체 파일서버: 학생 오답노트 이미지/PDF 저장 및 서빙",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "cleanup:dry": "node scripts/cleanup-orphans.js",
+    "cleanup:apply": "node scripts/cleanup-orphans.js --apply"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/multipart": "^8.3.0",
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.33.5"
+  }
+}

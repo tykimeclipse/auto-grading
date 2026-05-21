@@ -17,3 +17,5 @@ build/
 # mac
 .DS_Store
 .claude/
+
+_archive

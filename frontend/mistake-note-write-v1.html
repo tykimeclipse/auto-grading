@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <title>오답노트 작성</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --brand: #5b3df0;
+      --brand-soft: #f3f0ff;
+      --brand-line: #c7bfff;
+      --danger: #b42318;
+      --ok: #18794e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      --footer-h: 84px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.4;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 14px 14px calc(var(--footer-h) + 18px);
+    }
+    .topbar { margin-bottom: 14px; }
+    .title { font-size: 20px; font-weight: 800; margin: 0 0 8px; }
+    .meta {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+    }
+    .meta-line { color: var(--muted); margin: 2px 0; }
+    .meta-line strong { color: var(--text); font-weight: 700; }
+
+    .status-chip {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-left: 6px;
+    }
+    .status-draft     { background: #fff8e6; color: #946800; }
+    .status-submitted { background: #e6f4ec; color: var(--ok); }
+    .status-archived  { background: #eeeeee; color: #555; }
+
+    #messageArea { margin-bottom: 12px; }
+    .alert-box, .info-box, .loading-box {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      text-align: center;
+    }
+    .alert-box  { color: var(--danger); border: 1px solid #f4b8b0; }
+    .info-box   { color: var(--muted); }
+    .loading-box{ color: var(--muted); }
+
+    .content { margin-top: 12px; }
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 380px) {
+      .image-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .img-card {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #eee;
+      box-shadow: var(--shadow);
+    }
+    .img-card img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .img-card .order-badge {
+      position: absolute;
+      top: 6px; left: 6px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .img-card .delete-btn {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 28px; height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .img-card .delete-btn:hover  { background: rgba(180, 35, 24, 0.95); }
+    .img-card .delete-btn:disabled { opacity: 0.4; cursor: default; }
+
+    .empty-hint {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 22px 14px;
+      box-shadow: var(--shadow);
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: var(--footer-h);
+      background: var(--panel);
+      border-top: 1px solid var(--line);
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      z-index: 20;
+    }
+    .footer .inner {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      gap: 10px;
+    }
+    .btn-secondary, .btn-primary {
+      flex: 1;
+      height: 52px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-secondary { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--brand-line); }
+    .btn-secondary:disabled { background: #f0f0f0; color: #aaa; border-color: #ddd; cursor: default; }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:disabled { background: #c0b7f4; cursor: default; }
+
+    .progress-line {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    /* lightbox */
+    .lightbox {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 50;
+      padding: 20px;
+    }
+    .lightbox img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <h1 class="title">오답노트 작성</h1>
+      <div class="meta">
+        <div id="studentLine" class="meta-line">-</div>
+        <div id="testLine"    class="meta-line">-</div>
+        <div id="unitLine"    class="meta-line">-</div>
+        <div id="statusLine"  class="meta-line">-</div>
+      </div>
+    </header>
+
+    <div id="messageArea"></div>
+
+    <main id="contentArea" class="content" style="display:none;">
+      <div id="progressLine" class="progress-line hidden"></div>
+      <div id="imageGrid" class="image-grid"></div>
+      <div id="emptyHint" class="empty-hint" style="display:none;">
+        아직 추가된 사진이 없습니다. 아래 <strong>사진 추가</strong> 버튼을 눌러 시작하세요.
+      </div>
+    </main>
+  </div>
+
+  <footer id="footer" class="footer" style="display:none;">
+    <div class="inner">
+      <input type="file" id="fileInput" accept="image/*" hidden />
+      <button type="button" id="addBtn"    class="btn-secondary" disabled>사진 추가</button>
+      <button type="button" id="submitBtn" class="btn-primary"   disabled>전송</button>
+    </div>
+  </footer>
+
+  <div id="lightbox" class="lightbox hidden">
+    <img id="lightboxImg" src="" alt="" />
+  </div>
+
+  <script src="app-config.js"></script>
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+    // ============================================================
+    // 설정
+    // ============================================================
+    const SUPABASE_URL      = "https://gspsquuyqkydqphbcuel.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_osq8Sjog7qDEiZ3A8toJ6Q_TQ3ATAt6";
+
+    // 파일서버 주소는 app-config.js (window.APP_CONFIG) 에서 주입.
+    const FILE_SERVER_URL = window.APP_CONFIG?.FILE_SERVER_URL || "http://localhost:8787";
+    if (!window.APP_CONFIG) {
+      console.error("[app-config] app-config.js 미로드 — localhost 로 fallback 되었습니다.");
+    } else {
+      window.APP_CONFIG.warnIfMisconfigured?.();
+    }
+
+    // 클라이언트 사전 리사이즈: 긴 변 2000px / JPEG q=0.8
+    // EXIF 회전·WebP·썸네일·보정은 파일서버 sharp 가 담당
+    const CLIENT_RESIZE_MAX_EDGE = 2000;
+    const CLIENT_RESIZE_QUALITY  = 0.8;
+
+    // ============================================================
+    // 초기화
+    // ============================================================
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    const state = {
+      token:  null,
+      noteId: null,
+      note:   null,
+      images: [],
+      busy:   false,
+    };
+
+    const params = new URLSearchParams(location.search);
+    state.token  = (params.get('token')   || '').trim();
+    state.noteId = (params.get('note_id') || '').trim();
+
+    const messageArea = document.getElementById('messageArea');
+    const contentArea = document.getElementById('contentArea');
+    const footer      = document.getElementById('footer');
+    const imageGrid   = document.getElementById('imageGrid');
+    const emptyHint   = document.getElementById('emptyHint');
+    const progressLine= document.getElementById('progressLine');
+    const studentLine = document.getElementById('studentLine');
+    const testLine    = document.getElementById('testLine');
+    const unitLine    = document.getElementById('unitLine');
+    const statusLine  = document.getElementById('statusLine');
+    const fileInput   = document.getElementById('fileInput');
+    const addBtn      = document.getElementById('addBtn');
+    const submitBtn   = document.getElementById('submitBtn');
+    const lightbox    = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+
+    if (!UUID_RE.test(state.token) || !UUID_RE.test(state.noteId)) {
+      showAlert('유효하지 않은 링크입니다. 선생님께 새 링크를 요청해 주세요.');
+    } else {
+      init();
+    }
+
+    // ============================================================
+    // 메인 흐름
+    // ============================================================
+    async function init() {
+      showLoading('불러오는 중입니다...');
+      try {
+        await loadNote();
+
+        // submitted/archived 면 상세 페이지로 자동 이동
+        if (state.note.status === 'submitted' || state.note.status === 'archived') {
+          goToDetail();
+          return;
+        }
+
+        clearMessage();
+        contentArea.style.display = 'block';
+        footer.style.display = 'flex';
+        render();
+
+        addBtn.addEventListener('click',   () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelected);
+        submitBtn.addEventListener('click', handleSubmit);
+        lightbox.addEventListener('click',  closeLightbox);
+      } catch (err) {
+        console.error(err);
+        showAlert('오답노트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      }
+    }
+
+    async function loadNote() {
+      const { data, error } = await supabase
+        .schema('auto_grading')
+        .rpc('get_mistake_note_detail_by_token', {
+          p_token:   state.token,
+          p_note_id: state.noteId,
+        });
+      if (error) throw error;
+      const result = unwrap(data);
+      if (!result || result.ok !== true) {
+        const msg = errorToMessage(result && result.error)
+          || '오답노트를 불러오지 못했습니다.';
+        throw new Error(msg);
+      }
+      state.note   = result.note;
+      state.images = Array.isArray(result.images) ? result.images : [];
+    }
+
+    function render() {
+      const n = state.note;
+      studentLine.innerHTML = `<strong>학생 코드</strong> ${escapeHtml(state.note.student_code || '-')}`;
+      testLine.innerHTML    = `<strong>시험</strong> ${escapeHtml(n.test_title || '-')}`;
+      unitLine.innerHTML    = n.unit_title_snapshot
+        ? `<strong>단원</strong> ${escapeHtml(n.unit_title_snapshot)}`
+        : `<strong>단원</strong> -`;
+      statusLine.innerHTML  = `<strong>상태</strong> ${statusChip(n.status)} <span class="meta-line" style="display:inline">사진 ${state.images.length}장</span>`;
+
+      // 이미지 그리드
+      imageGrid.replaceChildren();
+      if (!state.images.length) {
+        emptyHint.style.display = 'block';
+        imageGrid.style.display = 'none';
+      } else {
+        emptyHint.style.display = 'none';
+        imageGrid.style.display = 'grid';
+        state.images.forEach((img, idx) => {
+          imageGrid.appendChild(buildImageCard(img, idx));
+        });
+      }
+
+      // 버튼 상태 (draft 일 때만 활성)
+      const draft = n.status === 'draft';
+      addBtn.disabled    = state.busy || !draft;
+      submitBtn.disabled = state.busy || !draft || state.images.length < 1;
+    }
+
+    function buildImageCard(img, idx) {
+      const card = document.createElement('div');
+      card.className = 'img-card';
+
+      const im = document.createElement('img');
+      im.src = thumbUrl(img.thumbnail_key || img.file_key);
+      im.alt = `사진 ${idx + 1}`;
+      im.loading = 'lazy';
+      im.addEventListener('click', () => openLightbox(fileUrl(img.file_key)));
+      card.appendChild(im);
+
+      const order = document.createElement('div');
+      order.className = 'order-badge';
+      order.textContent = `${idx + 1}`;
+      card.appendChild(order);
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'delete-btn';
+      del.textContent = '×';
+      del.title = '삭제';
+      del.disabled = state.busy;
+      del.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        handleDeleteImage(img);
+      });
+      card.appendChild(del);
+
+      return card;
+    }
+
+    // ============================================================
+    // 사진 추가 흐름
+    // ============================================================
+    async function handleFileSelected(ev) {
+      const file = ev.target.files && ev.target.files[0];
+      // 다음 추가를 위해 input value 초기화
+      fileInput.value = '';
+      if (!file) return;
+      if (!/^image\/(jpe?g|png|webp)$/i.test(file.type)) {
+        alert('jpeg / png / webp 이미지만 추가할 수 있습니다.');
+        return;
+      }
+      setBusy(true, '사진 처리 중...');
+      try {
+        const blob = await resizeImage(file);
+        setBusy(true, '업로드 중...');
+        const uploaded = await uploadToFileServer(blob);
+        setBusy(true, '저장 중...');
+        await attachToDb(uploaded);
+        await loadNote();
+        render();
+      } catch (err) {
+        console.error(err);
+        alert(err?.message || '사진을 추가하지 못했습니다.');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    // Canvas 기반 가벼운 리사이즈. 긴 변 2000px / JPEG q=0.8.
+    // 최신 모바일 브라우저는 EXIF orientation 을 자동 반영해 Canvas 에 그리므로
+    // 출력 JPEG 픽셀 방향은 올바르다. (서버 sharp 가 한번 더 .rotate() 호출 안전망)
+    async function resizeImage(file) {
+      const img = await loadImageFromFile(file);
+      const long = Math.max(img.naturalWidth, img.naturalHeight);
+      const ratio = long > CLIENT_RESIZE_MAX_EDGE
+        ? (CLIENT_RESIZE_MAX_EDGE / long)
+        : 1;
+      const w = Math.max(1, Math.round(img.naturalWidth  * ratio));
+      const h = Math.max(1, Math.round(img.naturalHeight * ratio));
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error('이미지 변환 실패')),
+          'image/jpeg',
+          CLIENT_RESIZE_QUALITY,
+        );
+      });
+    }
+
+    function loadImageFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽지 못했습니다.')); };
+        img.src = url;
+      });
+    }
+
+    async function uploadToFileServer(blob) {
+      const fd = new FormData();
+      fd.append('file', blob, 'capture.jpg');
+
+      const res = await fetch(`${FILE_SERVER_URL}/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'X-Note-Id':     state.noteId,
+        },
+        body: fd,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body || body.ok !== true) {
+        const msg = uploadErrorToMessage(body && body.error) || '업로드에 실패했습니다.';
+        throw new Error(msg);
+      }
+      return body;
+    }
+
+    async function attachToDb(meta) {
+      const { data, error } = await supabase
+        .schema('auto_grading')
+        .rpc('attach_mistake_image_by_token', {
+          p_token:         state.token,
+          p_note_id:       state.noteId,
+          p_file_backend:  meta.file_backend,
+          p_file_key:      meta.file_key,
+          p_thumbnail_key: meta.thumbnail_key,
+          p_mime_type:     meta.mime_type,
+          p_file_size:     meta.file_size,
+          p_width:         meta.width,
+          p_height:        meta.height,
+        });
+      if (error) throw error;
+      const result = unwrap(data);
+      if (!result || result.ok !== true) {
+        // DB attach 실패 → 파일서버 cleanup 시도 (best effort)
+        cleanupFileServer(meta.file_key, meta.thumbnail_key).catch(() => {});
+        throw new Error(errorToMessage(result && result.error)
+          || '사진 정보를 저장하지 못했습니다.');
+      }
+    }
+
+    // ============================================================
+    // 삭제 흐름
+    // ============================================================
+    async function handleDeleteImage(img) {
+      if (!confirm('이 사진을 삭제할까요?')) return;
+      setBusy(true, '삭제 중...');
+      try {
+        const { data, error } = await supabase
+          .schema('auto_grading')
+          .rpc('delete_mistake_image_by_token', {
+            p_token:    state.token,
+            p_image_id: img.image_id,
+          });
+        if (error) throw error;
+        const result = unwrap(data);
+        if (!result || result.ok !== true) {
+          throw new Error(errorToMessage(result && result.error)
+            || '삭제하지 못했습니다.');
+        }
+        // 파일서버 정리 (best effort)
+        cleanupFileServer(result.file_key, result.thumbnail_key).catch((e) => {
+          console.warn('file server cleanup failed', e);
+        });
+        await loadNote();
+        render();
+      } catch (err) {
+        console.error(err);
+        alert(err?.message || '삭제하지 못했습니다.');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function cleanupFileServer(fileKey, thumbKey) {
+      const res = await fetch(`${FILE_SERVER_URL}/delete`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({
+          file_key:      fileKey,
+          thumbnail_key: thumbKey || null,
+        }),
+      });
+      if (!res.ok) throw new Error(`file server delete ${res.status}`);
+    }
+
+    // ============================================================
+    // 전송 흐름
+    // ============================================================
+    async function handleSubmit() {
+      if (!confirm('오답노트를 전송할까요?\n전송 후에는 사진을 더 이상 추가/삭제할 수 없습니다.')) return;
+      setBusy(true, '전송 중...');
+      try {
+        const { data, error } = await supabase
+          .schema('auto_grading')
+          .rpc('submit_mistake_note_by_token', {
+            p_token:   state.token,
+            p_note_id: state.noteId,
+          });
+        if (error) throw error;
+        const result = unwrap(data);
+        if (!result || result.ok !== true) {
+          throw new Error(errorToMessage(result && result.error)
+            || '전송하지 못했습니다.');
+        }
+        goToDetail();
+      } catch (err) {
+        console.error(err);
+        alert(err?.message || '전송하지 못했습니다.');
+        setBusy(false);
+      }
+    }
+
+    // ============================================================
+    // 유틸
+    // ============================================================
+    function setBusy(busy, label) {
+      state.busy = busy;
+      if (busy && label) {
+        progressLine.textContent = label;
+        progressLine.classList.remove('hidden');
+      } else {
+        progressLine.classList.add('hidden');
+      }
+      render();
+    }
+
+    function fileUrl(fileKey) {
+      return `${FILE_SERVER_URL}/file/${fileKey}?token=${encodeURIComponent(state.token)}`;
+    }
+    function thumbUrl(thumbKey) {
+      return `${FILE_SERVER_URL}/file/${thumbKey}?token=${encodeURIComponent(state.token)}`;
+    }
+
+    function goToDetail() {
+      const url = new URL(location.href);
+      const base = url.pathname.replace(/[^/]+$/, 'mistake-note-detail-v1.html');
+      location.href = `${url.origin}${base}`
+        + `?token=${encodeURIComponent(state.token)}`
+        + `&note_id=${encodeURIComponent(state.noteId)}`;
+    }
+
+    function openLightbox(url) {
+      lightboxImg.src = url;
+      lightbox.classList.remove('hidden');
+    }
+    function closeLightbox() {
+      lightbox.classList.add('hidden');
+      lightboxImg.src = '';
+    }
+
+    function statusChip(status) {
+      const label = ({ draft: '작성중', submitted: '제출됨', archived: '보관' })[status] || status;
+      return `<span class="status-chip status-${status}">${label}</span>`;
+    }
+
+    function unwrap(data) {
+      // Supabase RPC 가 객체 / 배열을 다양하게 반환할 수 있음
+      if (Array.isArray(data)) return data[0] ?? null;
+      return data ?? null;
+    }
+
+    function showLoading(text) {
+      contentArea.style.display = 'none';
+      footer.style.display = 'none';
+      messageArea.innerHTML = `<div class="loading-box">${escapeHtml(text)}</div>`;
+    }
+    function showAlert(text) {
+      contentArea.style.display = 'none';
+      footer.style.display = 'none';
+      messageArea.innerHTML = `<div class="alert-box">${escapeHtml(text)}</div>`;
+    }
+    function clearMessage() {
+      messageArea.innerHTML = '';
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    function errorToMessage(code) {
+      switch (code) {
+        case 'unauthorized':       return '인증이 만료되었습니다. 선생님께 새 링크를 요청해 주세요.';
+        case 'note_not_owned':     return '본인의 오답노트만 열 수 있습니다.';
+        case 'note_not_editable':  return '이미 제출되어 수정할 수 없습니다.';
+        case 'note_not_draft':     return '이미 제출된 노트입니다.';
+        case 'no_images':          return '사진을 1장 이상 추가해 주세요.';
+        case 'duplicate_file_key': return '같은 사진이 이미 등록되어 있습니다.';
+        case 'invalid_image_metadata': return '사진 형식이 올바르지 않습니다.';
+        case 'image_not_owned':    return '삭제 권한이 없는 사진입니다.';
+        case 'file_key_required':  return '파일 정보가 누락되었습니다.';
+        default:                   return null;
+      }
+    }
+
+    function uploadErrorToMessage(code) {
+      switch (code) {
+        case 'invalid_token_format':
+        case 'unauthorized':       return '인증이 만료되었습니다. 선생님께 새 링크를 요청해 주세요.';
+        case 'invalid_note_id':    return '노트 정보가 누락되었습니다.';
+        case 'file_required':      return '파일을 선택해 주세요.';
+        case 'image_processing_failed': return '사진을 처리할 수 없습니다. 다른 사진을 시도해 주세요.';
+        case 'file_too_large':     return '사진이 너무 큽니다. 더 작은 사진을 사용해 주세요.';
+        case 'unsupported_mime':   return 'jpeg/png/webp 이미지만 사용할 수 있습니다.';
+        case 'storage_failed':     return '서버 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+        case 'upstream_error':     return '서버 통신 오류입니다. 잠시 후 다시 시도해 주세요.';
+        default:                   return null;
+      }
+    }
+  </script>
+</body>
+</html>

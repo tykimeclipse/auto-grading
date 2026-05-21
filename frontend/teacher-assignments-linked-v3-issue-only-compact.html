@@ -81,7 +81,7 @@
     .tag.green { background:#ebf8f0; color:var(--success); }
     .tag.orange { background:#fff4e8; color:var(--warning); }
     .list-card { border:1px solid var(--line); border-radius:18px; overflow:hidden; background:white; }
-    .list-head,.list-row { display:grid; grid-template-columns:76px minmax(0,2.2fr) 72px 52px minmax(180px,1.45fr) 56px; gap:6px; align-items:center; padding:12px 8px; font-size:13px; }
+    .list-head,.list-row { display:grid; grid-template-columns:76px minmax(0,2fr) 66px 46px 100px 78px; gap:6px; align-items:center; padding:12px 8px; font-size:13px; }
     .list-head { background:#f4f7fb; color:#48505e; font-size:12px; font-weight:700; border-bottom:1px solid var(--line); }
     .list-row { border-bottom:1px solid #eef2f7; }
     .list-row:last-child { border-bottom:0; }
@@ -98,9 +98,31 @@
     .status.error { display:block; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
     .status.info { display:block; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
     .code-box { border:1px dashed #93c5fd; background:#eff6ff; border-radius:12px; padding:12px; font-size:14px; color:#1e3a8a; line-height:1.55; }
+    .hidden { display:none !important; }
+    /* 오답노트 상태 배지 */
+    .mn-badge { display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .mn-badge.none      { background:#f1f3f5; color:#868e96; }
+    .mn-badge.draft     { background:#fff8e6; color:#946800; cursor:pointer; }
+    .mn-badge.submitted { background:#e6f4ec; color:#18794e; cursor:pointer; }
+    .mn-badge.loading   { background:#f1f3f5; color:#aab; }
+    /* 오답노트 모달 */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:60; padding:20px; }
+    .modal-card { background:white; border-radius:16px; max-width:680px; width:100%; max-height:86vh; overflow:auto; padding:20px; }
+    .modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .modal-title { font-size:18px; font-weight:800; margin:0; }
+    .modal-close { border:none; background:#f1f3f5; width:32px; height:32px; border-radius:8px; font-size:18px; cursor:pointer; }
+    .modal-meta { font-size:13px; color:#48505e; margin-bottom:12px; line-height:1.7; }
+    .modal-body-msg { font-size:14px; color:#6b7280; text-align:center; padding:24px 0; }
+    .mn-note-block { border-top:1px solid #eef2f7; padding-top:12px; margin-top:12px; }
+    .mn-note-title { font-size:14px; font-weight:700; margin:0 0 8px; }
+    .mn-img-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .mn-img-grid img { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; cursor:pointer; background:#eee; }
+    .mn-modal-actions { margin-top:14px; display:flex; gap:8px; justify-content:flex-end; }
+    .mn-lightbox { position:fixed; inset:0; background:rgba(0,0,0,0.88); display:flex; align-items:center; justify-content:center; z-index:70; padding:20px; }
+    .mn-lightbox img { max-width:100%; max-height:100%; object-fit:contain; }
     @media (max-width:1280px) {
       .layout,.subgrid { grid-template-columns:1fr; }
-      .list-head,.list-row { grid-template-columns:76px minmax(0,2fr) 70px 50px minmax(180px,1.35fr) 56px; gap:6px; padding:12px 8px; font-size:12px; }
+      .list-head,.list-row { grid-template-columns:72px minmax(0,1.7fr) 60px 44px 92px 72px; gap:6px; padding:12px 8px; font-size:12px; }
     }
     @media (max-width:980px) {
       .page-header { flex-direction:column; }
@@ -255,8 +277,8 @@
                 <div>시험 제목</div>
                 <div>학생</div>
                 <div>학년</div>
+                <div>오답노트</div>
                 <div>링크</div>
-                <div>복사</div>
               </div>
               <div id="assignmentListBody"></div>
             </div>
@@ -363,6 +385,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin-auth.js"></script>
+  <script src="app-config.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const state = {
@@ -375,6 +398,7 @@
       students: [],
       selectedStudentIds: new Set(),
       assignments: [],
+      mistakeNoteSummaries: {},
       courses: [],
       studentCourseTypes: [],
       studentGrades: []
@@ -727,7 +751,9 @@
     function buildStudentAssignmentLink(assignmentId) {
       if (!assignmentId) return '';
       const url = new URL(window.location.href);
-      const basePath = url.pathname.replace(/[^/]+$/, 'student-answer-omr-v3.html');
+      const basePath = url.pathname.replace(/[^/]+$/, 'student-answer-omr-v4.html');
+      // OMR 은 assignment_id(UUID) 만으로 학생을 식별한다. 학생 범용 token 은
+      // OMR 인증에 쓰이지 않으므로 URL 에 붙이지 않는다 (노출만 늘릴 뿐).
       return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`;
     }
 
@@ -766,6 +792,7 @@
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_assignments', params);
         if (error) throw error;
         state.assignments = Array.isArray(data) ? data : [];
+        await loadMistakeNoteSummaries();
         renderAssignmentList();
         setStatus('assignmentStatus', `assignment ${state.assignments.length}건을 불러왔습니다.`, 'ok');
       } catch (err) {
@@ -780,28 +807,246 @@
         updateSummaryCards();
         return;
       }
-      body.innerHTML = state.assignments.map(row => {
-        const studentLink = buildStudentAssignmentLink(row.assignment_id);
-        return `
+      body.innerHTML = state.assignments.map((row, idx) => `
         <div class="list-row">
           <div>${escapeHtml(fmtDate(row.assigned_at))}</div>
           <div><strong class="list-title-text">${escapeHtml(row.test_title || '-')}</strong></div>
           <div><span class="list-student-text">${escapeHtml(row.student_name || '-')}</span></div>
           <div>${escapeHtml(gradeLabel(row.student_grade))}</div>
-          <div class="link-box">
-            <input class="link-input" type="text" value="${escapeHtml(studentLink)}" readonly />
-          </div>
-          <div><button class="mini-btn copy-link-btn" type="button" data-link="${escapeHtml(studentLink)}">복사</button></div>
-        </div>`;
-      }).join('');
+          <div>${mistakeNoteBadgeHtml(row.assignment_id)}</div>
+          <div><button class="mini-btn copy-link-btn" type="button" data-idx="${idx}">링크 복사</button></div>
+        </div>`).join('');
+      body.querySelectorAll('.mn-badge.draft, .mn-badge.submitted').forEach(badge => {
+        badge.addEventListener('click', () => openMistakeNoteModal(badge.dataset.assignmentId));
+      });
       body.querySelectorAll('.copy-link-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const ok = await copyText(btn.dataset.link || '');
-          if (ok) setStatus('assignmentStatus', '학생용 링크를 복사했습니다.', 'ok');
-          else setStatus('assignmentStatus', '링크 복사에 실패했습니다. 링크를 직접 선택해 복사해 주세요.', 'error');
+        btn.addEventListener('click', () => {
+          const row = state.assignments[Number(btn.dataset.idx)];
+          if (row) handleCopyStudentLink(row);
         });
       });
       updateSummaryCards();
+    }
+
+    // ===== 오답노트 (Phase 8) =====
+    // 파일서버 주소는 app-config.js (window.APP_CONFIG) 에서 주입.
+    const FILE_SERVER_URL = window.APP_CONFIG?.FILE_SERVER_URL || 'http://localhost:8787';
+    if (!window.APP_CONFIG) {
+      console.error('[app-config] app-config.js 미로드 — localhost 로 fallback 되었습니다.');
+    } else {
+      window.APP_CONFIG.warnIfMisconfigured?.();
+    }
+
+    // ⚠️ 임시 브리지: 교사 모달의 이미지 표시는 학생 view token 을 사용한다.
+    //    token 은 모달 생명주기 동안만 이 지역 변수에 보관하고,
+    //    전역 state / storage / DOM data-* 어디에도 저장하지 않는다.
+    //    장기적으로 파일서버 admin 인증 (Phase 4c) 으로 전환 예정.
+    let modalViewToken = null;
+
+    async function loadMistakeNoteSummaries() {
+      state.mistakeNoteSummaries = {};
+      const ids = state.assignments.map(a => a.assignment_id).filter(Boolean);
+      if (!ids.length) return;
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_list_mistake_note_summaries', { p_assignment_ids: ids });
+        if (error) throw error;
+        const result = Array.isArray(data) ? data[0] : data;
+        if (result && result.ok === true && Array.isArray(result.rows)) {
+          for (const r of result.rows) {
+            state.mistakeNoteSummaries[r.assignment_id] = r;
+          }
+        }
+      } catch (err) {
+        // 오답노트 요약 실패가 발행상황 표시 자체를 막지 않도록 무시
+        console.warn('mistake note summary load failed');
+      }
+    }
+
+    function mistakeNoteBadgeHtml(assignmentId) {
+      const s = state.mistakeNoteSummaries[assignmentId];
+      if (!s) return `<span class="mn-badge none">미작성</span>`;
+      const n = s.image_count ?? 0;
+      const aid = escapeHtml(assignmentId);
+      if (s.status === 'draft') {
+        return `<span class="mn-badge draft" data-assignment-id="${aid}">작성중 ${n}장</span>`;
+      }
+      if (s.status === 'submitted') {
+        return `<span class="mn-badge submitted" data-assignment-id="${aid}">제출 ${n}장</span>`;
+      }
+      return `<span class="mn-badge none">미작성</span>`;
+    }
+
+    async function handleCopyStudentLink(row) {
+      // copyText 는 clipboard 권한/브라우저 정책으로 reject 될 수 있으므로
+      // try/catch 로 감싸 unhandled promise rejection 을 막는다.
+      try {
+        const link = buildStudentAssignmentLink(row.assignment_id);
+        if (!link) {
+          setStatus('assignmentStatus', '링크를 만들 수 없습니다.', 'error');
+          return;
+        }
+        const ok = await copyText(link);
+        if (ok) setStatus('assignmentStatus', `${row.student_name || '학생'} 링크를 복사했습니다.`, 'ok');
+        else setStatus('assignmentStatus', '링크 복사에 실패했습니다. 다시 시도해 주세요.', 'error');
+      } catch (err) {
+        setStatus('assignmentStatus', '링크 복사에 실패했습니다. 다시 시도해 주세요.', 'error');
+      }
+    }
+
+    async function openMistakeNoteModal(assignmentId) {
+      if (!assignmentId) return;
+      currentModalAssignmentId = assignmentId;
+      const overlay = $('mnModalOverlay');
+      const bodyEl  = $('mnModalBody');
+      overlay.classList.remove('hidden');
+      $('mnModalTitle').textContent = '오답노트';
+      $('mnModalMeta').textContent  = '';
+      bodyEl.innerHTML = '<div class="modal-body-msg">불러오는 중입니다...</div>';
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_list_mistake_notes_for_assignment', { p_assignment_id: assignmentId });
+        if (error) throw error;
+        const result = Array.isArray(data) ? data[0] : data;
+        if (!result || result.ok !== true) throw new Error('오답노트를 불러오지 못했습니다.');
+        const a = result.assignment || {};
+        $('mnModalTitle').textContent = `${a.student_name || '-'} · 오답노트`;
+        $('mnModalMeta').textContent  = `${a.test_title || '-'} · 학생코드 ${a.student_code || '-'}`;
+        renderMistakeNoteModal(Array.isArray(result.notes) ? result.notes : []);
+      } catch (err) {
+        bodyEl.innerHTML = `<div class="modal-body-msg">${escapeHtml(normalizeError(err))}</div>`;
+      }
+    }
+
+    function renderMistakeNoteModal(notes) {
+      const bodyEl = $('mnModalBody');
+      bodyEl.innerHTML = '';
+      if (!notes.length) {
+        bodyEl.innerHTML = '<div class="modal-body-msg">작성된 오답노트가 없습니다.</div>';
+        return;
+      }
+      const statusKo = { draft: '작성중', submitted: '제출됨', archived: '보관' };
+      notes.forEach(note => {
+        const block = document.createElement('div');
+        block.className = 'mn-note-block';
+
+        const title = document.createElement('p');
+        title.className = 'mn-note-title';
+        title.textContent = `${note.attempt_no}회차 · ${statusKo[note.status] || note.status} · 사진 ${note.image_count}장`;
+        block.appendChild(title);
+
+        const actions = document.createElement('div');
+        actions.className = 'mn-modal-actions';
+        actions.style.justifyContent = 'flex-start';
+
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'mini-btn';
+        viewBtn.type = 'button';
+        viewBtn.textContent = '사진 보기';
+        viewBtn.addEventListener('click', () => loadNoteImages(note.note_id, block));
+        actions.appendChild(viewBtn);
+
+        if (note.status === 'submitted') {
+          const reopenBtn = document.createElement('button');
+          reopenBtn.className = 'mini-btn';
+          reopenBtn.type = 'button';
+          reopenBtn.textContent = 'draft 로 되돌리기';
+          reopenBtn.addEventListener('click', () => reopenNote(note.note_id, assignmentIdOfModal()));
+          actions.appendChild(reopenBtn);
+        }
+        block.appendChild(actions);
+        bodyEl.appendChild(block);
+      });
+    }
+
+    // 현재 모달이 보고 있는 assignment_id (reopen 후 갱신용)
+    let currentModalAssignmentId = null;
+    function assignmentIdOfModal() { return currentModalAssignmentId; }
+
+    async function loadNoteImages(noteId, block) {
+      const old = block.querySelector('.mn-detail-area');
+      if (old) old.remove();
+      const area = document.createElement('div');
+      area.className = 'mn-detail-area';
+      area.innerHTML = '<div class="modal-body-msg">불러오는 중...</div>';
+      block.appendChild(area);
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_get_mistake_note_detail', { p_note_id: noteId });
+        if (error) throw error;
+        const result = Array.isArray(data) ? data[0] : data;
+        if (!result || result.ok !== true) throw new Error('상세를 불러오지 못했습니다.');
+        // view token 은 모달 지역 변수로만 유지
+        modalViewToken = result.student_view_token || null;
+        const images = Array.isArray(result.images) ? result.images : [];
+        area.innerHTML = '';
+        if (result.warning === 'view_token_issue_failed' || !modalViewToken) {
+          area.innerHTML = '<div class="modal-body-msg">이미지 토큰 발급에 실패해 사진을 표시할 수 없습니다.</div>';
+          return;
+        }
+        if (!images.length) {
+          area.innerHTML = '<div class="modal-body-msg">등록된 사진이 없습니다.</div>';
+          return;
+        }
+        const grid = document.createElement('div');
+        grid.className = 'mn-img-grid';
+        images.forEach(img => {
+          const im = document.createElement('img');
+          im.loading = 'lazy';
+          im.src = fileServerUrl(img.thumbnail_key || img.file_key);
+          im.addEventListener('click', () => openMnLightbox(fileServerUrl(img.file_key)));
+          grid.appendChild(im);
+        });
+        area.appendChild(grid);
+      } catch (err) {
+        area.innerHTML = `<div class="modal-body-msg">${escapeHtml(normalizeError(err))}</div>`;
+      }
+    }
+
+    function fileServerUrl(key) {
+      // token 은 URL 생성 순간에만 사용. DOM data-* 에 token 을 박지 않는다.
+      if (!modalViewToken || !key) return '';
+      return `${FILE_SERVER_URL}/file/${key}?token=${encodeURIComponent(modalViewToken)}`;
+    }
+
+    async function reopenNote(noteId, assignmentId) {
+      if (!confirm('이 오답노트를 draft 로 되돌릴까요?\n학생이 다시 사진을 추가/삭제할 수 있게 됩니다.')) return;
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_reopen_mistake_note_to_draft', { p_note_id: noteId });
+        if (error) throw error;
+        const result = Array.isArray(data) ? data[0] : data;
+        if (!result || result.ok !== true) throw new Error('되돌리기에 실패했습니다.');
+        setStatus('assignmentStatus', '오답노트를 draft 로 되돌렸습니다.', 'ok');
+        await loadMistakeNoteSummaries();
+        renderAssignmentList();
+        if (assignmentId) await openMistakeNoteModal(assignmentId);
+      } catch (err) {
+        alert(normalizeError(err));
+      }
+    }
+
+    function openMnLightbox(url) {
+      if (!url) return;
+      $('mnLightboxImg').src = url;
+      $('mnLightbox').classList.remove('hidden');
+    }
+    function closeMnLightbox() {
+      $('mnLightbox').classList.add('hidden');
+      $('mnLightboxImg').src = '';
+    }
+
+    function closeMistakeNoteModal() {
+      $('mnModalOverlay').classList.add('hidden');
+      $('mnModalBody').innerHTML = '';
+      closeMnLightbox();
+      // token 참조 폐기
+      modalViewToken = null;
+      currentModalAssignmentId = null;
     }
 
     function updateSelectionUi() {
@@ -901,6 +1146,12 @@
       $('studentNameSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadStudents(); });
       $('studentCodeSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadStudents(); });
       $('testTitleFilter').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadTestSets(); });
+      // 오답노트 모달
+      $('mnModalCloseBtn').addEventListener('click', closeMistakeNoteModal);
+      $('mnModalOverlay').addEventListener('click', (e) => {
+        if (e.target.id === 'mnModalOverlay') closeMistakeNoteModal();
+      });
+      $('mnLightbox').addEventListener('click', closeMnLightbox);
     }
 
     async function init() {
@@ -920,5 +1171,20 @@
 
     init();
   </script>
+
+  <!-- 오답노트 상세 모달 -->
+  <div id="mnModalOverlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="mnModalTitle" class="modal-title">오답노트</h3>
+        <button id="mnModalCloseBtn" class="modal-close" type="button">&times;</button>
+      </div>
+      <div id="mnModalMeta" class="modal-meta"></div>
+      <div id="mnModalBody"></div>
+    </div>
+  </div>
+  <div id="mnLightbox" class="mn-lightbox hidden">
+    <img id="mnLightboxImg" src="" alt="" />
+  </div>
 </body>
 </html>

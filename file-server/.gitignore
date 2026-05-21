@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+.env.cleanup
+data/
+assets/fonts/*.ttf
+*.log
+.DS_Store

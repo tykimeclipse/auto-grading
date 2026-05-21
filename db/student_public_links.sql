@@ -144,11 +144,21 @@ begin
 end;
 $$;
 
-grant execute on function auto_grading.get_or_create_student_public_token(uuid)
-  to anon, authenticated, service_role;
+-- 교사용 함수 — anon 직접 호출 차단.
+-- student_id 만 알면 학생 범용 public token 을 발급할 수 있으므로 anon 노출 금지.
+-- PUBLIC 기본 grant 도 함께 revoke (anon 은 PUBLIC 멤버).
+-- SECURITY DEFINER 함수(omr_bridge, teacher_get_mistake_note_detail) 의 내부
+-- 호출은 정의자 권한으로 실행되므로 이 revoke 의 영향을 받지 않는다.
+-- TODO(보안 게이트): 장기적으로 authenticated 직접 grant 도 제거하고
+--   teacher_get_or_create_student_public_token wrapper(assert_admin 내장) +
+--   public grant 없는 internal helper 로 분리한다.
+revoke execute on function auto_grading.get_or_create_student_public_token(uuid)
+  from public, anon;
+grant  execute on function auto_grading.get_or_create_student_public_token(uuid)
+  to authenticated, service_role;
 
 comment on function auto_grading.get_or_create_student_public_token(uuid)
-  is '교사용. 학생의 활성 성취도 링크 토큰을 반환하거나 신규 발급한다.';
+  is '교사용. 학생의 활성 성취도 링크 토큰을 반환하거나 신규 발급한다. anon 호출 금지.';
 
 
 -- ----------------------------------------------------------------
@@ -186,8 +196,17 @@ begin
 end;
 $$;
 
-grant execute on function auto_grading.revoke_and_reissue_student_public_token(uuid)
-  to anon, authenticated, service_role;
+-- 교사용 함수 — anon 직접 호출 차단 (위 get_or_create 와 동일 사유).
+revoke execute on function auto_grading.revoke_and_reissue_student_public_token(uuid)
+  from public, anon;
+grant  execute on function auto_grading.revoke_and_reissue_student_public_token(uuid)
+  to authenticated, service_role;
 
 comment on function auto_grading.revoke_and_reissue_student_public_token(uuid)
-  is '교사용. 기존 성취도 링크 토큰을 폐기하고 새 토큰을 즉시 발급한다.';
+  is '교사용. 기존 성취도 링크 토큰을 폐기하고 새 토큰을 즉시 발급한다. anon 호출 금지.';
+
+
+-- ----------------------------------------------------------------
+-- 7. PostgREST 스키마 캐시 reload (grant 변경 반영)
+-- ----------------------------------------------------------------
+notify pgrst, 'reload schema';

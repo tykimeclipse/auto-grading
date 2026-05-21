@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>내 오답노트</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --brand: #5b3df0;
+      --brand-soft: #f3f0ff;
+      --brand-line: #c7bfff;
+      --danger: #b42318;
+      --ok: #18794e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.4;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 16px 14px 40px;
+    }
+    .topbar { margin-bottom: 14px; }
+    .title { font-size: 22px; font-weight: 800; margin: 0 0 4px; }
+    .subtitle { font-size: 14px; color: var(--muted); margin: 0; }
+
+    #messageArea { margin-bottom: 12px; }
+    .alert-box, .info-box, .loading-box, .empty-box {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 20px 16px;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      text-align: center;
+    }
+    .alert-box { color: var(--danger); border: 1px solid #f4b8b0; }
+    .info-box, .empty-box, .loading-box { color: var(--muted); }
+
+    .note-list { display: grid; gap: 10px; }
+    .note-card {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .note-card:hover { border-color: var(--brand-line); }
+    .note-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .note-test {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0 0 4px;
+    }
+    .note-unit { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+    .note-foot {
+      display: flex;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--muted);
+      align-items: center;
+    }
+
+    .status-chip {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .status-draft     { background: #fff8e6; color: #946800; }
+    .status-submitted { background: #e6f4ec; color: var(--ok); }
+
+    .more-wrap { text-align: center; margin-top: 14px; }
+    .btn-more {
+      background: var(--brand-soft);
+      color: var(--brand);
+      border: 1px solid var(--brand-line);
+      border-radius: 10px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-more:disabled { opacity: 0.5; cursor: default; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <h1 class="title">내 오답노트</h1>
+      <p class="subtitle">지금까지 작성한 오답노트를 확인할 수 있습니다.</p>
+    </header>
+
+    <div id="messageArea"></div>
+
+    <main id="contentArea" style="display:none;">
+      <div id="noteList" class="note-list"></div>
+      <div id="moreWrap" class="more-wrap" style="display:none;">
+        <button type="button" id="moreBtn" class="btn-more">더 보기</button>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+    const SUPABASE_URL      = "https://gspsquuyqkydqphbcuel.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_osq8Sjog7qDEiZ3A8toJ6Q_TQ3ATAt6";
+
+    const PAGE_SIZE = 50;
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    const state = { token: null, offset: 0, total: 0, rows: [], loading: false };
+
+    const params = new URLSearchParams(location.search);
+    state.token = (params.get('token') || '').trim();
+
+    const messageArea = document.getElementById('messageArea');
+    const contentArea = document.getElementById('contentArea');
+    const noteList    = document.getElementById('noteList');
+    const moreWrap    = document.getElementById('moreWrap');
+    const moreBtn     = document.getElementById('moreBtn');
+
+    if (!UUID_RE.test(state.token)) {
+      showAlert('유효하지 않은 링크입니다. 선생님께 성취도 링크를 요청해 주세요.');
+    } else {
+      init();
+    }
+
+    async function init() {
+      showLoading('불러오는 중입니다...');
+      try {
+        await loadPage();
+        clearMessage();
+        contentArea.style.display = 'block';
+        render();
+        moreBtn.addEventListener('click', async () => {
+          await loadPage();
+          render();
+        });
+      } catch (err) {
+        console.error(err);
+        showAlert(err?.message || '오답노트 목록을 불러오지 못했습니다.');
+      }
+    }
+
+    async function loadPage() {
+      if (state.loading) return;
+      state.loading = true;
+      moreBtn.disabled = true;
+      try {
+        const { data, error } = await supabase
+          .schema('auto_grading')
+          .rpc('list_mistake_notes_by_token', {
+            p_token:  state.token,
+            p_limit:  PAGE_SIZE,
+            p_offset: state.offset,
+          });
+        if (error) throw error;
+        const result = unwrap(data);
+        if (!result || result.ok !== true) {
+          throw new Error(errorToMessage(result && result.error)
+            || '오답노트 목록을 불러오지 못했습니다.');
+        }
+        state.total = Number(result.total || 0);
+        const rows = Array.isArray(result.rows) ? result.rows : [];
+        state.rows = state.rows.concat(rows);
+        state.offset += rows.length;
+      } finally {
+        state.loading = false;
+        moreBtn.disabled = false;
+      }
+    }
+
+    function render() {
+      noteList.replaceChildren();
+
+      if (!state.rows.length) {
+        noteList.innerHTML = '';
+        messageArea.innerHTML =
+          '<div class="empty-box">아직 작성한 오답노트가 없습니다.<br>2차 채점이 끝난 시험에서 오답노트를 만들어 보세요.</div>';
+        moreWrap.style.display = 'none';
+        return;
+      }
+      clearMessage();
+
+      for (const row of state.rows) {
+        noteList.appendChild(buildCard(row));
+      }
+
+      // 더 보기 노출 여부
+      moreWrap.style.display = (state.offset < state.total) ? 'block' : 'none';
+    }
+
+    function buildCard(row) {
+      const card = document.createElement('div');
+      card.className = 'note-card';
+      card.addEventListener('click', () => goToDetail(row.note_id));
+
+      const top = document.createElement('div');
+      top.className = 'note-card-top';
+
+      const left = document.createElement('div');
+      const test = document.createElement('p');
+      test.className = 'note-test';
+      test.textContent = row.test_title || '시험명 없음';
+      const unit = document.createElement('p');
+      unit.className = 'note-unit';
+      unit.textContent = row.unit_title_snapshot || '단원 정보 없음';
+      left.append(test, unit);
+
+      const chip = document.createElement('span');
+      chip.className = `status-chip status-${row.status}`;
+      chip.textContent = ({ draft: '작성중', submitted: '제출됨' })[row.status] || row.status;
+
+      top.append(left, chip);
+      card.appendChild(top);
+
+      const foot = document.createElement('div');
+      foot.className = 'note-foot';
+      const photos = document.createElement('span');
+      photos.textContent = `사진 ${row.image_count ?? 0}장`;
+      const date = document.createElement('span');
+      date.textContent = formatDate(row.created_at);
+      foot.append(photos, date);
+      card.appendChild(foot);
+
+      return card;
+    }
+
+    function goToDetail(noteId) {
+      const url = new URL(location.href);
+      const base = url.pathname.replace(/[^/]+$/, 'mistake-note-detail-v1.html');
+      location.href = `${url.origin}${base}`
+        + `?token=${encodeURIComponent(state.token)}`
+        + `&note_id=${encodeURIComponent(noteId)}`;
+    }
+
+    function formatDate(value) {
+      if (!value) return '';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function unwrap(data) {
+      if (Array.isArray(data)) return data[0] ?? null;
+      return data ?? null;
+    }
+
+    function showLoading(text) {
+      contentArea.style.display = 'none';
+      messageArea.innerHTML = `<div class="loading-box">${escapeHtml(text)}</div>`;
+    }
+    function showAlert(text) {
+      contentArea.style.display = 'none';
+      messageArea.innerHTML = `<div class="alert-box">${escapeHtml(text)}</div>`;
+    }
+    function clearMessage() { messageArea.innerHTML = ''; }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    function errorToMessage(code) {
+      switch (code) {
+        case 'unauthorized': return '인증이 만료되었습니다. 선생님께 새 링크를 요청해 주세요.';
+        default:             return null;
+      }
+    }
+  </script>
+</body>
+</html>
