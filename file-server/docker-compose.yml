@@ -1,0 +1,47 @@
+# ============================================================
+# auto-grading file-server — Docker Compose
+#
+# 사용:
+#   1) cp .env.example .env  → .env 의 SUPABASE_ANON_KEY 채우기
+#   2) (선택) assets/fonts/NotoSansKR-Regular.ttf 배치 — PDF 한글 헤더용
+#   3) docker compose up -d --build
+#   4) docker compose logs -f          # 로그 확인
+#   5) curl http://<host-ip>:8787/health
+#
+# 데이터/폰트는 host 디렉터리에 마운트 → 컨테이너 재생성해도 영속.
+# ============================================================
+
+services:
+  file-server:
+    build: .
+    image: auto-grading-file-server:latest
+    container_name: auto-grading-file-server
+    restart: unless-stopped
+
+    # 컨테이너 8787 을 host 8787 로 노출 (LAN 내부 접근).
+    # 외부 인터넷 노출은 별도 (Cloudflare Tunnel 등) — 보안 게이트 통과 후에만.
+    ports:
+      - "8787:8787"
+
+    # .env 의 모든 변수를 컨테이너에 주입
+    env_file:
+      - .env
+
+    # .env 의 HOST 가 127.0.0.1 이어도 컨테이너 안에선 0.0.0.0 으로 강제.
+    # (compose 의 environment 가 env_file 보다 우선)
+    environment:
+      HOST: "0.0.0.0"
+
+    volumes:
+      # 업로드된 이미지/PDF 영속
+      - ./data:/app/data
+      # PDF 한글 폰트 (있을 때만 효과). read-only 마운트.
+      - ./assets/fonts:/app/assets/fonts:ro
+
+    # 헬스체크 — 컨테이너 자체 상태 확인
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

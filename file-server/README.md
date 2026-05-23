@@ -197,6 +197,69 @@ curl -X POST http://localhost:8787/upload \
   -F "file=@./sample.jpg"
 ```
 
+## 학원 PC 배포 (Docker Compose)
+
+학원 우분투 PC에 컨테이너로 띄우는 절차. **LAN 내부 검증용** 단계 — 외부
+인터넷 노출(Cloudflare Tunnel)은 보안 게이트 통과 후에만 추가한다.
+
+### 사전 준비
+- Docker Engine + Compose v2 (`docker compose version` 으로 확인)
+- 학원 PC 의 LAN IP 확인 (`hostname -I` 또는 `ip a`)
+- (선택) `assets/fonts/NotoSansKR-Regular.ttf` — PDF 한글 헤더용
+
+### 절차
+```bash
+# 1) 코드 가져오기 (방법은 자유 — git clone 또는 scp 등)
+cd file-server
+
+# 2) 환경변수 — SUPABASE_ANON_KEY 채우기
+cp .env.example .env
+nano .env
+
+# 3) 빌드 + 백그라운드 기동
+docker compose up -d --build
+
+# 4) 로그 확인
+docker compose logs -f file-server
+
+# 5) 다른 PC(개발 PC 등)에서 health 체크
+curl http://<학원-PC-LAN-IP>:8787/health
+```
+
+### 관리 명령
+| 동작 | 명령 |
+|------|------|
+| 중지 | `docker compose down` |
+| 재시작 | `docker compose restart file-server` |
+| 코드 변경 후 재배포 | `docker compose up -d --build` |
+| orphan 정리 1회 (dry-run) | `docker compose exec file-server node scripts/cleanup-orphans.js` |
+
+`data/` 와 `assets/fonts/` 는 host 디렉터리에 마운트되므로, 컨테이너를
+재생성해도 업로드된 이미지/PDF 와 폰트는 그대로 유지된다.
+
+### 프론트 (개발 PC) 설정
+프론트는 개발 PC 의 `python -m http.server`(또는 임의 정적 서버)에서
+계속 서빙하고, 파일서버 주소만 학원 PC 로 가리키도록 바꾼다:
+
+`frontend/app-config.js`:
+```js
+window.APP_CONFIG = {
+  FILE_SERVER_URL: 'http://<학원-PC-LAN-IP>:8787',
+  ENABLE_OMR_MISTAKE_NOTE_BRIDGE: true,
+};
+```
+
+학원 PC `.env` 의 `ALLOWED_ORIGINS` 에 개발 PC 의 프론트 origin
+(`http://localhost:3000` 등) 이 들어 있어야 CORS 통과한다 (`.env.example`
+기본값에 이미 포함).
+
+### orphan 정리 cron (선택, 운영용)
+컨테이너 안에서 cron 을 돌리지 말고 host crontab 에서 `docker compose exec`
+로 호출한다. 호스트 crontab 예시 (`crontab -e`):
+```
+0 3 * * * cd /path/to/file-server && docker compose exec -T file-server node scripts/cleanup-orphans.js --apply >> /var/log/cleanup-orphans.log 2>&1
+```
+
 ## orphan 파일 정리 (배치)
 
 DB(`mistake_images`)에 등록되지 않은 파일을 7일 grace 후 삭제하는 배치 스크립트.
