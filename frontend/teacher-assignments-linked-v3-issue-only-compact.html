@@ -234,7 +234,6 @@
                   <div class="meta-item"><span class="k">문항수</span><span id="metaTestItems" class="v">-</span></div>
                   <div class="meta-item"><span class="k">소단원코드</span><span id="metaTestUnitCode" class="v">-</span></div>
                   <div class="meta-item"><span class="k">최근 사용</span><span id="metaTestLastUsed" class="v">-</span></div>
-                  <div class="meta-item"><span class="k">정답 입력 상태</span><span id="metaAnswerReady" class="v">-</span></div>
                 </div>
               </div>
               <div class="inner-box">
@@ -629,12 +628,9 @@
       }
       const { data, error } = await state.supabase
         .schema('auto_grading')
-        .from('test_sets')
-        .select('id,subject,unit_code,source_category,source_name,source_type,total_items,updated_at,created_at')
-        .eq('id', testSetId)
-        .maybeSingle();
+        .rpc('teacher_get_test_set_detail', { p_test_set_id: testSetId });
       if (error) throw error;
-      state.selectedTestDetail = data || null;
+      state.selectedTestDetail = Array.isArray(data) ? (data[0] || null) : (data || null);
     }
 
     function renderSelectedTest() {
@@ -647,7 +643,6 @@
       $('metaTestItems').textContent = `${td?.total_items ?? ts?.total_items ?? '-'}문항`;
       $('metaTestUnitCode').textContent = td?.unit_code || '-';
       $('metaTestLastUsed').textContent = ts?.last_used_at ? fmtDateTime(ts.last_used_at) : '-';
-      $('metaAnswerReady').textContent = td?.total_items ? '확인 필요' : '-';
       $('ovAssignmentCount').textContent = fmtCount(ov?.assignment_count);
       $('ovOpenAssignmentCount').textContent = fmtCount(ov?.open_assignment_count);
       $('ovStartedCount').textContent = fmtCount(ov?.started_assignment_count);

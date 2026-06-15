@@ -15,6 +15,8 @@
 )
 returns table(test_set_id uuid, title text, inserted_items integer)
 language plpgsql
+security definer
+set search_path to 'auto_grading', 'public'
 as $function$
 declare
   v_test_set_id uuid;
@@ -23,6 +25,8 @@ declare
   v_invalid_count integer;
   v_source_category text;
 begin
+  perform auto_grading.assert_admin();
+
   if p_title is null or btrim(p_title) = '' then
     raise exception 'p_title is required';
   end if;
@@ -170,3 +174,16 @@ begin
     v_item_count;
 end;
 $function$;
+
+-- 관리자 전용 쓰기 RPC: anon/public 차단, authenticated 만 호출 가능
+-- (실제 관리자 검증은 함수 본문 첫 줄 assert_admin() 에서 수행)
+-- service_role 은 grant 대상에서 제외: assert_admin 이 auth.jwt()->>'email' 을 보는데
+-- service_role 키 호출에는 email claim 이 없어 어차피 통과하지 못하며,
+-- 서버측 작업은 테이블에 직접 쓰면 RLS 를 우회한다. (teacher_* RPC 컨벤션과 일치)
+revoke execute on function auto_grading.create_test_set_from_json(
+  text, text, jsonb, text, text, text, text, text, text, integer, text, text, text
+) from public, anon;
+
+grant execute on function auto_grading.create_test_set_from_json(
+  text, text, jsonb, text, text, text, text, text, text, integer, text, text, text
+) to authenticated;
