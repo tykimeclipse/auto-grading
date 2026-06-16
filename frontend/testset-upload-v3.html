@@ -1024,25 +1024,20 @@
         setStatus("검색 중...", "info");
         try {
           const byId = $("searchById").value.trim();
-          let query = state.supabase
+          const titleVal = $("title").value.trim();
+          const { data, error } = await state.supabase
             .schema("auto_grading")
-            .from("test_sets")
-            .select("id,title,curriculum_version,grade_level,subject,unit_code,source_type,source_category,source_name,test_items(count)");
-          if (byId) {
-            query = query.eq("id", byId);
-          } else {
-            query = query
-              .eq("curriculum_version", $("curriculumVersion").value)
-              .eq("grade_level", $("gradeLevel").value)
-              .eq("subject", $("subject").value)
-              .eq("unit_code", unitCode)
-              .eq("source_category", sourceCategory);
-            const titleVal = $("title").value.trim();
-            if (titleVal) query = query.ilike("title", `%${titleVal}%`);
-          }
-          const { data, error } = await query;
+            .rpc("teacher_find_test_sets_for_upload", {
+              p_test_set_id: byId || null,
+              p_curriculum_version: byId ? null : $("curriculumVersion").value,
+              p_grade_level: byId ? null : $("gradeLevel").value,
+              p_subject: byId ? null : $("subject").value,
+              p_unit_code: byId ? null : unitCode,
+              p_source_category: byId ? null : sourceCategory,
+              p_title: byId ? null : (titleVal || null),
+            });
           if (error) throw error;
-          const itemCount = (d) => d.test_items?.[0]?.count ?? "-";
+          const itemCount = (d) => d.item_count ?? "-";
           if (!data || data.length === 0) {
             setStatus("해당 조건의 문제지가 없습니다.", "error");
             $("editBtn").disabled = true;
