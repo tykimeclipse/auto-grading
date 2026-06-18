@@ -556,52 +556,19 @@ ${names.join('\n')}`);
 
       showStatus($('formStatus'), 'info', '학생을 등록하는 중입니다...');
 
-      const { data: dup, error: dupError } = await client
-        .schema('auto_grading')
-        .from('students')
-        .select('id, student_code')
-        .eq('student_code', student_code)
-        .maybeSingle();
-
-      if (dupError) throw dupError;
-      if (dup) {
-        throw new Error(`이미 사용 중인 student_code입니다: ${student_code}`);
-      }
-
-      const payload = {
-        student_code,
-        name,
-        grade_level,
-        is_active: true,
-        student_no: Number(student_code)
-      };
-
+      // 학생 insert + 선택 강좌 연결을 단일 트랜잭션 RPC 로 처리.
+      // (students 직접 CRUD 는 RLS default-deny 로 막히고, RPC 가 원자성·롤백을 보장)
       const { data, error } = await client
         .schema('auto_grading')
-        .from('students')
-        .insert(payload)
-        .select('id, student_code, name, grade_level, is_active, created_at')
-        .single();
+        .rpc('teacher_register_student_with_course', {
+          p_student_code: student_code,
+          p_name: name,
+          p_grade_level: grade_level,
+          p_course_id: course_id,
+          p_service_type: course_id ? student_course_type : null
+        });
 
       if (error) throw error;
-
-      try {
-        if (course_id) {
-          const { data: courseLinkData, error: courseLinkError } = await client
-            .schema('auto_grading')
-            .rpc('teacher_attach_student_to_course', {
-              p_student_id: data.id,
-              p_course_id: course_id,
-              p_service_type: student_course_type
-            });
-
-          if (courseLinkError) throw courseLinkError;
-          if (courseLinkData?.ok === false) throw new Error(courseLinkData.error || '강좌 연결에 실패했습니다.');
-        }
-      } catch (linkErr) {
-        await client.schema('auto_grading').from('students').delete().eq('id', data.id);
-        throw linkErr;
-      }
 
       $('studentName').value = '';
       $('gradeLevel').value = '';
