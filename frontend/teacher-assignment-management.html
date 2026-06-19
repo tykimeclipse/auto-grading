@@ -196,7 +196,7 @@
     function gradeLabel(v){ return GRADE_LABELS[String(v)] || (v || '-'); }
     function fmtDate(v){ if(!v) return '-'; const d=new Date(v); if(Number.isNaN(d.getTime())) return v; return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
     function fmtDateTime(v){ if(!v) return ''; const d=new Date(v); if(Number.isNaN(d.getTime())) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
-    function buildStudentAssignmentLink(assignmentId){ if(!assignmentId) return ''; const url=new URL(window.location.href); const basePath=url.pathname.replace(/[^/]+$/, 'student-answer-omr-v3.html'); return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`; }
+    function buildStudentAssignmentLink(assignmentId){ if(!assignmentId) return ''; const url=new URL(window.location.href); const basePath=url.pathname.replace(/[^/]+$/, 'student-answer-omr-v4.html'); return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`; }
     async function copyText(text){ if(!text) throw new Error('복사할 내용이 없습니다.'); if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return true; } const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.focus(); ta.select(); const ok=document.execCommand('copy'); ta.remove(); return ok; }
 
     function scoreText(correct, total, percent){
