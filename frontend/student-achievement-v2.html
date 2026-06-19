@@ -94,14 +94,6 @@
         justify-content: space-between;
         gap: 10px;
       }
-      .mistake-note-link {
-        font-size: 14px;
-        font-weight: 600;
-        color: #5b3df0;
-        text-decoration: none;
-        white-space: nowrap;
-      }
-      .mistake-note-link:hover { text-decoration: underline; }
       .table-wrap {
         overflow-x: auto;
       }
@@ -196,7 +188,6 @@
         <div class="table-box">
           <div class="table-header">
             <span>시험 기록</span>
-            <a id="mistakeNoteLink" class="mistake-note-link" href="#">내 오답노트 &rarr;</a>
           </div>
           <div class="table-wrap">
             <table>
@@ -451,13 +442,6 @@
             "유효한 링크가 아닙니다. 선생님께 성취도 링크를 요청해 주세요.",
           );
           return;
-        }
-
-        // '내 오답노트' 링크에 동일 토큰 전달
-        const mistakeNoteLink = document.getElementById("mistakeNoteLink");
-        if (mistakeNoteLink) {
-          mistakeNoteLink.href =
-            `mistake-note-list-v1.html?token=${encodeURIComponent(token)}`;
         }
 
         showMessage("loading", "조회 중입니다...");
