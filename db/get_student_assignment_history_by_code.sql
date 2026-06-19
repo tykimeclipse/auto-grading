@@ -178,5 +178,10 @@ begin
 end;
 $$;
 
+-- anon 회수: student_code(101~999)가 enumerable 이라 anon 공개 시 토큰 없이 전 학생
+-- 이력 스크래핑이 가능하다. 공개 페이지는 토큰 경로(get_student_assignment_history_by_token,
+-- security definer)로만 접근하고, by_code 는 관리자(authenticated)만 직접 호출한다.
+-- (운영 DB 는 이미 anon 회수 상태 — 이 파일을 운영에 맞춰 정합화)
+revoke execute on function auto_grading.get_student_assignment_history_by_code(text, integer) from anon, public;
 grant execute on function auto_grading.get_student_assignment_history_by_code(text, integer)
-to anon, authenticated;
+to authenticated;
