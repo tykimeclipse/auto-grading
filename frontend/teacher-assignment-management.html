@@ -73,6 +73,16 @@
     .muted{color:var(--muted)}
     .score-cell{font-weight:700}
     .score-cell.blank{color:#b0b8c5;font-weight:500}
+    .score-count{cursor:help;border-bottom:1px dashed #9aa3b2}
+    .wrong-tip{position:fixed;z-index:1000;display:none;max-width:340px;background:#1f2430;color:#f1f3f7;
+               border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;font-weight:500;
+               box-shadow:0 6px 20px rgba(0,0,0,.28);pointer-events:none}
+    .wrong-tip table{border-collapse:collapse;width:100%}
+    .wrong-tip th,.wrong-tip td{padding:2px 8px;text-align:center;white-space:nowrap}
+    .wrong-tip th{color:#aeb6c4;font-weight:600;border-bottom:1px solid #3a4150}
+    .wrong-tip td.wrong{color:#ff9a9a}
+    .wrong-tip td.ok{color:#9be7a6}
+    .wrong-tip .tip-empty{color:#aeb6c4}
     .link-box{display:flex;align-items:center;min-width:0}
     .link-input{width:100%;min-height:32px;border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:11px;background:#fff;color:var(--text);overflow:hidden;text-overflow:ellipsis}
     .toggle-wrap{display:flex;align-items:center;gap:8px}
@@ -204,6 +214,78 @@
       return `${correct}/${total} · ${Number(percent).toFixed(0)}%`;
     }
 
+    // 점수 셀: '맞은 갯수'(틀린답/정답 표 hover) + '%'(작성시간 title) 로 분리 렌더
+    function scoreCellHtml(correct, total, percent, submittedAt, assignmentId, roundNo){
+      if (correct == null || total == null || percent == null) return '<div class="score-cell blank">-</div>';
+      const countPart = `${correct}/${total}`;
+      const pctPart = `${Number(percent).toFixed(0)}%`;
+      const t = fmtDateTime(submittedAt);
+      const pctTitle = t ? ` title="${escapeHtml(t)}"` : '';
+      return `<div class="score-cell">`
+        + `<span class="score-count" data-assignment-id="${escapeHtml(assignmentId)}" data-round="${roundNo}">${escapeHtml(countPart)}</span>`
+        + ` · `
+        + `<span class="score-pct"${pctTitle}>${escapeHtml(pctPart)}</span>`
+        + `</div>`;
+    }
+
+    // ── '맞은 갯수' hover 시 틀린 문항(학생답/정답) lazy 툴팁 ──────────────
+    const wrongCache = new Map(); // assignment_id -> Promise<array>
+    function getWrongAnswers(assignmentId){
+      if (!wrongCache.has(assignmentId)){
+        wrongCache.set(assignmentId, (async () => {
+          const { data, error } = await state.supabase.schema('auto_grading')
+            .rpc('teacher_get_attempt_wrong_answers', { p_assignment_id: assignmentId });
+          if (error) throw error;
+          return Array.isArray(data) ? data : (data || []);
+        })().catch(err => { wrongCache.delete(assignmentId); throw err; }));
+      }
+      return wrongCache.get(assignmentId);
+    }
+    function ensureWrongTip(){
+      let tip = document.getElementById('wrongTip');
+      if (!tip){ tip = document.createElement('div'); tip.id = 'wrongTip'; tip.className = 'wrong-tip'; document.body.appendChild(tip); }
+      return tip;
+    }
+    function positionWrongTip(tip, el){
+      const r = el.getBoundingClientRect();
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - tip.offsetWidth - 12));
+      tip.style.left = left + 'px';
+      tip.style.top = (r.bottom + 6) + 'px';
+    }
+    function renderWrongTable(rows, roundNo){
+      const list = (rows || []).filter(x => Number(x.round_no) === Number(roundNo));
+      if (!list.length) return '<div class="tip-empty">틀린 문항 없음</div>';
+      const trs = list.map(x =>
+        `<tr><td>${escapeHtml(String(x.item_no))}</td>`
+        + `<td class="wrong">${escapeHtml(x.selected == null ? '—' : String(x.selected))}</td>`
+        + `<td class="ok">${escapeHtml(x.correct == null ? '—' : String(x.correct))}</td></tr>`
+      ).join('');
+      return `<table><thead><tr><th>문항</th><th>학생답</th><th>정답</th></tr></thead><tbody>${trs}</tbody></table>`;
+    }
+    async function showWrongTip(el){
+      const tip = ensureWrongTip();
+      const aid = el.dataset.assignmentId;
+      const round = el.dataset.round;
+      const key = aid + ':' + round;
+      tip.dataset.activeKey = key;
+      tip.innerHTML = '불러오는 중…';
+      tip.style.display = 'block';
+      positionWrongTip(tip, el);
+      try {
+        const rows = await getWrongAnswers(aid);
+        if (tip.dataset.activeKey !== key) return;
+        tip.innerHTML = renderWrongTable(rows, round);
+        positionWrongTip(tip, el);
+      } catch (e) {
+        if (tip.dataset.activeKey !== key) return;
+        tip.innerHTML = '<div class="tip-empty">불러오기 실패</div>';
+      }
+    }
+    function hideWrongTip(){
+      const tip = document.getElementById('wrongTip');
+      if (tip){ tip.style.display = 'none'; tip.dataset.activeKey = ''; }
+    }
+
     function hasTeacherFinal(row){
       return Boolean(row?.has_teacher_final);
     }
@@ -304,13 +386,14 @@
         updateSummary();
         return;
       }
+      wrongCache.clear();
       body.innerHTML = state.assignments.map(row => {
         const link = buildStudentAssignmentLink(row.assignment_id);
         const finalInfo = derivedFinalDisplay(row);
-        const round1 = scoreText(row.round1_correct_count, row.total_items, row.round1_score_percent);
-        const round2 = shouldShowRound2(row)
-          ? scoreText(row.round2_correct_count, row.total_items, row.round2_score_percent)
-          : '-';
+        const round1Cell = scoreCellHtml(row.round1_correct_count, row.total_items, row.round1_score_percent, row.round1_submitted_at, row.assignment_id, 1);
+        const round2Cell = shouldShowRound2(row)
+          ? scoreCellHtml(row.round2_correct_count, row.total_items, row.round2_score_percent, row.round2_submitted_at, row.assignment_id, 2)
+          : '<div class="score-cell blank">-</div>';
         const finalText = finalInfo ? `${finalInfo.correct}/${row.total_items} · ${Number(finalInfo.percent).toFixed(0)}%` : '-';
         const finalClass = finalText === '-' ? 'blank' : '';
         return `
@@ -321,8 +404,8 @@
             <div>${escapeHtml(gradeLabel(row.student_grade))}</div>
             <div class="link-box"><input class="link-input" type="text" value="${escapeHtml(link)}" readonly /></div>
             <div><button class="mini-btn copy-link-btn" type="button" data-link="${escapeHtml(link)}">복사</button></div>
-            <div class="score-cell ${round1==='-'?'blank':''}" ${fmtDateTime(row.round1_submitted_at)?`title="${escapeHtml(fmtDateTime(row.round1_submitted_at))}"`:''}>${escapeHtml(round1)}</div>
-            <div class="score-cell ${round2==='-'?'blank':''}" ${fmtDateTime(row.round2_submitted_at)?`title="${escapeHtml(fmtDateTime(row.round2_submitted_at))}"`:''}>${escapeHtml(round2)}</div>
+            ${round1Cell}
+            ${round2Cell}
             <div class="score-cell ${finalClass}">${escapeHtml(finalText)}</div>
             <div>${renderFinalEditor(row)}</div>
             <div>${renderResetButton(row)}</div>
@@ -350,6 +433,10 @@
       body.querySelectorAll('.cancel-reset-btn').forEach(btn => btn.addEventListener('click', () => { state.resetingAssignmentId = null; renderAssignmentList(); }));
       body.querySelectorAll('.reset-r2-btn').forEach(btn => btn.addEventListener('click', async () => { await resetAttemptRound2(btn.dataset.assignmentId); }));
       body.querySelectorAll('.reset-full-btn').forEach(btn => btn.addEventListener('click', async () => { await resetAttemptFull(btn.dataset.assignmentId); }));
+      body.querySelectorAll('.score-count').forEach(el => {
+        el.addEventListener('mouseenter', () => showWrongTip(el));
+        el.addEventListener('mouseleave', hideWrongTip);
+      });
       updateSummary();
     }
 
