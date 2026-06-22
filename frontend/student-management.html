@@ -891,10 +891,12 @@
         const r2Pct    = h.round2_score_percent   != null ? Number(h.round2_score_percent)   : null;
         const r1Perf   = r1Pct === 100;
         const r2Perf   = r2Pct === 100;
+        // 수동시험은 teacher_final 로만 최종 확정(1차/2차 100점 자동확정 미적용)
+        const isManual = h.source_type === 'manual';
         let finalValue = null;
         if (h.teacher_final_score_percent != null) finalValue = h.teacher_final_score_percent;
-        else if (r1Perf) finalValue = 100;
-        else if (r2Perf) finalValue = 100;
+        else if (!isManual && r1Perf) finalValue = 100;
+        else if (!isManual && r2Perf) finalValue = 100;
 
         const r1Cell    = r1Pct != null ? getScoreHighlight(r1Pct, `${Math.round(r1Pct)}%`) : '-';
         const r2Cell    = (!r1Perf && r2Pct != null) ? getScoreHighlight(r2Pct, `${Math.round(r2Pct)}%`) : '-';
@@ -902,7 +904,7 @@
 
         return `<tr>
           <td>${shortDate(h.event_date)}</td>
-          <td class="title-cell">${escapeHtml(h.test_title || '-')}</td>
+          <td class="title-cell">${escapeHtml(h.test_title || '-')}${isManual ? ' <span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:999px;font-size:11px;font-weight:700;background:#f3e8ff;color:#7e22ce;border:1px solid #e9d5ff;">수동</span>' : ''}</td>
           <td>${h.total_items != null ? h.total_items : ''}</td>
           <td>${r1Cell}</td>
           <td>${r2Cell}</td>

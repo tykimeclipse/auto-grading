@@ -103,6 +103,26 @@
       .top-summary,.search-grid{grid-template-columns:1fr}
       .page-header{flex-direction:column}
     }
+    /* 수동 시험 배지 */
+    .manual-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;
+                  background:#f3e8ff;color:#7e22ce;border:1px solid #e9d5ff;vertical-align:middle}
+    /* 수동 시험 입력 모달 */
+    .modal-overlay{position:fixed;inset:0;background:rgba(22,34,51,.45);display:none;align-items:flex-start;justify-content:center;
+                   z-index:2000;overflow-y:auto;padding:40px 16px}
+    .modal-overlay.open{display:flex}
+    .modal{background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:760px;max-width:100%;overflow:hidden}
+    .modal-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:linear-gradient(to bottom,#fff,#fbfcff)}
+    .modal-head h3{margin:0;font-size:18px}
+    .modal-body{padding:18px 20px;max-height:70vh;overflow-y:auto}
+    .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+    .modal-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:8px}
+    .modal-sub{font-size:13px;color:var(--muted);margin:0 0 12px}
+    .ms-row{display:grid;grid-template-columns:minmax(120px,1.6fr) 90px 90px 70px minmax(80px,1fr);gap:8px;align-items:center;
+            padding:8px 0;border-bottom:1px solid #eef2f7;font-size:13px}
+    .ms-row.head{font-weight:700;color:#48505e;font-size:12px;border-bottom:1px solid var(--line)}
+    .ms-row input{min-height:34px;padding:6px 8px}
+    .ms-saved{color:var(--success);font-weight:700;font-size:12px}
+    .issued-tag{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;color:#0f766e;font-size:13px;font-weight:700}
   </style>
 </head>
 <body>
@@ -154,6 +174,7 @@
             <label class="chip"><input id="filterOpenOnly" type="checkbox" checked /> 열림만 보기</label>
           </div>
           <div class="actions">
+            <button id="openManualBtn" class="btn-ghost" type="button">＋ 수동 시험 점수 입력</button>
             <button id="loadAssignmentsBtn" class="btn-primary" type="button">발행상황 불러오기</button>
             <button id="resetFiltersBtn" class="btn-secondary" type="button">필터 초기화</button>
           </div>
@@ -187,6 +208,46 @@
         </div>
       </div>
     </section>
+  </div>
+
+  <!-- 수동 시험 점수 입력 모달 -->
+  <div id="manualModal" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>수동 시험 점수 입력</h3>
+        <button id="manualCloseBtn" class="btn-ghost" type="button">닫기</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-sub">오프라인 평가(복습퀴즈·단답형/주관식·내신대비 등)를 발행하고 학생별 점수를 입력합니다.
+          누적 성취도는 <strong>정답 문항수 / 총 문항수</strong> 기준입니다(배점·부분점수 미지원).</p>
+
+        <!-- 1단계: 시험 발행 -->
+        <div class="modal-grid">
+          <div class="field"><label for="mTitle">시험명</label><input id="mTitle" type="text" placeholder="예: 6월 내신대비 1차 · 3단원 복습퀴즈" /></div>
+          <div class="field"><label for="mDate">평가일</label><input id="mDate" type="date" /></div>
+          <div class="field"><label for="mTotal">총 문항수</label><input id="mTotal" type="number" min="1" placeholder="예: 20" /></div>
+        </div>
+        <div class="actions" style="margin-bottom:14px;">
+          <button id="mIssueBtn" class="btn-primary" type="button">시험 발행</button>
+          <span id="mIssuedTag" class="issued-tag" style="display:none;"></span>
+        </div>
+
+        <!-- 2단계: 학생 점수 입력 -->
+        <div id="mStudentArea" style="display:none;">
+          <div class="modal-grid" style="grid-template-columns:1fr 1.4fr auto;">
+            <div class="field"><label for="mCourseSelect">수강과정</label><select id="mCourseSelect"><option value="">전체</option></select></div>
+            <div class="field"><label for="mStudentSearch">학생명/학생번호</label><input id="mStudentSearch" type="text" placeholder="예: 김동하 또는 101" /></div>
+            <div class="field"><label>&nbsp;</label><button id="mLoadStudentsBtn" class="btn-secondary" type="button">학생 불러오기</button></div>
+          </div>
+          <div id="mStudentList" style="margin-top:8px;"></div>
+        </div>
+
+        <div id="manualStatus" class="status info"></div>
+      </div>
+      <div class="modal-foot">
+        <button id="manualDoneBtn" class="btn-secondary" type="button">완료</button>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -301,7 +362,10 @@
       return Boolean(row?.attempt_id) && ['completed', 'needs_review'].includes(row?.status);
     }
 
+    function isManualRow(row){ return row?.source_type === 'manual'; }
+
     function shouldShowRound2(row){
+      if (isManualRow(row)) return false;          // 수동시험은 2차 없음
       if (!row?.attempt_id) return false;
       if (!['completed', 'needs_review'].includes(row?.status)) return false;
       if (isPerfectScore(row.round1_correct_count, row.total_items, row.round1_score_percent)) return false;
@@ -326,6 +390,8 @@
       if (hasTeacherFinal(row)) {
         return { correct: row.final_correct_count, percent: row.final_score_percent, auto:false };
       }
+      // 수동시험은 teacher_final 이 없으면 최종 없음(1차 100점 자동확정 미적용)
+      if (isManualRow(row)) return null;
       if (isPerfectScore(row.round1_correct_count, row.total_items, row.round1_score_percent)) {
         return { correct: row.total_items, percent: 100, auto:true };
       }
@@ -340,6 +406,7 @@
     }
 
     function canResetFull(row){
+      if (isManualRow(row)) return false;          // 수동시험은 OMR 응답이 없어 초기화 대상 아님
       return Boolean(row?.attempt_id) && ['in_progress', 'awaiting_retry', 'completed', 'needs_review'].includes(row?.status);
     }
 
@@ -363,7 +430,8 @@
         return `<span class="muted">${escapeHtml(finalEditHint(row))}</span>`;
       }
       if (state.editingAssignmentId !== row.assignment_id) {
-        const canFinalize = row.status === 'needs_review' && !hasTeacherFinal(row) && row.round2_score_percent != null;
+        // 수동시험은 2차가 없으므로 round2 기반 '확정'을 노출하지 않는다(최종은 모달/수정으로 입력).
+        const canFinalize = !isManualRow(row) && row.status === 'needs_review' && !hasTeacherFinal(row) && row.round2_score_percent != null;
         return `
           <button class="mini-btn edit-final-btn" type="button" data-assignment-id="${row.assignment_id}">수정</button>
           ${canFinalize ? `<button class="mini-btn primary confirm-final-btn" type="button" data-assignment-id="${row.assignment_id}">확정</button>` : ''}`;
@@ -388,22 +456,33 @@
       }
       wrongCache.clear();
       body.innerHTML = state.assignments.map(row => {
+        const isManual = isManualRow(row);
         const link = buildStudentAssignmentLink(row.assignment_id);
         const finalInfo = derivedFinalDisplay(row);
-        const round1Cell = scoreCellHtml(row.round1_correct_count, row.total_items, row.round1_score_percent, row.round1_submitted_at, row.assignment_id, 1);
+        // 수동시험: OMR 응답이 없으므로 틀린문항 hover 없는 plain 셀로 렌더
+        const round1Cell = isManual
+          ? `<div class="score-cell ${row.round1_score_percent == null ? 'blank' : ''}">${escapeHtml(scoreText(row.round1_correct_count, row.total_items, row.round1_score_percent))}</div>`
+          : scoreCellHtml(row.round1_correct_count, row.total_items, row.round1_score_percent, row.round1_submitted_at, row.assignment_id, 1);
         const round2Cell = shouldShowRound2(row)
           ? scoreCellHtml(row.round2_correct_count, row.total_items, row.round2_score_percent, row.round2_submitted_at, row.assignment_id, 2)
           : '<div class="score-cell blank">-</div>';
         const finalText = finalInfo ? `${finalInfo.correct}/${row.total_items} · ${Number(finalInfo.percent).toFixed(0)}%` : '-';
         const finalClass = finalText === '-' ? 'blank' : '';
+        const titleHtml = `<strong>${escapeHtml(row.test_title || '-')}</strong>` + (isManual ? '<span class="manual-badge">수동</span>' : '');
+        const linkCell = isManual
+          ? '<div class="link-box"><span class="muted">수동 입력</span></div>'
+          : `<div class="link-box"><input class="link-input" type="text" value="${escapeHtml(link)}" readonly /></div>`;
+        const copyCell = isManual
+          ? '<div class="muted">-</div>'
+          : `<div><button class="mini-btn copy-link-btn" type="button" data-link="${escapeHtml(link)}">복사</button></div>`;
         return `
           <div class="list-row">
             <div>${escapeHtml(fmtDate(row.assigned_at))}</div>
-            <div><strong>${escapeHtml(row.test_title || '-')}</strong></div>
+            <div>${titleHtml}</div>
             <div>${escapeHtml(row.student_name || '-')}</div>
             <div>${escapeHtml(gradeLabel(row.student_grade))}</div>
-            <div class="link-box"><input class="link-input" type="text" value="${escapeHtml(link)}" readonly /></div>
-            <div><button class="mini-btn copy-link-btn" type="button" data-link="${escapeHtml(link)}">복사</button></div>
+            ${linkCell}
+            ${copyCell}
             ${round1Cell}
             ${round2Cell}
             <div class="score-cell ${finalClass}">${escapeHtml(finalText)}</div>
@@ -615,6 +694,125 @@
       $('sumSelectedTest').textContent = selectedText;
     }
 
+    // ── 수동 시험 점수 입력 모달 ──────────────────────────────
+    const manual = { testSetId:null, title:'', total:0, students:[] };
+
+    function todayISO(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+    function openManualModal(){
+      manual.testSetId=null; manual.title=''; manual.total=0; manual.students=[];
+      $('mTitle').value=''; $('mTotal').value=''; $('mDate').value=todayISO();
+      $('mIssuedTag').style.display='none'; $('mIssuedTag').textContent='';
+      $('mStudentArea').style.display='none';
+      $('mStudentList').innerHTML='';
+      $('mTitle').disabled=false; $('mTotal').disabled=false; $('mDate').disabled=false; $('mIssueBtn').disabled=false;
+      setStatus('manualStatus','','info');
+      // 수강과정 옵션은 메인과 동일하게 채운다
+      $('mCourseSelect').innerHTML = '<option value="">전체</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
+      $('mStudentSearch').value='';
+      $('manualModal').classList.add('open');
+    }
+    function closeManualModal(){ $('manualModal').classList.remove('open'); }
+
+    async function issueManualTest(){
+      try {
+        const title = $('mTitle').value.trim();
+        const total = Number($('mTotal').value);
+        if (!title) throw new Error('시험명을 입력하세요.');
+        if (!Number.isInteger(total) || total <= 0) throw new Error('총 문항수는 1 이상의 정수여야 합니다.');
+        setStatus('manualStatus','시험을 발행하는 중...','info');
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_create_manual_test_set', {
+          p_title: title, p_total_items: total, p_grade_level: null, p_subject: null
+        });
+        if (error) throw error;
+        ensureRpcOk(data, '시험 발행에 실패했습니다.');
+        manual.testSetId = data.test_set_id; manual.title = title; manual.total = total;
+        $('mTitle').disabled=true; $('mTotal').disabled=true; $('mDate').disabled=true; $('mIssueBtn').disabled=true;
+        $('mIssuedTag').textContent = `발행됨: ${title} · ${total}문항`;
+        $('mIssuedTag').style.display='inline-flex';
+        $('mStudentArea').style.display='block';
+        setStatus('manualStatus','시험이 발행되었습니다. 학생을 불러와 점수를 입력하세요.','ok');
+      } catch (err) {
+        setStatus('manualStatus', normalizeError(err), 'error');
+      }
+    }
+
+    async function loadManualStudents(){
+      try {
+        if (!manual.testSetId) throw new Error('먼저 시험을 발행하세요.');
+        setStatus('manualStatus','학생을 불러오는 중...','info');
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_students_for_assignment', {
+          p_course_id: $('mCourseSelect').value || null,
+          p_test_set_id: null,
+          p_search: $('mStudentSearch').value.trim() || null,
+          p_grade: null, p_service_type: null, p_enrollment_type: null,
+          p_only_active: true, p_only_not_assigned: false,
+          p_limit: 200, p_offset: 0
+        });
+        if (error) throw error;
+        manual.students = Array.isArray(data) ? data : [];
+        renderManualStudents();
+        setStatus('manualStatus', `학생 ${manual.students.length}명을 불러왔습니다. 1차/최종 정답수를 입력 후 저장하세요.`, 'ok');
+      } catch (err) {
+        setStatus('manualStatus', normalizeError(err), 'error');
+      }
+    }
+
+    function renderManualStudents(){
+      const box = $('mStudentList');
+      if (!manual.students.length){ box.innerHTML = '<div class="muted" style="padding:10px 0;">해당 조건의 학생이 없습니다.</div>'; return; }
+      const head = `<div class="ms-row head"><div>학생</div><div>1차 정답수</div><div>최종 정답수</div><div></div><div>상태</div></div>`;
+      const rows = manual.students.map(s => `
+        <div class="ms-row" data-student-id="${escapeHtml(s.student_id)}">
+          <div>${escapeHtml(s.student_name || '-')} <span class="muted">${escapeHtml(s.student_code || '')}</span></div>
+          <div><input class="ms-first" type="number" min="0" max="${manual.total}" placeholder="0~${manual.total}" /></div>
+          <div><input class="ms-final" type="number" min="0" max="${manual.total}" placeholder="선택" /></div>
+          <div><button class="mini-btn primary ms-save-btn" type="button" data-student-id="${escapeHtml(s.student_id)}">저장</button></div>
+          <div class="ms-state muted">미입력</div>
+        </div>`).join('');
+      box.innerHTML = head + rows;
+      box.querySelectorAll('.ms-save-btn').forEach(btn => btn.addEventListener('click', () => saveManualStudent(btn.dataset.studentId)));
+    }
+
+    async function saveManualStudent(studentId){
+      const rowEl = $('mStudentList').querySelector(`.ms-row[data-student-id="${studentId}"]`);
+      if (!rowEl) return;
+      const stateEl = rowEl.querySelector('.ms-state');
+      try {
+        const firstRaw = rowEl.querySelector('.ms-first').value;
+        const finalRaw = rowEl.querySelector('.ms-final').value;
+        const first = Number(firstRaw);
+        if (firstRaw === '' || !Number.isInteger(first) || first < 0 || first > manual.total)
+          throw new Error(`1차 정답수는 0~${manual.total} 정수`);
+        let finalCount = null;
+        if (finalRaw !== ''){
+          finalCount = Number(finalRaw);
+          if (!Number.isInteger(finalCount) || finalCount < 0 || finalCount > manual.total)
+            throw new Error(`최종 정답수는 0~${manual.total} 정수`);
+        }
+        stateEl.textContent='저장 중...'; stateEl.className='ms-state muted';
+        const stu = manual.students.find(x => x.student_id === studentId);
+        const courseId = (stu && stu.course_id) || $('mCourseSelect').value || null;
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_upsert_manual_score', {
+          p_test_set_id: manual.testSetId,
+          p_student_id: studentId,
+          p_first_correct_count: first,
+          p_teacher_final_correct_count: finalCount,
+          p_event_date: $('mDate').value || null,
+          p_note: null,
+          p_course_id: courseId
+        });
+        if (error) throw error;
+        ensureRpcOk(data, '점수 저장에 실패했습니다.');
+        stateEl.textContent = finalCount != null ? '최종확정 ✓' : '1차 저장 ✓';
+        stateEl.className='ms-state ms-saved';
+      } catch (err) {
+        stateEl.textContent = normalizeError(err);
+        stateEl.className='ms-state';
+        stateEl.style.color = 'var(--danger)';
+      }
+    }
+
     function resetFilters(){ $('courseSelect').value=''; $('testSetSelect').value=''; $('studentSearch').value=''; $('purposeSelect').value=''; $('filterOpenOnly').checked=true; }
     function wireEvents(){
       $('loadAssignmentsBtn').addEventListener('click', loadAssignments);
@@ -627,6 +825,14 @@
       $('studentSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadAssignments(); });
       $('courseSelect').addEventListener('change', updateSummary);
       $('testSetSelect').addEventListener('change', updateSummary);
+      // 수동 시험 모달
+      $('openManualBtn').addEventListener('click', openManualModal);
+      $('manualCloseBtn').addEventListener('click', closeManualModal);
+      $('mIssueBtn').addEventListener('click', issueManualTest);
+      $('mLoadStudentsBtn').addEventListener('click', loadManualStudents);
+      $('manualDoneBtn').addEventListener('click', async () => { closeManualModal(); await loadAssignments(); });
+      $('manualModal').addEventListener('click', (e) => { if (e.target === $('manualModal')) closeManualModal(); });
+      $('mStudentSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadManualStudents(); });
     }
 
     (async () => {

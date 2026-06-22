@@ -1,3 +1,15 @@
+-- ================================================================
+-- get_student_assignment_history_by_code
+-- 학생 성취도 "시험 기록" 표(assignment 단위, 최신 attempt 기준).
+--
+-- 수동시험(source_type='manual') 대응:
+--   · total_items : test_items 행이 없으므로 count=0 → nullif 로 0을 NULL 처리한 뒤
+--                   attempt.total_items → test_sets.total_items 순으로 폴백.
+--   · 2차 칼럼   : 수동시험은 2차가 없으므로 항상 NULL('-')로 반환.
+--   · 최종 칼럼  : 수동시험은 teacher_final 만 사용(미확정 전 NULL → '-').
+--                  (자동시험은 기존대로 teacher_final → final 폴백)
+--   · source_type 를 반환해 프론트가 수동시험을 식별(배지/2차'-'/OMR숨김)하게 한다.
+-- ================================================================
 drop function if exists auto_grading.get_student_assignment_history_by_code(text, integer);
 
 create or replace function auto_grading.get_student_assignment_history_by_code(
@@ -8,6 +20,7 @@ returns table (
     assignment_id uuid,
     test_set_id uuid,
     test_title text,
+    source_type text,
     assigned_at timestamptz,
     event_date date,
     total_items integer,
@@ -17,6 +30,7 @@ returns table (
     round2_score_percent numeric(5,1),
     final_correct_count integer,
     final_score_percent numeric(5,1),
+    teacher_final_score_percent numeric(5,1),
     last_activity_at timestamptz
 )
 language plpgsql
@@ -57,7 +71,7 @@ begin
     test_item_counts as (
         select
             ti.test_set_id,
-            count(*)::integer as total_items
+            count(*)::integer as item_count
         from auto_grading.test_items ti
         where ti.test_set_id in (
             select distinct ba.test_set_id
@@ -68,6 +82,7 @@ begin
     ranked_attempts as (
         select
             at.assignment_id,
+            at.total_items as attempt_total_items,
             at.first_correct_count,
             at.final_correct_count,
             at.teacher_final_correct_count,
@@ -102,6 +117,8 @@ begin
             ba.assignment_id,
             ba.test_set_id,
             ts.title as test_title,
+            ts.source_type as source_type,
+            (ts.source_type = 'manual') as is_manual,
             ba.assigned_at,
             coalesce(
                 la.completed_at,
@@ -110,37 +127,64 @@ begin
                 la.started_at,
                 ba.assigned_at
             )::date as event_date,
-            coalesce(tic.total_items, 0) as total_items,
+            -- 총 문항수: test_items count(0이면 NULL) → attempt.total_items → test_sets.total_items
+            coalesce(
+                nullif(tic.item_count, 0),
+                la.attempt_total_items,
+                ts.total_items,
+                0
+            ) as total_items,
             la.first_correct_count as round1_correct_count,
             case
-                when la.first_score_percent is not null
+                when la.round1_submitted_at is not null and la.first_score_percent is not null
                 then round(la.first_score_percent::numeric, 1)
-                when la.first_correct_count is not null
-                     and tic.total_items > 0
-                then round((la.first_correct_count::numeric * 100) / tic.total_items, 1)
+                when la.round1_submitted_at is not null and la.first_correct_count is not null
+                     and coalesce(nullif(tic.item_count, 0), la.attempt_total_items, ts.total_items, 0) > 0
+                then round((la.first_correct_count::numeric * 100) / coalesce(nullif(tic.item_count, 0), la.attempt_total_items, ts.total_items), 1)
                 else null
             end as round1_score_percent,
-            la.final_correct_count as round2_correct_count,
+            -- 2차: 수동시험은 항상 NULL
+            case when ts.source_type = 'manual' then null
+                 else la.final_correct_count end as round2_correct_count,
             case
-                when la.final_score_percent is not null
+                when ts.source_type = 'manual' then null
+                when la.round2_submitted_at is not null and la.final_score_percent is not null
                 then round(la.final_score_percent::numeric, 1)
-                when la.final_correct_count is not null
-                     and tic.total_items > 0
-                then round((la.final_correct_count::numeric * 100) / tic.total_items, 1)
+                when la.round2_submitted_at is not null and la.final_correct_count is not null
+                     and coalesce(nullif(tic.item_count, 0), la.attempt_total_items, ts.total_items, 0) > 0
+                then round((la.final_correct_count::numeric * 100) / coalesce(nullif(tic.item_count, 0), la.attempt_total_items, ts.total_items), 1)
                 else null
             end as round2_score_percent,
-            coalesce(
-                la.teacher_final_correct_count,
-                la.final_correct_count
-            ) as final_correct_count,
+            -- 최종 정답수: 수동은 teacher_final 만, 자동은 teacher_final → final 폴백
             case
-                when coalesce(la.teacher_final_score_percent, la.final_score_percent) is not null
-                then round(coalesce(la.teacher_final_score_percent, la.final_score_percent)::numeric, 1)
-                when coalesce(la.teacher_final_correct_count, la.final_correct_count) is not null
-                     and tic.total_items > 0
-                then round((coalesce(la.teacher_final_correct_count, la.final_correct_count)::numeric * 100) / tic.total_items, 1)
-                else null
+                when ts.source_type = 'manual' then la.teacher_final_correct_count
+                else coalesce(la.teacher_final_correct_count, la.final_correct_count)
+            end as final_correct_count,
+            -- 최종 성취도: 수동은 teacher_final 만, 자동은 기존 로직
+            case
+                when ts.source_type = 'manual' then
+                    case when la.teacher_final_score_percent is not null
+                         then round(la.teacher_final_score_percent::numeric, 1)
+                         else null end
+                else
+                    case
+                        when coalesce(la.teacher_final_score_percent, la.final_score_percent) is not null
+                        then round(coalesce(la.teacher_final_score_percent, la.final_score_percent)::numeric, 1)
+                        when coalesce(la.teacher_final_correct_count, la.final_correct_count) is not null
+                             and coalesce(nullif(tic.item_count, 0), la.attempt_total_items, ts.total_items, 0) > 0
+                        then round((coalesce(la.teacher_final_correct_count, la.final_correct_count)::numeric * 100)
+                                   / coalesce(nullif(tic.item_count, 0), la.attempt_total_items, ts.total_items), 1)
+                        else null
+                    end
             end as final_score_percent,
+            case
+                when la.teacher_final_score_percent is not null
+                then round(la.teacher_final_score_percent::numeric, 1)
+                when la.teacher_final_correct_count is not null
+                     and coalesce(nullif(tic.item_count, 0), la.attempt_total_items, ts.total_items, 0) > 0
+                then round((la.teacher_final_correct_count::numeric * 100) / coalesce(nullif(tic.item_count, 0), la.attempt_total_items, ts.total_items), 1)
+                else null
+            end as teacher_final_score_percent,
             coalesce(
                 la.completed_at,
                 la.round2_submitted_at,
@@ -161,6 +205,7 @@ begin
         hb.assignment_id,
         hb.test_set_id,
         hb.test_title,
+        hb.source_type,
         hb.assigned_at,
         hb.event_date,
         hb.total_items,
@@ -170,6 +215,7 @@ begin
         hb.round2_score_percent,
         hb.final_correct_count,
         hb.final_score_percent,
+        hb.teacher_final_score_percent,
         hb.last_activity_at
     from history_base hb
     order by hb.last_activity_at desc, hb.assignment_id desc
@@ -178,10 +224,6 @@ begin
 end;
 $$;
 
--- anon 회수: student_code(101~999)가 enumerable 이라 anon 공개 시 토큰 없이 전 학생
--- 이력 스크래핑이 가능하다. 공개 페이지는 토큰 경로(get_student_assignment_history_by_token,
--- security definer)로만 접근하고, by_code 는 관리자(authenticated)만 직접 호출한다.
--- (운영 DB 는 이미 anon 회수 상태 — 이 파일을 운영에 맞춰 정합화)
+-- by_code 는 관리자(authenticated)만 직접 호출. 공개 페이지는 token 래퍼 경유.
 revoke execute on function auto_grading.get_student_assignment_history_by_code(text, integer) from anon, public;
-grant execute on function auto_grading.get_student_assignment_history_by_code(text, integer)
-to authenticated;
+grant  execute on function auto_grading.get_student_assignment_history_by_code(text, integer) to authenticated;

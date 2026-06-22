@@ -27,6 +27,7 @@ as $function$
 declare
   v_latest_attempt_id uuid;
   v_latest_attempt_created_at timestamptz;
+  v_source text;
 begin
   if new.assignment_id is null then
     return new;
@@ -35,6 +36,13 @@ begin
   if tg_op = 'INSERT' then
     new.created_at := coalesce(new.created_at, now());
   end if;
+
+  -- 수동시험(source_type='manual')은 "1차 100점 자동완료"를 적용하지 않는다.
+  -- 최종 확정은 오직 teacher_final 입력으로만 이뤄진다(상단 통계/이력 일관성).
+  select ts.source_type
+    into v_source
+  from auto_grading.test_sets ts
+  where ts.id = new.test_set_id;
 
   select
     m.attempt_id,
@@ -62,15 +70,25 @@ begin
     end if;
   end if;
 
-  if coalesce(new.first_score_percent, -1) >= 100 then
-    new.status := 'completed';
-  elsif coalesce(new.final_score_percent, -1) >= 100 then
-    new.status := 'completed';
-  elsif new.teacher_final_score_percent is not null then
-    new.status := 'completed';
-  elsif tg_op = 'UPDATE'
-    and coalesce(old.status::text, '') = 'completed' then
-    new.status := 'needs_review';
+  if v_source = 'manual' then
+    -- 수동시험: teacher_final 입력 시에만 completed. 그 외(1차 100점 포함)는 승격하지 않음.
+    if new.teacher_final_score_percent is not null then
+      new.status := 'completed';
+    elsif tg_op = 'UPDATE'
+      and coalesce(old.status::text, '') = 'completed' then
+      new.status := 'needs_review';
+    end if;
+  else
+    if coalesce(new.first_score_percent, -1) >= 100 then
+      new.status := 'completed';
+    elsif coalesce(new.final_score_percent, -1) >= 100 then
+      new.status := 'completed';
+    elsif new.teacher_final_score_percent is not null then
+      new.status := 'completed';
+    elsif tg_op = 'UPDATE'
+      and coalesce(old.status::text, '') = 'completed' then
+      new.status := 'needs_review';
+    end if;
   end if;
 
   return new;
@@ -95,10 +113,16 @@ declare
 
   v_new_closed_at timestamptz;
   v_new_closed_reason text;
+  v_source text;
 begin
   if new.assignment_id is null then
     return null;
   end if;
+
+  select ts.source_type
+    into v_source
+  from auto_grading.test_sets ts
+  where ts.id = new.test_set_id;
 
   select
     m.attempt_id,
@@ -113,7 +137,16 @@ begin
     return null;
   end if;
 
-  if coalesce(new.first_score_percent, -1) >= 100 then
+  if v_source = 'manual' then
+    -- 수동시험: teacher_final 확정으로만 닫는다(1차 100점 자동닫힘 미적용).
+    if new.teacher_final_score_percent is not null then
+      v_should_close := true;
+      v_close_reason := 'teacher_review_completed';
+    else
+      v_should_close := false;
+      v_close_reason := null;
+    end if;
+  elsif coalesce(new.first_score_percent, -1) >= 100 then
     v_should_close := true;
     v_close_reason := 'auto_completed_round1';
   elsif coalesce(new.final_score_percent, -1) >= 100 then
@@ -200,117 +233,7 @@ comment on function auto_grading.get_latest_attempt_meta(uuid)
 is 'assignment별 최신 attempt 1개를 created_at desc, id desc 기준으로 반환';
 
 comment on function auto_grading.trg_attempts_apply_auto_status_before()
-is '최신 attempt 기준 자동 상태 규칙. 1차100/2차100/teacher_final 저장 시 completed, 그 외 completed 원인이 사라지면 needs_review 복귀';
+is '최신 attempt 기준 자동 상태 규칙. 자동시험은 1차100/2차100/teacher_final 저장 시 completed. 수동시험(source_type=manual)은 teacher_final 저장 시에만 completed(1차100점 자동완료 미적용). completed 원인이 사라지면 needs_review 복귀';
 
 comment on function auto_grading.trg_attempts_sync_assignment_close_after()
 is '최신 attempt 기준 assignment 자동 닫힘 규칙. 수동으로 닫힌 assignment는 자동 트리거가 reopen/overwrite하지 않음';
-
-
-
-with
-  latest as (
-    select
-      distinct on (at.assignment_id) at.assignment_id,
-      case
-        when coalesce(at.first_score_percent, -1) >= 100 then true
-        when coalesce(at.final_score_percent, -1) >= 100 then true
-        when at.teacher_final_score_percent is not null then true
-        else false
-      end as should_close,
-      case
-        when coalesce(at.first_score_percent, -1) >= 100 then 'auto_completed_round1'
-        when coalesce(at.final_score_percent, -1) >= 100 then 'auto_completed_round2'
-        when at.teacher_final_score_percent is not null then 'teacher_review_completed'
-        else null
-      end as close_reason
-    from
-      auto_grading.attempts at
-    where
-      at.assignment_id is not null
-    order by
-      at.assignment_id,
-      at.created_at desc nulls last,
-      at.id desc
-  ),
-  resolved as (
-    select
-      a.id as assignment_id,
-      case
-        when a.closed_at is not null
-        and a.closed_reason not in (
-          'auto_completed_round1',
-          'auto_completed_round2',
-          'teacher_review_completed'
-        ) then a.closed_at
-        when a.closed_at is not null
-        and a.closed_reason is null then a.closed_at
-        when l.should_close
-        and a.closed_at is not null
-        and a.closed_reason is not distinct
-        from
-          l.close_reason then a.closed_at
-          when l.should_close then now()
-          else null
-      end as new_closed_at,
-      case
-        when a.closed_at is not null
-        and a.closed_reason not in (
-          'auto_completed_round1',
-          'auto_completed_round2',
-          'teacher_review_completed'
-        ) then a.closed_reason
-        when a.closed_at is not null
-        and a.closed_reason is null then a.closed_reason
-        when l.should_close then l.close_reason
-        else null
-      end as new_closed_reason
-    from
-      auto_grading.assignments a
-      join latest l on l.assignment_id = a.id
-  )
-update
-  auto_grading.assignments a
-set
-  closed_at = r.new_closed_at,
-  closed_reason = r.new_closed_reason,
-  updated_at = now()
-from
-  resolved r
-where
-  a.id = r.assignment_id
-  and (
-    a.closed_at is distinct
-    from
-      r.new_closed_at
-      or a.closed_reason is distinct
-    from
-      r.new_closed_reason
-  );
-
-
-select
-  a.id as assignment_id,
-  a.closed_at,
-  a.closed_reason,
-  at.id as attempt_id,
-  at.status,
-  at.first_score_percent,
-  at.final_score_percent,
-  at.teacher_final_score_percent
-from
-  auto_grading.assignments a
-  left join lateral (
-    select
-      x.*
-    from
-      auto_grading.attempts x
-    where
-      x.assignment_id = a.id
-    order by
-      x.created_at desc nulls last,
-      x.id desc
-    limit
-      1
-  ) at on true
-where
-  a.id = '여기에-assignment-id';

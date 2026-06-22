@@ -138,6 +138,18 @@
       .muted {
         color: #9ca3af;
       }
+      .manual-badge {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 1px 7px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: #f3e8ff;
+        color: #7e22ce;
+        border: 1px solid #e9d5ff;
+        vertical-align: middle;
+      }
       @media (max-width: 720px) {
         .cards {
           grid-template-columns: 1fr 1fr;
@@ -240,6 +252,15 @@
 
       function clearMessage() {
         messageArea.innerHTML = "";
+      }
+
+      function escapeHtml(v) {
+        return String(v ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
       }
 
       function formatPercent(value) {
@@ -380,7 +401,12 @@
 
           const tdTitle = document.createElement("td");
           tdTitle.className = "title-cell";
-          tdTitle.textContent = row.test_title ?? "-";
+          if (row.source_type === "manual") {
+            tdTitle.innerHTML =
+              `${escapeHtml(row.test_title ?? "-")} <span class="manual-badge">수동</span>`;
+          } else {
+            tdTitle.textContent = row.test_title ?? "-";
+          }
 
           const tdItems = document.createElement("td");
           tdItems.textContent =
@@ -403,13 +429,15 @@
             : "-";
 
           // 최종: teacher_final이 있거나, round1 또는 round2가 100점일 때만 확정값 표시
+          // 단, 수동시험은 teacher_final 로만 최종 확정(1차/2차 100점 자동확정 미적용)
+          const isManual = row.source_type === "manual";
           const tdFinal = document.createElement("td");
           let finalValue = null;
           if (row.teacher_final_score_percent != null) {
             finalValue = row.teacher_final_score_percent;
-          } else if (r1Perfect) {
+          } else if (!isManual && r1Perfect) {
             finalValue = 100;
-          } else if (r2Perfect) {
+          } else if (!isManual && r2Perfect) {
             finalValue = 100;
           }
           // 위 조건 모두 해당 없으면 finalValue = null → '-'

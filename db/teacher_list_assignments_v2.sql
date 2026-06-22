@@ -38,6 +38,7 @@ returns table(
   test_set_id uuid,
   test_title text,
   test_source text,
+  source_type text,
   purpose text,
   assigned_at timestamptz,
   is_open boolean,
@@ -131,6 +132,7 @@ base as (
       to_jsonb(ts)->>'source_name',
       to_jsonb(ts)->>'origin'
     ) as test_source,
+    to_jsonb(ts)->>'source_type' as source_type,
     coalesce(a.purpose, '') as purpose,
     nullif(
       coalesce(
@@ -224,6 +226,7 @@ select
   b.test_set_id,
   b.test_title,
   b.test_source,
+  b.source_type,
   b.purpose,
   b.assigned_at,
   b.is_open,

@@ -89,7 +89,7 @@ create table if not exists auto_grading.test_sets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint chk_test_sets_source_type
-    check (source_type in ('csv_upload', 'printed_sheet', 'published_book', 'problem_bank')),
+    check (source_type in ('csv_upload', 'printed_sheet', 'published_book', 'problem_bank', 'manual')),
   constraint chk_test_sets_default_choice_count
     check (default_choice_count >= 2 and default_choice_count <= 20),
   constraint chk_test_sets_total_items
