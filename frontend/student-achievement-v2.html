@@ -144,10 +144,10 @@
         padding: 1px 7px;
         border-radius: 999px;
         font-size: 11px;
-        font-weight: 700;
-        background: #f3e8ff;
-        color: #7e22ce;
-        border: 1px solid #e9d5ff;
+        font-weight: 600;
+        background: #f3f4f6;
+        color: #6b7280;
+        border: 1px solid #e5e7eb;
         vertical-align: middle;
       }
       @media (max-width: 720px) {
@@ -402,8 +402,9 @@
           const tdTitle = document.createElement("td");
           tdTitle.className = "title-cell";
           if (row.source_type === "manual") {
+            // 학부모/학생용: '수동'(교사 관점) 대신 2차 없는 1회성 평가임을 나타내는 라벨
             tdTitle.innerHTML =
-              `${escapeHtml(row.test_title ?? "-")} <span class="manual-badge">수동</span>`;
+              `${escapeHtml(row.test_title ?? "-")} <span class="manual-badge">단일 평가</span>`;
           } else {
             tdTitle.textContent = row.test_title ?? "-";
           }
