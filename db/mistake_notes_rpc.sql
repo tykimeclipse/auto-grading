@@ -274,8 +274,15 @@ exception
 end;
 $$;
 
-grant execute on function auto_grading.create_mistake_note_by_token(uuid, uuid, uuid)
-  to anon, authenticated, service_role;
+-- [보안 잠금 2026-06-23] 오답노트 기능 중단·미게이트 상태 — 공개(anon)/로그인(authenticated) 노출 금지.
+-- grant 비활성화 + default privileges 로 authenticated 에 자동 부여되는 EXECUTE 까지 revoke 한다.
+-- (revoke 가 없으면 이 파일 재실행 시 함수 재생성만으로 authenticated 가 다시 뚫린다.)
+-- 재개(보안 게이트 통과) 후 anon 이 아니라 note-scoped 토큰 검증 경로로만 재부여할 것. [[mistake-note-deploy-gate]]
+-- grant execute on function auto_grading.create_mistake_note_by_token(uuid, uuid, uuid)
+--   to anon, authenticated, service_role;
+revoke execute on function auto_grading.create_mistake_note_by_token(uuid, uuid, uuid) from anon, authenticated;
+-- 내부 헬퍼도 default privilege 자동부여 차단
+revoke execute on function auto_grading._resolve_student_id_by_token(uuid) from anon, authenticated;
 
 comment on function auto_grading.create_mistake_note_by_token(uuid, uuid, uuid)
   is '학생용. 토큰 검증 + attempt(needs_review) 소유 검증 + 멱등 생성. 실패 시 jsonb error 반환.';
@@ -370,9 +377,13 @@ exception
 end;
 $$;
 
-grant execute on function auto_grading.attach_mistake_image_by_token(
+-- [보안 잠금 2026-06-23] anon/authenticated 노출 금지. grant 비활성화 + 자동부여 revoke. [[mistake-note-deploy-gate]]
+-- grant execute on function auto_grading.attach_mistake_image_by_token(
+--   uuid, uuid, text, text, text, text, integer, integer, integer
+-- ) to anon, authenticated, service_role;
+revoke execute on function auto_grading.attach_mistake_image_by_token(
   uuid, uuid, text, text, text, text, integer, integer, integer
-) to anon, authenticated, service_role;
+) from anon, authenticated;
 
 comment on function auto_grading.attach_mistake_image_by_token(
   uuid, uuid, text, text, text, text, integer, integer, integer
@@ -440,8 +451,10 @@ begin
 end;
 $$;
 
-grant execute on function auto_grading.delete_mistake_image_by_token(uuid, uuid)
-  to anon, authenticated, service_role;
+-- [보안 잠금 2026-06-23] anon/authenticated 노출 금지. grant 비활성화 + 자동부여 revoke. [[mistake-note-deploy-gate]]
+-- grant execute on function auto_grading.delete_mistake_image_by_token(uuid, uuid)
+--   to anon, authenticated, service_role;
+revoke execute on function auto_grading.delete_mistake_image_by_token(uuid, uuid) from anon, authenticated;
 
 comment on function auto_grading.delete_mistake_image_by_token(uuid, uuid)
   is '학생용. draft 상태 노트의 이미지 1건 삭제. 응답에 file_key 포함 (파일서버 cleanup 용).';
@@ -503,8 +516,10 @@ begin
 end;
 $$;
 
-grant execute on function auto_grading.submit_mistake_note_by_token(uuid, uuid)
-  to anon, authenticated, service_role;
+-- [보안 잠금 2026-06-23] anon/authenticated 노출 금지. grant 비활성화 + 자동부여 revoke. [[mistake-note-deploy-gate]]
+-- grant execute on function auto_grading.submit_mistake_note_by_token(uuid, uuid)
+--   to anon, authenticated, service_role;
+revoke execute on function auto_grading.submit_mistake_note_by_token(uuid, uuid) from anon, authenticated;
 
 comment on function auto_grading.submit_mistake_note_by_token(uuid, uuid)
   is '학생용. draft 노트를 submitted 로 전환. DB image_count >= 1 강제.';
@@ -591,8 +606,10 @@ begin
 end;
 $$;
 
-grant execute on function auto_grading.list_mistake_notes_by_token(uuid, integer, integer)
-  to anon, authenticated, service_role;
+-- [보안 잠금 2026-06-23] anon/authenticated 노출 금지. grant 비활성화 + 자동부여 revoke. [[mistake-note-deploy-gate]]
+-- grant execute on function auto_grading.list_mistake_notes_by_token(uuid, integer, integer)
+--   to anon, authenticated, service_role;
+revoke execute on function auto_grading.list_mistake_notes_by_token(uuid, integer, integer) from anon, authenticated;
 
 comment on function auto_grading.list_mistake_notes_by_token(uuid, integer, integer)
   is '학생용. 본인 노트 리스트(페이지네이션). archived 제외, 최신순.';
@@ -693,8 +710,10 @@ begin
 end;
 $$;
 
-grant execute on function auto_grading.get_mistake_note_detail_by_token(uuid, uuid)
-  to anon, authenticated, service_role;
+-- [보안 잠금 2026-06-23] anon/authenticated 노출 금지. grant 비활성화 + 자동부여 revoke. [[mistake-note-deploy-gate]]
+-- grant execute on function auto_grading.get_mistake_note_detail_by_token(uuid, uuid)
+--   to anon, authenticated, service_role;
+revoke execute on function auto_grading.get_mistake_note_detail_by_token(uuid, uuid) from anon, authenticated;
 
 comment on function auto_grading.get_mistake_note_detail_by_token(uuid, uuid)
   is '학생용. 본인 노트 1건 + 이미지 리스트 반환. archived 도 조회 가능.';
