@@ -1181,7 +1181,13 @@
       }
     }
 
-    init();
+    // 모달 등 스크립트 뒤쪽 마크업까지 모두 파싱된 뒤 init을 실행한다.
+    // (init→wireEvents가 파싱 도중 실행되면 아직 없는 모달 요소에서 예외가 나 자동 로드가 중단됨)
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
   </script>
 
   <!-- 오답노트 상세 모달 -->
