@@ -334,3 +334,28 @@ comment on function auto_grading.teacher_get_test_set_overview(
   uuid, text
 )
 is '교사용 시험 상세 요약 RPC. last_used_at = 마지막 assignment 발행(created_at) 시각. avg_round2_score = 교사 보정 전 학생 2차 누적 평균, avg_final_score = teacher_final 반영 최종 평균';
+
+
+-- ---------------------------------------------------------
+-- 출처(source_category) 필터 드롭다운용 전역 distinct 목록 RPC.
+-- teacher_search_test_sets 의 검색 결과(limit/정렬)에 의존하지 않고
+-- test_sets 전체의 출처 분류를 반환해, 검색 전에도 출처 필터를 채울 수 있게 한다.
+-- ---------------------------------------------------------
+create or replace function auto_grading.teacher_list_source_categories()
+returns table(
+  source_category text
+)
+language sql
+security definer
+set search_path to 'auto_grading', 'public'
+as $function$
+  select distinct btrim(ts.source_category) as source_category
+  from auto_grading.test_sets ts
+  where nullif(btrim(ts.source_category), '') is not null
+  order by 1;
+$function$;
+
+grant execute on function auto_grading.teacher_list_source_categories() to authenticated;
+
+comment on function auto_grading.teacher_list_source_categories()
+is '교사용 시험 검색 화면의 출처(source_category) 필터 드롭다운을 채우기 위한 전역 distinct 목록 RPC. 검색 결과 limit 에 의존하지 않고 test_sets 전체의 출처 분류를 반환한다.';

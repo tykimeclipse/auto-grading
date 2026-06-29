@@ -390,6 +390,7 @@
     const state = {
       supabase: null,
       testSets: [],
+      sourceCategories: [],
       selectedTestSetId: null,
       selectedTestSet: null,
       selectedTestDetail: null,
@@ -565,9 +566,25 @@
       }
     }
 
+    async function loadSourceCategories() {
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_list_source_categories');
+        if (error) throw error;
+        state.sourceCategories = (Array.isArray(data) ? data : [])
+          .map(r => r.source_category)
+          .filter(Boolean);
+      } catch (err) {
+        // 출처 목록 로드 실패가 검색 자체를 막지 않도록 조용히 비운다.
+        state.sourceCategories = [];
+      }
+      renderTestSourceOptions();
+    }
+
     function renderTestSourceOptions() {
       const current = $('testSourceFilter').value;
-      const categories = [...new Set(state.testSets.map(t => t.source_category || t.test_source).filter(Boolean))].sort();
+      const categories = state.sourceCategories;
       $('testSourceFilter').innerHTML = '<option value="">전체</option>' + categories.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
       if (current && categories.includes(current)) $('testSourceFilter').value = current;
     }
@@ -1158,7 +1175,7 @@
       updateFooter();
       renderSelectedTest();
       try {
-        await Promise.all([loadCourses(), loadTestSets(), loadStudentFilterOptions()]);
+        await Promise.all([loadCourses(), loadSourceCategories(), loadTestSets(), loadStudentFilterOptions()]);
       } catch (err) {
         setStatus('assignmentStatus', normalizeError(err), 'error');
       }
