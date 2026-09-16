@@ -509,6 +509,12 @@ $function$;
 --     - 등록 페이지에 필요한 컬럼만 반환
 --     - legacy 의존성 최소화
 -- =========================================================
+-- 반환 컬럼(active_student_count) 추가로 시그니처가 바뀌므로 먼저 drop.
+-- ⚠️ 의존성: 아래 활성 학생수 집계는 auto_grading.v_student_courses_normalized 뷰를
+--    참조한다. 이 뷰는 teacher_list_courses.sql 에서 생성되므로, 신규/부분 배포 시
+--    반드시 teacher_list_courses.sql 을 먼저 적용해야 이 함수 생성이 성공한다.
+drop function if exists auto_grading.teacher_list_course_catalog(text, boolean, integer, integer);
+
 create or replace function auto_grading.teacher_list_course_catalog(
   p_search text default null,
   p_only_active boolean default false,
@@ -527,13 +533,21 @@ returns table(
   course_type text,
   note text,
   is_active boolean,
+  active_student_count integer,
   created_at timestamptz
 )
 language sql
 security definer
 set search_path to 'auto_grading', 'public'
 as $function$
-with base as (
+with sc_counts as (
+  select
+    v.course_id,
+    count(distinct v.student_id) filter (where v.is_active)::integer as active_student_count
+  from auto_grading.v_student_courses_normalized v
+  group by v.course_id
+),
+base as (
   select
     c.id as course_id,
     c.course_no,
@@ -545,8 +559,11 @@ with base as (
     c.course_type,
     c.note,
     c.is_active,
+    coalesce(sc.active_student_count, 0) as active_student_count,
     c.created_at
   from auto_grading.courses c
+  left join sc_counts sc
+    on sc.course_id = c.id
   where 1 = 1
     and (
       p_search is null
@@ -573,6 +590,7 @@ select
   b.course_type,
   b.note,
   b.is_active,
+  b.active_student_count,
   b.created_at
 from base b
 order by
@@ -583,9 +601,86 @@ limit greatest(coalesce(p_limit, 100), 1)
 offset greatest(coalesce(p_offset, 0), 0);
 $function$;
 
+-- =========================================================
+-- 12) 과정 종료/재개 토글 RPC (canonical 위치)
+--     - is_active=false 로 종료(소프트). end_date 가 비어 있으면 오늘로 자동 기입
+--     - is_active=true  로 재개(end_date 는 이력 보존 위해 건드리지 않음)
+--     - 삭제와 달리 사용중이어도 처리 가능(학생 연결/이력 유지가 목적)
+--     - assert_admin() 게이트 내장(신규 함수는 정본부터 게이트 포함)
+--     - 이미 목표 상태인 행은 갱신하지 않아 updated_count 가 실제 변경분만 센다
+-- =========================================================
+create or replace function auto_grading.teacher_set_course_active(
+  p_course_ids uuid[],
+  p_is_active boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'auto_grading', 'public'
+as $function$
+declare
+  v_requested_count integer := 0;
+  v_existing_count integer := 0;
+  v_updated_count integer := 0;
+begin
+  perform auto_grading.assert_admin();
+
+  if p_is_active is null then
+    raise exception 'p_is_active is required';
+  end if;
+
+  if coalesce(cardinality(p_course_ids), 0) = 0 then
+    raise exception 'p_course_ids is required';
+  end if;
+
+  with input_ids as (
+    select distinct x.course_id
+    from unnest(p_course_ids) as x(course_id)
+    where x.course_id is not null
+  ),
+  existing as (
+    select i.course_id
+    from input_ids i
+    join auto_grading.courses c
+      on c.id = i.course_id
+  ),
+  updated as (
+    update auto_grading.courses c
+    set is_active = p_is_active,
+        end_date = case
+          when p_is_active = false and c.end_date is null then current_date
+          else c.end_date
+        end
+    from input_ids i
+    where c.id = i.course_id
+      and c.is_active is distinct from p_is_active
+    returning c.id
+  )
+  select
+    (select count(*) from input_ids),
+    (select count(*) from existing),
+    (select count(*) from updated)
+  into v_requested_count, v_existing_count, v_updated_count;
+
+  return jsonb_build_object(
+    'ok', true,
+    'is_active', p_is_active,
+    'requested_count', v_requested_count,
+    'updated_count', v_updated_count,
+    'unchanged_count', v_existing_count - v_updated_count,
+    'skipped_not_found_count', v_requested_count - v_existing_count
+  );
+end;
+$function$;
+
 grant execute on function auto_grading.teacher_get_next_course_no() to authenticated;
 grant execute on function auto_grading.teacher_create_course(text, integer, date, date, text, text) to authenticated;
 grant execute on function auto_grading.teacher_list_course_catalog(text, boolean, integer, integer) to authenticated;
+
+-- 신규 write RPC: 생성 시 붙는 PUBLIC 기본 실행권한을 정본 파일 안에서 즉시 회수한다.
+-- (assert_admin 이 1차로 막지만, 이 repo 원칙인 "게이트 + grant/revoke 이중 방어" 유지)
+revoke execute on function auto_grading.teacher_set_course_active(uuid[], boolean) from public, anon;
+grant  execute on function auto_grading.teacher_set_course_active(uuid[], boolean) to authenticated;
 
 comment on function auto_grading.teacher_get_next_course_no()
 is '참고용 다음 수강번호 조회. 실제 확정 번호는 teacher_create_course 반환값을 따른다.';
@@ -594,6 +689,9 @@ comment on function auto_grading.teacher_create_course(text, integer, date, date
 is '현재 운영 courses 테이블 구조에 맞춘 안전한 등록 RPC. 존재하는 컬럼만 insert 하며, grade_level/subject_group이 NOT NULL이면 제목에서 추론한다.';
 
 comment on function auto_grading.teacher_list_course_catalog(text, boolean, integer, integer)
-is '과정 등록/조회 화면용 목록 RPC. 등록 페이지에 필요한 컬럼만 반환한다.';
+is '과정 등록/조회 화면용 목록 RPC. 등록 페이지에 필요한 컬럼만 반환한다. 활성 학생수는 v_student_courses_normalized 뷰 기준.';
+
+comment on function auto_grading.teacher_set_course_active(uuid[], boolean)
+is '수강과정 종료(is_active=false, 빈 end_date는 오늘로)/재개(is_active=true) 토글 RPC. assert_admin 게이트. 이미 목표 상태인 행은 갱신하지 않는다.';
 
 commit;

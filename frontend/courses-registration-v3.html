@@ -328,11 +328,10 @@
           <input id="searchText" type="text" placeholder="제목, 코드, 번호, 유형 검색" />
         </div>
         <div class="field">
-          <label for="onlyActive">표시 조건</label>
-          <select id="onlyActive">
-            <option value="false">전체</option>
-            <option value="true">활성만</option>
-          </select>
+          <label for="includeEnded">표시 조건</label>
+          <label style="display:flex; align-items:center; gap:6px; font-weight:normal; padding-top:6px;">
+            <input id="includeEnded" type="checkbox" /> 종료된 강좌 포함
+          </label>
         </div>
       </div>
       <div class="toolbar">
@@ -348,14 +347,15 @@
               <th>수강번호</th>
               <th>기존 코드</th>
               <th>제목</th>
-              <th>개설년도</th>
+              <th>학생수</th>
               <th>기간</th>
               <th>활성</th>
               <th>기타</th>
+              <th>관리</th>
             </tr>
           </thead>
           <tbody id="courseTableBody">
-            <tr><td colspan="8" class="muted">아직 조회된 데이터가 없습니다.</td></tr>
+            <tr><td colspan="9" class="muted">아직 조회된 데이터가 없습니다.</td></tr>
           </tbody>
         </table>
       </div>
@@ -525,7 +525,7 @@
           .schema("auto_grading")
           .rpc("teacher_list_course_catalog", {
             p_search: $("searchText").value.trim() || null,
-            p_only_active: $("onlyActive").value === "true",
+            p_only_active: !$("includeEnded").checked,
             p_limit: 200,
             p_offset: 0
           });
@@ -543,7 +543,7 @@
     function renderCourseTable() {
       const body = $("courseTableBody");
       if (!state.courses.length) {
-        body.innerHTML = '<tr><td colspan="8" class="muted">조회 결과가 없습니다.</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" class="muted">조회 결과가 없습니다.</td></tr>';
         return;
       }
 
@@ -553,10 +553,11 @@
           <td>${escapeHtml(row.course_no ?? "-")}</td>
           <td>${escapeHtml(row.course_code ?? "-")}</td>
           <td><strong>${escapeHtml(row.course_name ?? "-")}</strong></td>
-          <td>${escapeHtml(row.open_year ?? "-")}</td>
+          <td>${escapeHtml(row.active_student_count ?? 0)}명</td>
           <td>${escapeHtml(row.start_date ?? "-")} ~ ${escapeHtml(row.end_date ?? "-")}</td>
           <td>${row.is_active ? "Y" : "N"}</td>
           <td>${escapeHtml(row.note ?? "-")}</td>
+          <td><button type="button" class="soft course-toggle" data-course-id="${row.course_id}" data-target="${row.is_active ? 'false' : 'true'}">${row.is_active ? '종료' : '재개'}</button></td>
         </tr>
       `).join("");
 
@@ -567,6 +568,37 @@
           else state.selectedCourseIds.delete(id);
         });
       });
+
+      body.querySelectorAll(".course-toggle").forEach((el) => {
+        el.addEventListener("click", () =>
+          toggleCourseActive(el.dataset.courseId, el.dataset.target === "true")
+        );
+      });
+    }
+
+    async function toggleCourseActive(courseId, targetActive) {
+      try {
+        const actionLabel = targetActive ? "재개" : "종료";
+        if (!targetActive && !confirm("이 수강과정을 종료 처리할까요?\n(학생 연결은 유지되며, 나중에 재개할 수 있습니다.)")) {
+          return;
+        }
+        setStatus("listStatus", `수강과정을 ${actionLabel} 처리하는 중입니다.`, "info");
+
+        const { data, error } = await state.supabase
+          .schema("auto_grading")
+          .rpc("teacher_set_course_active", {
+            p_course_ids: [courseId],
+            p_is_active: targetActive
+          });
+
+        if (error) throw error;
+        if (data?.ok === false) throw new Error(data.error || `수강과정 ${actionLabel} 실패`);
+
+        setStatus("listStatus", `수강과정을 ${actionLabel} 처리했습니다. (변경 ${data?.updated_count ?? 0}건)`, "ok");
+        await loadCourseList();
+      } catch (err) {
+        setStatus("listStatus", normalizeError(err), "error");
+      }
     }
 
     async function deleteSelectedCourses() {
@@ -627,6 +659,12 @@
       $("resetBtn").addEventListener("click", () => resetForm(true));
       $("deleteSelectedBtn").addEventListener("click", deleteSelectedCourses);
       $("searchBtn").addEventListener("click", async () => {
+        try {
+          await loadCourseList();
+        } catch (_) {}
+      });
+
+      $("includeEnded").addEventListener("change", async () => {
         try {
           await loadCourseList();
         } catch (_) {}

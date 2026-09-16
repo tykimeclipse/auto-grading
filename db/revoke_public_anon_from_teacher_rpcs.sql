@@ -105,6 +105,10 @@ grant execute on function auto_grading.teacher_create_course(text, integer, date
 grant execute on function auto_grading.teacher_list_course_catalog(text, boolean, integer, integer)
   to authenticated, service_role;
 
+-- teacher_set_course_active (종료/재개 토글, assert_admin 게이트 write)
+grant execute on function auto_grading.teacher_set_course_active(uuid[], boolean)
+  to authenticated;
+
 -- teacher_deactivate_student_course
 grant execute on function auto_grading.teacher_deactivate_student_course(uuid, uuid)
   to authenticated, service_role;

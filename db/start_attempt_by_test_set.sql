@@ -9,48 +9,14 @@
 -- 전제:
 --   - students.student_code 는 실제 학생 식별에 사용됨
 --   - assignments 는 학생-시험 배정 레코드
---   - 같은 학생-같은 시험에 대해 활성 assignment는 1개만 허용
+--   - UNIQUE(student_id, test_set_id)에 따라 같은 학생-같은 시험의
+--     assignment는 전체 기간에 1개만 허용됨
 --
--- 배포 전 체크:
---   1) 활성 assignment 중복 여부 확인
---   2) assigned_by 기존 값 패턴 확인
---   3) 기존 public.start_attempt wrapper의 보안 속성 확인
+-- 3단계 정책:
+--   - 기존 assignment/attempt는 그대로 재사용하여 진행 중 응시를 보호함
+--   - 신규 assignment는 활성 강좌가 정확히 1개일 때만 생성함
+--   - 신규 assignment에는 course_id를 반드시 저장함
 -- =========================================================
-
-
--- =========================================================
--- 0. 사전 점검 1: 활성 assignment 중복 여부 확인
---    결과가 0행이어야 partial unique index 생성 가능
--- =========================================================
-select
-  student_id,
-  test_set_id,
-  count(*) as active_count
-from auto_grading.assignments
-where is_active = true
-group by student_id, test_set_id
-having count(*) > 1;
-
-
--- =========================================================
--- 0-1. 사전 점검 2: assigned_by 기존 값 패턴 확인
---     현재는 text 컬럼이므로 'self_service' 사용 가능
---     단, 기존 값들이 관리자 UUID/이메일 등이라면
---     장기적으로 assignment_source 분리 검토 가능
--- =========================================================
-select distinct assigned_by
-from auto_grading.assignments
-limit 20;
-
-
--- =========================================================
--- 1. 활성 assignment만 유니크 보장하는 partial unique index
---    같은 학생-같은 시험에 대해 활성 assignment는 1개만 허용
---    비활성 assignment는 과거 이력으로 남길 수 있음
--- =========================================================
-create unique index if not exists uq_assignments_student_testset_active
-on auto_grading.assignments (student_id, test_set_id)
-where is_active = true;
 
 
 -- =========================================================
@@ -58,6 +24,8 @@ where is_active = true;
 --    입력: test_set_id + student_code
 --    출력: 기존 start_attempt와 동일한 jsonb
 -- =========================================================
+begin;
+
 create or replace function auto_grading.start_attempt_by_test_set(
   p_test_set_id uuid,
   p_student_code text
@@ -65,12 +33,23 @@ create or replace function auto_grading.start_attempt_by_test_set(
 returns jsonb
 language plpgsql
 security definer
-as $$
+set search_path to 'auto_grading', 'public'
+as $function$
 declare
   v_student_id uuid;
   v_assignment_id uuid;
   v_test_set_exists boolean;
+  v_active_course_count integer := 0;
+  v_active_course_id uuid;
 begin
+  if p_test_set_id is null then
+    raise exception 'INVALID_TEST_SET' using errcode = 'P0001';
+  end if;
+
+  if p_student_code is null or btrim(p_student_code) = '' then
+    raise exception 'INVALID_STUDENT_CODE' using errcode = 'P0001';
+  end if;
+
   -- -------------------------------------------------------
   -- 2-1. 학생 확인
   -- -------------------------------------------------------
@@ -108,19 +87,61 @@ begin
   end if;
 
   -- -------------------------------------------------------
-  -- 2-3. 기존 활성 assignment 재사용 시도
+  -- 2-3. 기존 assignment가 있으면 먼저 재사용한다.
+  --      이미 진행 중인 응시는 강좌가 종료된 뒤에도 마칠 수 있어야 하므로,
+  --      활성 강좌 해석보다 기존 assignment 확인을 먼저 한다.
   -- -------------------------------------------------------
   select a.id
     into v_assignment_id
   from auto_grading.assignments a
   where a.student_id = v_student_id
     and a.test_set_id = p_test_set_id
-    and a.is_active = true
   order by a.created_at desc
   limit 1;
 
+  if v_assignment_id is not null then
+    return auto_grading.start_attempt(
+      p_assignment_id := v_assignment_id,
+      p_student_code := p_student_code
+    );
+  end if;
+
   -- -------------------------------------------------------
-  -- 2-4. 없으면 새 assignment 생성
+  -- 2-4. 신규 assignment는 학생의 활성 강좌가 정확히 1개일 때만 생성
+  --      과정과 수강 연결이 모두 활성인 강좌만 후보로 인정한다.
+  -- -------------------------------------------------------
+  select
+    count(distinct v.course_id)::integer,
+    min(v.course_id::text)::uuid
+    into v_active_course_count, v_active_course_id
+  from auto_grading.v_student_courses_normalized v
+  join auto_grading.courses c
+    on c.id = v.course_id
+   and c.is_active
+  where v.student_id = v_student_id
+    and v.is_active;
+
+  if v_active_course_count = 0 then
+    raise exception 'ACTIVE_COURSE_NOT_FOUND' using errcode = 'P0001';
+  end if;
+
+  if v_active_course_count > 1 then
+    raise exception 'MULTIPLE_ACTIVE_COURSES' using errcode = 'P0001';
+  end if;
+
+  -- 강좌 종료와 신규 assignment 생성의 동시 실행을 막는다.
+  perform 1
+  from auto_grading.courses c
+  where c.id = v_active_course_id
+    and c.is_active
+  for share;
+
+  if not found then
+    raise exception 'COURSE_INACTIVE' using errcode = 'P0001';
+  end if;
+
+  -- -------------------------------------------------------
+  -- 2-5. 신규 assignment 생성
   --     경쟁 상황에서 unique_violation이 나면 재조회
   --
   --     주의:
@@ -128,50 +149,49 @@ begin
   --     재조회에서도 못 잡힐 수 있으므로,
   --     그 경우 프론트가 재시도 가능한 에러명을 반환한다.
   -- -------------------------------------------------------
-  if v_assignment_id is null then
-    begin
-      insert into auto_grading.assignments (
-        student_id,
-        test_set_id,
-        assigned_by,
-        status,
-        is_active
-      )
-      values (
-        v_student_id,
-        p_test_set_id,
-        'self_service', -- TODO: 장기적으로 assignment_source 컬럼 분리 가능
-        'assigned',     -- TODO: 향후 공개/예약 정책에 따라 초기 status 재검토 가능
-        true
-      )
-      returning id into v_assignment_id;
+  begin
+    insert into auto_grading.assignments (
+      student_id,
+      test_set_id,
+      course_id,
+      assigned_by,
+      status,
+      is_active
+    )
+    values (
+      v_student_id,
+      p_test_set_id,
+      v_active_course_id,
+      'self_service',
+      'assigned',
+      true
+    )
+    returning id into v_assignment_id;
 
-    exception
-      when unique_violation then
-        select a.id
-          into v_assignment_id
-        from auto_grading.assignments a
-        where a.student_id = v_student_id
-          and a.test_set_id = p_test_set_id
-          and a.is_active = true
-        order by a.created_at desc
-        limit 1;
-    end;
-  end if;
+  exception
+    when unique_violation then
+      select a.id
+        into v_assignment_id
+      from auto_grading.assignments a
+      where a.student_id = v_student_id
+        and a.test_set_id = p_test_set_id
+      order by a.created_at desc
+      limit 1;
+  end;
 
   if v_assignment_id is null then
     raise exception 'ASSIGNMENT_UNAVAILABLE_RETRY';
   end if;
 
   -- -------------------------------------------------------
-  -- 2-5. 기존 검증 완료된 start_attempt 재사용
+  -- 2-6. 기존 검증 완료된 start_attempt 재사용
   -- -------------------------------------------------------
   return auto_grading.start_attempt(
     p_assignment_id := v_assignment_id,
     p_student_code := p_student_code
   );
 end;
-$$;
+$function$;
 
 
 -- =========================================================
@@ -189,22 +209,23 @@ create or replace function public.start_attempt_by_test_set(
 returns jsonb
 language sql
 security definer
-as $$
+set search_path to 'public', 'auto_grading'
+as $function$
   select auto_grading.start_attempt_by_test_set(p_test_set_id, p_student_code);
-$$;
+$function$;
 
 
 -- =========================================================
 -- 4. anon 실행 권한 부여
 -- =========================================================
-grant execute on function public.start_attempt_by_test_set(uuid, text) to anon;
+revoke execute on function auto_grading.start_attempt_by_test_set(uuid, text)
+  from public, anon;
+grant execute on function auto_grading.start_attempt_by_test_set(uuid, text)
+  to authenticated, service_role;
 
+revoke execute on function public.start_attempt_by_test_set(uuid, text)
+  from public;
+grant execute on function public.start_attempt_by_test_set(uuid, text)
+  to anon, authenticated, service_role;
 
--- =========================================================
--- 5. 수동 테스트
---    실제 존재하는 test_set_id / student_code로 실행
--- =========================================================
-select public.start_attempt_by_test_set(
-  '668e3d4a-20e6-463c-b644-8a712e9f3006'::uuid,
-  'S003'::text
-);
+commit;

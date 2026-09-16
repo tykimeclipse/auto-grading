@@ -1,4 +1,6 @@
-﻿create
+﻿begin;
+
+create
 or replace function auto_grading.start_attempt(p_assignment_id uuid, p_student_code text) returns jsonb language plpgsql security definer
 set
   search_path = auto_grading,
@@ -30,6 +32,12 @@ v_should_lock boolean := false;
 
 
 v_return_current_round integer;
+
+
+v_course_is_active boolean;
+
+
+v_has_active_enrollment boolean;
 
 
 begin if p_assignment_id is null then raise exception 'INVALID_ASSIGNMENT' using errcode = 'P0001';
@@ -95,7 +103,7 @@ end if;
 
 /*
  현재 구조상 latest attempt 탐색은 기존 로직을 유지한다.
- 다만, 새로 생성되는 attempt에는 assignment_id / total_items를 반드시 저장한다.
+ 다만, 새로 생성되는 attempt에는 assignment_id / course_id / total_items를 반드시 저장한다.
  과거 legacy attempt를 현재 assignment 기준으로 자동 보정하지는 않는다.
  */
 select
@@ -113,13 +121,65 @@ update
 ;
 
 
-if not found then v_next_attempt_no := 1;
+if not found then
+if v_assignment.closed_at is not null then raise exception 'ASSIGNMENT_CLOSED' using errcode = 'P0001';
+
+
+end if;
+
+
+if v_assignment.course_id is null then raise exception 'COURSE_REQUIRED' using errcode = 'P0001';
+
+
+end if;
+
+
+select
+  c.is_active into v_course_is_active
+from
+  auto_grading.courses as c
+where
+  c.id = v_assignment.course_id for share;
+
+
+if not found then raise exception 'COURSE_NOT_FOUND' using errcode = 'P0001';
+
+
+end if;
+
+
+if not coalesce(v_course_is_active, false) then raise exception 'COURSE_INACTIVE' using errcode = 'P0001';
+
+
+end if;
+
+
+select exists (
+  select
+    1
+  from
+    auto_grading.v_student_courses_normalized as sc
+  where
+    sc.student_id = v_assignment.student_id
+    and sc.course_id = v_assignment.course_id
+    and sc.is_active
+) into v_has_active_enrollment;
+
+
+if not coalesce(v_has_active_enrollment, false) then raise exception 'STUDENT_NOT_ENROLLED_IN_COURSE' using errcode = 'P0001';
+
+
+end if;
+
+
+v_next_attempt_no := 1;
 
 
 begin
 insert into
   auto_grading.attempts (
     assignment_id,
+    course_id,
     student_id,
     test_set_id,
     total_items,
@@ -132,6 +192,7 @@ insert into
 values
   (
     v_assignment.id,
+    v_assignment.course_id,
     v_assignment.student_id,
     v_assignment.test_set_id,
     v_test_set.total_items,
@@ -293,6 +354,8 @@ return jsonb_build_object(
   v_attempt.id,
   'assignment_id',
   v_attempt.assignment_id,
+  'course_id',
+  v_attempt.course_id,
   'student_id',
   v_student.id,
   'student_name',
@@ -326,3 +389,5 @@ end;
 
 
 $$;
+
+commit;

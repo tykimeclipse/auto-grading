@@ -976,6 +976,27 @@
             }
         }
 
+        function startAttemptErrorMessage(err) {
+            const code = String(err?.message || err || '').trim();
+            switch (code) {
+                case 'STUDENT_NOT_FOUND':
+                    return '등록되지 않은 학생 코드입니다. 다시 확인해 주세요.';
+                case 'ACTIVE_COURSE_NOT_FOUND':
+                case 'STUDENT_NOT_ENROLLED_IN_COURSE':
+                    return '현재 수강 중인 활성 강좌가 확인되지 않습니다. 선생님께 문의해 주세요.';
+                case 'MULTIPLE_ACTIVE_COURSES':
+                    return '수강 중인 강좌가 여러 개라 시험 강좌를 자동으로 정할 수 없습니다. 선생님께 문의해 주세요.';
+                case 'COURSE_REQUIRED':
+                case 'COURSE_NOT_FOUND':
+                    return '이 시험에 강좌 정보가 지정되어 있지 않습니다. 선생님께 문의해 주세요.';
+                case 'COURSE_INACTIVE':
+                case 'ASSIGNMENT_CLOSED':
+                    return '종료된 강좌이거나 마감된 시험이어서 새로 응시할 수 없습니다.';
+                default:
+                    return `시험을 불러오지 못했습니다. ${code}`.trim();
+            }
+        }
+
         function renderFooter() {
             const footer = document.getElementById('footerActions');
             const btn = document.getElementById('submitBtn');
@@ -1553,11 +1574,7 @@
             } catch (err) {
                 console.error(err);
 
-                if (err?.message === 'STUDENT_NOT_FOUND') {
-                    showGateError('등록되지 않은 학생 코드입니다. 다시 확인해 주세요.');
-                } else {
-                    showGateError(`시험을 불러오지 못했습니다. ${err?.message || ''}`.trim());
-                }
+                showGateError(startAttemptErrorMessage(err));
             } finally {
                 setGateBusy(false);
             }
@@ -1614,7 +1631,7 @@
                         input.focus();
                     } else {
                         hideGateInline();
-                        showLoadError('시험을 불러오는 데 실패했습니다. 페이지를 새로 고침해 주세요.');
+                        showLoadError(startAttemptErrorMessage(err));
                     }
                 }
                 return;

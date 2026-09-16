@@ -39,6 +39,8 @@
 -- ----------------------------------------------------------------
 -- 0) source_type 에 'manual' 허용 (idempotent)
 -- ----------------------------------------------------------------
+begin;
+
 alter table auto_grading.test_sets
   drop constraint if exists chk_test_sets_source_type;
 
@@ -127,16 +129,50 @@ declare
   v_total          integer;
   v_source         text;
   v_assignment_id  uuid;
+  v_assignment_course_id uuid;
   v_attempt_id     uuid;
+  v_attempt_course_id uuid;
   v_event          timestamptz;
   v_first_pct      numeric(5,2);
   v_tf_pct         numeric(5,2);
   v_finalize       boolean := (p_teacher_final_correct_count is not null);
+  v_course_is_active boolean;
+  v_has_active_enrollment boolean;
 begin
   perform auto_grading.assert_admin();
 
   if p_test_set_id is null or p_student_id is null then
     raise exception 'p_test_set_id 와 p_student_id 는 필수입니다.';
+  end if;
+
+  if p_course_id is null then
+    raise exception 'COURSE_REQUIRED';
+  end if;
+
+  select c.is_active
+    into v_course_is_active
+  from auto_grading.courses c
+  where c.id = p_course_id
+  for share;
+
+  if not found then
+    raise exception 'course not found: %', p_course_id;
+  end if;
+
+  if not coalesce(v_course_is_active, false) then
+    raise exception 'COURSE_INACTIVE';
+  end if;
+
+  select exists (
+    select 1
+    from auto_grading.v_student_courses_normalized sc
+    where sc.student_id = p_student_id
+      and sc.course_id = p_course_id
+      and sc.is_active
+  ) into v_has_active_enrollment;
+
+  if not coalesce(v_has_active_enrollment, false) then
+    raise exception 'STUDENT_NOT_ENROLLED_IN_COURSE';
   end if;
 
   -- 수동 시험만 허용 + 총 문항수 확보(단일 진실원천: test_set)
@@ -172,30 +208,68 @@ begin
                       then round(p_teacher_final_correct_count::numeric * 100 / v_total, 2)
                       else null end;
 
-  -- assignment upsert (unique student_id, test_set_id)
-  -- course_id 를 함께 저장해 과정 필터/과정별 집계에 포함되게 한다.
-  -- 재저장 시 course_id 미전달이면 기존 값 보존(coalesce).
-  insert into auto_grading.assignments(student_id, test_set_id, course_id, assigned_at, status)
-  values (p_student_id, p_test_set_id, p_course_id, v_event, 'assigned')
-  on conflict (student_id, test_set_id) do update
-    set course_id  = coalesce(excluded.course_id, auto_grading.assignments.course_id),
-        updated_at = now()
-  returning id into v_assignment_id;
+  -- 같은 학생·시험의 기존 assignment를 다른 강좌로 자동 재태깅하지 않는다.
+  select a.id, a.course_id
+    into v_assignment_id, v_assignment_course_id
+  from auto_grading.assignments a
+  where a.student_id = p_student_id
+    and a.test_set_id = p_test_set_id
+  for update;
+
+  if v_assignment_id is not null then
+    if v_assignment_course_id is distinct from p_course_id then
+      raise exception 'ASSIGNMENT_OTHER_COURSE';
+    end if;
+
+    update auto_grading.assignments
+    set updated_at = now()
+    where id = v_assignment_id;
+  else
+    begin
+      insert into auto_grading.assignments(
+        student_id, test_set_id, course_id, assigned_at, status
+      ) values (
+        p_student_id, p_test_set_id, p_course_id, v_event, 'assigned'
+      )
+      returning id, course_id into v_assignment_id, v_assignment_course_id;
+    exception
+      when unique_violation then
+        select a.id, a.course_id
+          into v_assignment_id, v_assignment_course_id
+        from auto_grading.assignments a
+        where a.student_id = p_student_id
+          and a.test_set_id = p_test_set_id
+        for update;
+
+        if v_assignment_id is null then
+          raise exception 'ASSIGNMENT_UNAVAILABLE_RETRY';
+        end if;
+
+        if v_assignment_course_id is distinct from p_course_id then
+          raise exception 'ASSIGNMENT_OTHER_COURSE';
+        end if;
+    end;
+  end if;
 
   -- 기존 manual attempt 조회(assignment 당 1건 유지)
-  select id
-    into v_attempt_id
+  select id, course_id
+    into v_attempt_id, v_attempt_course_id
   from auto_grading.attempts
   where assignment_id = v_assignment_id
   order by created_at asc nulls first, id asc
   limit 1
   for update;
 
+  if v_attempt_id is not null
+     and v_attempt_course_id is distinct from p_course_id then
+    raise exception 'ATTEMPT_OTHER_COURSE';
+  end if;
+
   if v_attempt_id is null then
     -- 신규: status='needs_review' 로 넣는다. BEFORE 트리거는 수동시험의 경우
     --       teacher_final 입력 시에만 completed 로 승격한다(1차 100점 자동완료 미적용).
     insert into auto_grading.attempts(
-      student_id, test_set_id, assignment_id,
+      student_id, test_set_id, assignment_id, course_id,
       attempt_no, max_rounds, current_round, status, total_items,
       first_correct_count, first_score_percent,
       final_correct_count, final_score_percent,
@@ -203,7 +277,7 @@ begin
       teacher_final_note, teacher_final_updated_at, teacher_final_updated_by,
       round1_submitted_at, started_at
     ) values (
-      p_student_id, p_test_set_id, v_assignment_id,
+      p_student_id, p_test_set_id, v_assignment_id, p_course_id,
       1, 1, 1, 'needs_review', v_total,
       p_first_correct_count, v_first_pct,
       p_first_correct_count, v_first_pct,   -- final_* = first_* 복사(방어적)
@@ -237,6 +311,7 @@ begin
     'ok',                          true,
     'assignment_id',               v_assignment_id,
     'attempt_id',                  v_attempt_id,
+    'course_id',                   p_course_id,
     'total_items',                 v_total,
     'first_correct_count',         p_first_correct_count,
     'first_score_percent',         v_first_pct,
@@ -262,10 +337,12 @@ revoke execute on function auto_grading.teacher_create_manual_test_set(text, int
 grant  execute on function auto_grading.teacher_create_manual_test_set(text, integer, text, text) to authenticated;
 
 revoke execute on function auto_grading.teacher_upsert_manual_score(uuid, uuid, integer, integer, date, text, uuid) from public, anon;
-grant  execute on function auto_grading.teacher_upsert_manual_score(uuid, uuid, integer, integer, date, text, uuid) to authenticated;
+grant  execute on function auto_grading.teacher_upsert_manual_score(uuid, uuid, integer, integer, date, text, uuid) to authenticated, service_role;
 
 comment on function auto_grading.teacher_create_manual_test_set(text, integer, text, text)
   is '교사용. 수동 시험(source_type=manual, 문항 없는 test_set) 1건 발행.';
 
 comment on function auto_grading.teacher_upsert_manual_score(uuid, uuid, integer, integer, date, text, uuid)
   is '교사용. 수동 시험 학생별 점수 입력/수정. assignment당 attempt 1건 유지(upsert). teacher_final 입력 시 최종 확정. course_id 저장으로 과정별 집계 포함. 문항수 기준만 지원.';
+
+commit;

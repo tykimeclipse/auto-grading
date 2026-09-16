@@ -1,4 +1,6 @@
-﻿create or replace function auto_grading.teacher_issue_assignments(
+﻿begin;
+
+create or replace function auto_grading.teacher_issue_assignments(
   p_test_set_id uuid,
   p_student_ids uuid[],
   p_course_id uuid default null,
@@ -18,9 +20,11 @@ declare
   v_skipped_existing_open_count integer := 0;
   v_skipped_existing_closed_count integer := 0;
   v_skipped_existing_count integer := 0;
+  v_skipped_other_course_count integer := 0;
   v_skipped_not_found_count integer := 0;
   v_skipped_not_in_course_count integer := 0;
   v_items jsonb := '[]'::jsonb;
+  v_course_is_active boolean;
 begin
   perform auto_grading.assert_admin();
   if p_test_set_id is null then
@@ -31,6 +35,10 @@ begin
     raise exception 'p_student_ids is required';
   end if;
 
+  if p_course_id is null then
+    raise exception 'COURSE_REQUIRED' using errcode = 'P0001';
+  end if;
+
   perform 1
   from auto_grading.test_sets ts
   where ts.id = p_test_set_id;
@@ -39,14 +47,18 @@ begin
     raise exception 'test_set not found: %', p_test_set_id;
   end if;
 
-  if p_course_id is not null then
-    perform 1
-    from auto_grading.courses c
-    where c.id = p_course_id;
+  select c.is_active
+    into v_course_is_active
+  from auto_grading.courses c
+  where c.id = p_course_id
+  for share;
 
-    if not found then
-      raise exception 'course not found: %', p_course_id;
-    end if;
+  if not found then
+    raise exception 'course not found: %', p_course_id;
+  end if;
+
+  if not coalesce(v_course_is_active, false) then
+    raise exception 'COURSE_INACTIVE' using errcode = 'P0001';
   end if;
 
   drop table if exists pg_temp.tmp_teacher_issue_input;
@@ -58,6 +70,7 @@ begin
     student_exists boolean default false,
     in_course boolean default false,
     existing_assignment_id uuid,
+    existing_course_id uuid,
     existing_closed_at timestamptz
   ) on commit drop;
 
@@ -94,26 +107,22 @@ begin
     from auto_grading.students s
    where s.id = i.student_id;
 
-  if p_course_id is null then
-    update pg_temp.tmp_teacher_issue_input
-       set in_course = student_exists
-     where student_id is not null;
-  else
-    update pg_temp.tmp_teacher_issue_input i
-       set in_course = true
-      from auto_grading.v_student_courses_normalized v
-     where v.student_id = i.student_id
-       and v.course_id = p_course_id
-       and v.is_active;
-  end if;
+  update pg_temp.tmp_teacher_issue_input i
+     set in_course = true
+    from auto_grading.v_student_courses_normalized v
+   where v.student_id = i.student_id
+     and v.course_id = p_course_id
+     and v.is_active;
 
   update pg_temp.tmp_teacher_issue_input i
      set existing_assignment_id = e.assignment_id,
+         existing_course_id = e.course_id,
          existing_closed_at = e.closed_at
     from (
       select distinct on (a.student_id)
         a.student_id,
         a.id as assignment_id,
+        a.course_id,
         a.closed_at
       from auto_grading.assignments a
       join pg_temp.tmp_teacher_issue_input t
@@ -170,11 +179,13 @@ begin
 
   update pg_temp.tmp_teacher_issue_input i
      set existing_assignment_id = e.assignment_id,
+         existing_course_id = e.course_id,
          existing_closed_at = e.closed_at
     from (
       select distinct on (a.student_id)
         a.student_id,
         a.id as assignment_id,
+        a.course_id,
         a.closed_at
       from auto_grading.assignments a
       join pg_temp.tmp_teacher_issue_input t
@@ -194,8 +205,7 @@ begin
   if p_reopen_existing then
     with reopened as (
       update auto_grading.assignments a
-         set course_id = coalesce(p_course_id, a.course_id),
-             purpose = coalesce(p_purpose, a.purpose),
+         set purpose = coalesce(p_purpose, a.purpose),
              closed_at = null,
              closed_reason = null,
              updated_at = now()
@@ -204,6 +214,7 @@ begin
          and i.student_exists
          and i.in_course
          and i.existing_assignment_id is not null
+         and i.existing_course_id = p_course_id
          and i.existing_closed_at is not null
          and not exists (
            select 1
@@ -293,6 +304,32 @@ begin
     i.ord,
     i.student_id,
     i.existing_assignment_id,
+    i.existing_course_id,
+    p_purpose,
+    'skipped_other_course'
+  from pg_temp.tmp_teacher_issue_input i
+  where i.student_exists
+    and i.in_course
+    and i.existing_assignment_id is not null
+    and i.existing_course_id is distinct from p_course_id
+    and not exists (
+      select 1
+      from pg_temp.tmp_teacher_issue_result r
+      where r.student_id = i.student_id
+    );
+
+  insert into pg_temp.tmp_teacher_issue_result (
+    ord,
+    student_id,
+    assignment_id,
+    course_id,
+    purpose,
+    action
+  )
+  select
+    i.ord,
+    i.student_id,
+    i.existing_assignment_id,
     p_course_id,
     p_purpose,
     'skipped_existing_open'
@@ -300,6 +337,7 @@ begin
   where i.student_exists
     and i.in_course
     and i.existing_assignment_id is not null
+    and i.existing_course_id = p_course_id
     and i.existing_closed_at is null
     and not exists (
       select 1
@@ -326,6 +364,7 @@ begin
   where i.student_exists
     and i.in_course
     and i.existing_assignment_id is not null
+    and i.existing_course_id = p_course_id
     and i.existing_closed_at is not null
     and not p_reopen_existing
     and not exists (
@@ -341,8 +380,13 @@ begin
     count(*) filter (where action = 'skipped_existing_open')::integer,
     count(*) filter (where action = 'skipped_existing_closed')::integer,
     count(*) filter (
-      where action in ('skipped_existing_open', 'skipped_existing_closed')
+      where action in (
+        'skipped_existing_open',
+        'skipped_existing_closed',
+        'skipped_other_course'
+      )
     )::integer,
+    count(*) filter (where action = 'skipped_other_course')::integer,
     count(*) filter (where action = 'skipped_student_not_found')::integer,
     count(*) filter (where action = 'skipped_not_in_course')::integer,
     coalesce(
@@ -367,6 +411,7 @@ begin
     v_skipped_existing_open_count,
     v_skipped_existing_closed_count,
     v_skipped_existing_count,
+    v_skipped_other_course_count,
     v_skipped_not_found_count,
     v_skipped_not_in_course_count,
     v_items
@@ -391,6 +436,7 @@ begin
     'skipped_existing_open_count', v_skipped_existing_open_count,
     'skipped_existing_closed_count', v_skipped_existing_closed_count,
     'skipped_existing_count', v_skipped_existing_count,
+    'skipped_other_course_count', v_skipped_other_course_count,
     'skipped_student_not_found_count', v_skipped_not_found_count,
     'skipped_not_in_course_count', v_skipped_not_in_course_count,
     'items', v_items
@@ -398,6 +444,11 @@ begin
 end;
 $function$;
 
+revoke execute on function auto_grading.teacher_issue_assignments(
+  uuid, uuid[], uuid, text, boolean
+) from public, anon;
 grant execute on function auto_grading.teacher_issue_assignments(
   uuid, uuid[], uuid, text, boolean
-) to authenticated;
+) to authenticated, service_role;
+
+commit;

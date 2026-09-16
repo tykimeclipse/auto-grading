@@ -278,11 +278,20 @@
       </div>
       <div class="grid">
         <div class="panel">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <h2 id="leftPanelTitle" style="margin:0">문제지 기본 정보</h2>
-            <button id="toggleModeBtn" type="button" class="soft">검색 모드</button>
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 14px;
+            "
+          >
+            <h2 id="leftPanelTitle" style="margin: 0">문제지 기본 정보</h2>
+            <button id="toggleModeBtn" type="button" class="soft">
+              검색 모드
+            </button>
           </div>
-          <div id="modeBanner" class="mode-banner" style="display:none"></div>
+          <div id="modeBanner" class="mode-banner" style="display: none"></div>
           <div class="form-grid">
             <div class="field wide">
               <label for="title">문제지 제목</label
@@ -329,10 +338,17 @@
                 소단원은 `111`처럼 뒤 자리를 0으로 채워 계층을 표현합니다.
               </div>
             </div>
-            <div id="searchByIdField" class="field wide" style="display:none">
+            <div id="searchByIdField" class="field wide" style="display: none">
               <label for="searchById">Test Set ID로 직접 검색 (선택)</label>
-              <input id="searchById" type="text" placeholder="UUID 붙여넣기 — 입력 시 다른 조건 무시" />
-              <div class="hint">검색 결과가 여러 건일 때 ID를 복사해 여기에 붙여넣으면 정확히 1건만 조회됩니다.</div>
+              <input
+                id="searchById"
+                type="text"
+                placeholder="UUID 붙여넣기 — 입력 시 다른 조건 무시"
+              />
+              <div class="hint">
+                검색 결과가 여러 건일 때 ID를 복사해 여기에 붙여넣으면 정확히
+                1건만 조회됩니다.
+              </div>
             </div>
           </div>
           <div style="height: 14px"></div>
@@ -354,14 +370,18 @@
               <label for="sourceType">출처 분류</label
               ><select id="sourceType">
                 <option value="problem_bank|족보(기본)">족보(기본)</option>
-                <option value="problem_bank|족보(빈출)" selected>족보(빈출)</option>
+                <option value="problem_bank|족보(빈출)" selected>
+                  족보(빈출)
+                </option>
                 <option value="problem_bank|족보(오답)">족보(오답)</option>
                 <option value="problem_bank|족보(발전)">족보(발전)</option>
+                <option value="problem_bank|족보(발전)">족보(최상위)</option>
                 <option value="published_book|오투">오투</option>
-                <option value="published_book|오투(시험대비)">오투(시험대비)</option>
+                <option value="published_book|오투(시험대비)">
+                  오투(시험대비)
+                </option>
                 <option value="published_book|개념풀">개념풀</option>
                 <option value="published_book|본">본</option>
-
               </select>
             </div>
             <div class="field wide">
@@ -369,8 +389,8 @@
               <div id="unitGuide" class="code-box">
                 DB 연결 후 curriculum_units를 불러오면 현재 선택한 교육과정 /
                 학년 / 과목 조합에 맞는 단원 목록이 여기에 반영됩니다. 중단원과
-                소단원 드롭다운에는 `0. 선택없음`이 포함되어 대단원/중단원/소단원
-                범위를 모두 선택할 수 있습니다.
+                소단원 드롭다운에는 `0. 선택없음`이 포함되어
+                대단원/중단원/소단원 범위를 모두 선택할 수 있습니다.
               </div>
             </div>
           </div>
@@ -394,8 +414,17 @@
           </div>
           <div class="toolbar">
             <button id="resetBtn" class="soft" type="button">초기화</button>
-            <button id="uploadBtn" class="primary" type="button">문제지 등록</button>
-            <button id="searchExecBtn" class="primary" type="button" style="display:none">검색 실행</button>
+            <button id="uploadBtn" class="primary" type="button">
+              문제지 등록
+            </button>
+            <button
+              id="searchExecBtn"
+              class="primary"
+              type="button"
+              style="display: none"
+            >
+              검색 실행
+            </button>
           </div>
           <div id="statusBox" class="status info"></div>
         </div>
@@ -412,11 +441,15 @@
             </div>
             <div class="summary-item">
               <div class="k">대단원 / 중단원</div>
-              <div id="summaryMajorMinor" class="v">1 - 대단원 / 0 - 선택없음</div>
+              <div id="summaryMajorMinor" class="v">
+                1 - 대단원 / 0 - 선택없음
+              </div>
             </div>
             <div class="summary-item">
               <div class="k">단원 코드 / 선택 단원</div>
-              <div id="summaryUnitNano" class="v">112 / 소단원: (소단원명 미지정)</div>
+              <div id="summaryUnitNano" class="v">
+                112 / 소단원: (소단원명 미지정)
+              </div>
             </div>
             <div class="summary-item">
               <div class="k">소스</div>
@@ -425,7 +458,8 @@
             <div class="summary-item">
               <div class="k">등록 기준 키</div>
               <div id="summarySubmittedTitle" class="v">
-                제목 / curriculum_version / unit_code / source_category 조합으로 등록
+                제목 / curriculum_version / unit_code / source_category 조합으로
+                등록
               </div>
             </div>
             <div id="summaryCsvItem" class="summary-item">
@@ -433,16 +467,31 @@
               <div id="summaryCsv" class="v">파일 미선택</div>
             </div>
           </div>
-          <div id="searchResultArea" style="display:none;margin-top:14px">
-            <div class="summary-item" style="border-color:#93c5fd;background:#eff6ff">
-              <div class="k" style="color:#1d4ed8">검색된 문제지</div>
-              <div id="searchResultText" class="v" style="font-size:13px;white-space:pre-line">-</div>
+          <div id="searchResultArea" style="display: none; margin-top: 14px">
+            <div
+              class="summary-item"
+              style="border-color: #93c5fd; background: #eff6ff"
+            >
+              <div class="k" style="color: #1d4ed8">검색된 문제지</div>
+              <div
+                id="searchResultText"
+                class="v"
+                style="font-size: 13px; white-space: pre-line"
+              >
+                -
+              </div>
             </div>
             <div class="toolbar">
-              <button id="editBtn" type="button" class="soft" disabled>수정하기</button>
+              <button id="editBtn" type="button" class="soft" disabled>
+                수정하기
+              </button>
             </div>
           </div>
-          <div id="editActionBox" class="toolbar" style="display:none;margin-top:14px">
+          <div
+            id="editActionBox"
+            class="toolbar"
+            style="display: none; margin-top: 14px"
+          >
             <button id="saveBtn" type="button" class="primary">저장</button>
             <button id="cancelBtn" type="button" class="soft">취소</button>
           </div>
@@ -451,8 +500,8 @@
           <div class="code-box">
             현재 페이지는 subject 값을 curriculum_units.subject와 정확히
             일치시키고, 단원명은 curriculum_units 원본에서 조회해 사용합니다.
-            등록 호출에서는 source_type(내부 enum)과
-            source_category(화면 라벨)를 분리해서 전송합니다.
+            등록 호출에서는 source_type(내부 enum)과 source_category(화면
+            라벨)를 분리해서 전송합니다.
           </div>
         </div>
       </div>
@@ -469,8 +518,8 @@
         csvRows: [],
         csvFileName: "",
         unitSyncLock: false,
-        mode: "register",     // "register" | "search" | "edit"
-        foundTestSet: null,   // 검색으로 찾은 test_set 데이터
+        mode: "register", // "register" | "search" | "edit"
+        foundTestSet: null, // 검색으로 찾은 test_set 데이터
       };
 
       const UNIT_LEVEL_LABELS = {
@@ -534,26 +583,37 @@
 
       function formatSubjectLabel(value) {
         const map = {
-          "중1과학": "중1 과학",
-          "중2과학": "중2 과학",
-          "중3과학": "중3 과학",
-          "고1통합과학": "고1 통합과학",
-          "통합과학": "통합과학",
+          중1과학: "중1 과학",
+          중2과학: "중2 과학",
+          중3과학: "중3 과학",
+          고1통합과학: "고1 통합과학",
+          통합과학: "통합과학",
         };
         return map[value] || value || "-";
       }
 
       function formatGradeLabel(code) {
-        const map = { M1: "중1", M2: "중2", M3: "중3", H1: "고1", H2: "고2", H3: "고3" };
+        const map = {
+          M1: "중1",
+          M2: "중2",
+          M3: "중3",
+          H1: "고1",
+          H2: "고2",
+          H3: "고3",
+        };
         return map[code] || code || "-";
       }
 
       function normalizeUnitCode(value) {
-        return String(value || "").replace(/\D/g, "").slice(0, 3);
+        return String(value || "")
+          .replace(/\D/g, "")
+          .slice(0, 3);
       }
 
       function normalizeSingleDigit(value, fallback = "0") {
-        const digits = String(value ?? "").replace(/\D/g, "").slice(0, 1);
+        const digits = String(value ?? "")
+          .replace(/\D/g, "")
+          .slice(0, 1);
         return digits || fallback;
       }
 
@@ -561,7 +621,8 @@
         return [...options].sort((a, b) => {
           const av = Number(a.value);
           const bv = Number(b.value);
-          if (!Number.isNaN(av) && !Number.isNaN(bv) && av !== bv) return av - bv;
+          if (!Number.isNaN(av) && !Number.isNaN(bv) && av !== bv)
+            return av - bv;
           return String(a.label).localeCompare(String(b.label), "ko");
         });
       }
@@ -572,8 +633,10 @@
 
       function getUnitDisplayName(unit) {
         if (!unit) return "-";
-        if (unit.unit_level === "major") return unit.major_unit_name || "(대단원명 미지정)";
-        if (unit.unit_level === "middle") return unit.minor_unit_name || "(중단원명 미지정)";
+        if (unit.unit_level === "major")
+          return unit.major_unit_name || "(대단원명 미지정)";
+        if (unit.unit_level === "middle")
+          return unit.minor_unit_name || "(중단원명 미지정)";
         return unit.nano_unit_name || "(소단원명 미지정)";
       }
 
@@ -592,17 +655,22 @@
       function findUnitByCode(unitCode, units = getFilteredUnits()) {
         const normalized = normalizeUnitCode(unitCode);
         if (!normalized) return null;
-        return units.find((unit) => String(unit.unit_code).padStart(3, "0") === normalized) || null;
+        return (
+          units.find(
+            (unit) => String(unit.unit_code).padStart(3, "0") === normalized,
+          ) || null
+        );
       }
 
       function getFilteredUnits() {
         const curriculumVersion = $("curriculumVersion").value;
         const gradeLevel = $("gradeLevel").value;
         const subject = $("subject").value;
-        return state.units.filter((unit) =>
-          String(unit.curriculum_version) === curriculumVersion &&
-          String(unit.grade_level) === gradeLevel &&
-          String(unit.subject) === subject
+        return state.units.filter(
+          (unit) =>
+            String(unit.curriculum_version) === curriculumVersion &&
+            String(unit.grade_level) === gradeLevel &&
+            String(unit.subject) === subject,
         );
       }
 
@@ -637,7 +705,11 @@
           { value: "고1통합과학", label: "고1 통합과학" },
           { value: "통합과학", label: "통합과학" },
         ];
-        fillSimpleSelect($("subject"), fallback, $("subject").value || "중3과학");
+        fillSimpleSelect(
+          $("subject"),
+          fallback,
+          $("subject").value || "중3과학",
+        );
       }
 
       function refreshSubjectOptionsFromUnits() {
@@ -648,16 +720,22 @@
         }
         const curriculumVersion = $("curriculumVersion").value;
         const gradeLevel = $("gradeLevel").value;
-        const subjects = [...new Set(
-          state.units
-            .filter((unit) =>
-              String(unit.curriculum_version) === curriculumVersion &&
-              String(unit.grade_level) === gradeLevel
-            )
-            .map((unit) => String(unit.subject))
-        )];
-        const options = (subjects.length ? subjects : [...new Set(state.units.map((u) => String(u.subject)))])
-          .map((value) => ({ value, label: formatSubjectLabel(value) }));
+        const subjects = [
+          ...new Set(
+            state.units
+              .filter(
+                (unit) =>
+                  String(unit.curriculum_version) === curriculumVersion &&
+                  String(unit.grade_level) === gradeLevel,
+              )
+              .map((unit) => String(unit.subject)),
+          ),
+        ];
+        const options = (
+          subjects.length
+            ? subjects
+            : [...new Set(state.units.map((u) => String(u.subject)))]
+        ).map((value) => ({ value, label: formatSubjectLabel(value) }));
         fillSimpleSelect($("subject"), options, $("subject").value);
         refreshUnitSelectors();
       }
@@ -665,20 +743,27 @@
       function refreshUnitSelectors() {
         const filteredUnits = getFilteredUnits();
 
-        const majorOptions = sortOptionValues(
-          [...new Map(
+        const majorOptions = sortOptionValues([
+          ...new Map(
             filteredUnits.map((unit) => [
               String(unit.major_unit_code),
-              { value: String(unit.major_unit_code), label: `${unit.major_unit_code} - ${unit.major_unit_name}` },
-            ])
-          ).values()]
-        );
+              {
+                value: String(unit.major_unit_code),
+                label: `${unit.major_unit_code} - ${unit.major_unit_name}`,
+              },
+            ]),
+          ).values(),
+        ]);
         fillSimpleSelect($("majorUnit"), majorOptions, $("majorUnit").value);
 
         const selectedMajor = $("majorUnit").value;
         const minorMap = new Map();
         filteredUnits
-          .filter((unit) => String(unit.major_unit_code) === selectedMajor && String(unit.minor_unit_code) !== "0")
+          .filter(
+            (unit) =>
+              String(unit.major_unit_code) === selectedMajor &&
+              String(unit.minor_unit_code) !== "0",
+          )
           .forEach((unit) => {
             const code = String(unit.minor_unit_code);
             if (!minorMap.has(code)) {
@@ -688,17 +773,21 @@
               });
             }
           });
-        const minorOptions = [buildZeroOption(), ...sortOptionValues([...minorMap.values()])];
+        const minorOptions = [
+          buildZeroOption(),
+          ...sortOptionValues([...minorMap.values()]),
+        ];
         fillSimpleSelect($("middleUnit"), minorOptions, $("middleUnit").value);
 
         const selectedMinor = $("middleUnit").value;
         const nanoMap = new Map();
         if (selectedMinor !== "0") {
           filteredUnits
-            .filter((unit) =>
-              String(unit.major_unit_code) === selectedMajor &&
-              String(unit.minor_unit_code) === selectedMinor &&
-              String(unit.nano_unit_code) !== "0"
+            .filter(
+              (unit) =>
+                String(unit.major_unit_code) === selectedMajor &&
+                String(unit.minor_unit_code) === selectedMinor &&
+                String(unit.nano_unit_code) !== "0",
             )
             .forEach((unit) => {
               const code = String(unit.nano_unit_code);
@@ -710,7 +799,10 @@
               }
             });
         }
-        const nanoOptions = [buildZeroOption(), ...sortOptionValues([...nanoMap.values()])];
+        const nanoOptions = [
+          buildZeroOption(),
+          ...sortOptionValues([...nanoMap.values()]),
+        ];
         fillSimpleSelect($("nanoUnit"), nanoOptions, $("nanoUnit").value);
 
         updateUnitGuide(filteredUnits);
@@ -719,11 +811,13 @@
       function updateUnitGuide(filteredUnits = getFilteredUnits()) {
         const guide = $("unitGuide");
         if (!state.units.length) {
-          guide.innerHTML = "DB 연결 후 curriculum_units에서 단원 목록을 불러옵니다.";
+          guide.innerHTML =
+            "DB 연결 후 curriculum_units에서 단원 목록을 불러옵니다.";
           return;
         }
         if (!filteredUnits.length) {
-          guide.innerHTML = "현재 선택한 교육과정 / 학년 / 과목 조합에 해당하는 단원 데이터가 없습니다.";
+          guide.innerHTML =
+            "현재 선택한 교육과정 / 학년 / 과목 조합에 해당하는 단원 데이터가 없습니다.";
           return;
         }
         const selected = getSelectedUnit();
@@ -731,7 +825,9 @@
         const minorText = selectedText($("middleUnit")) || "-";
         const nanoText = selectedText($("nanoUnit")) || "-";
         const levelText = selected ? getUnitLevelLabel(selected) : "단원";
-        const selectedName = selected ? getUnitDisplayName(selected) : "(해당 unit row 없음)";
+        const selectedName = selected
+          ? getUnitDisplayName(selected)
+          : "(해당 unit row 없음)";
         guide.innerHTML =
           `현재 조합 기준 단원 ${filteredUnits.length}건이 로드되어 있습니다.<br>` +
           `대단원: ${escapeHtml(majorText)}<br>` +
@@ -742,7 +838,8 @@
       }
 
       function getSelectedUnit() {
-        const unitCode = normalizeUnitCode($("unitCode").value) || buildSelectedUnitCode();
+        const unitCode =
+          normalizeUnitCode($("unitCode").value) || buildSelectedUnitCode();
         if (!unitCode || !state.units.length) return null;
         return findUnitByCode(unitCode, getFilteredUnits());
       }
@@ -779,7 +876,10 @@
           return;
         }
         refreshUnitSelectors();
-        const found = findUnitByCode(buildSelectedUnitCode(), getFilteredUnits());
+        const found = findUnitByCode(
+          buildSelectedUnitCode(),
+          getFilteredUnits(),
+        );
         if (found) {
           $("unitCode").value = String(found.unit_code).padStart(3, "0");
         } else {
@@ -810,7 +910,9 @@
         $("summarySource").textContent = getSourceLabel() || "-";
         $("summarySubmittedTitle").textContent = buildSummaryRegistrationKey();
         const file = $("csvFile").files[0];
-        $("summaryCsv").textContent = file ? `${file.name} (${state.csvRows.length || "검증 전"}문항)` : "파일 미선택";
+        $("summaryCsv").textContent = file
+          ? `${file.name} (${state.csvRows.length || "검증 전"}문항)`
+          : "파일 미선택";
       }
 
       async function parseCsvFile() {
@@ -826,8 +928,13 @@
                 reject(new Error("CSV에 데이터가 없습니다."));
                 return;
               }
-              const headers = Object.keys(rows[0] || {}).map((key) => key.trim());
-              if (!headers.includes("item_no") || !headers.includes("answer_key")) {
+              const headers = Object.keys(rows[0] || {}).map((key) =>
+                key.trim(),
+              );
+              if (
+                !headers.includes("item_no") ||
+                !headers.includes("answer_key")
+              ) {
                 reject(new Error("필수 컬럼(item_no, answer_key)이 없습니다."));
                 return;
               }
@@ -839,24 +946,39 @@
                   topic_tag: String(row.topic_tag ?? "").trim(),
                   note: String(row.note ?? "").trim(),
                 }))
-                .filter((row) => row.item_no || row.answer_key || row.choice_count || row.topic_tag || row.note);
+                .filter(
+                  (row) =>
+                    row.item_no ||
+                    row.answer_key ||
+                    row.choice_count ||
+                    row.topic_tag ||
+                    row.note,
+                );
 
               const errors = [];
               const seen = new Set();
               normalized.forEach((row, idx) => {
                 const lineNo = idx + 2;
                 if (!row.item_no) errors.push(`${lineNo}행: item_no 비어 있음`);
-                if (row.item_no && !/^\d+$/.test(row.item_no)) errors.push(`${lineNo}행: item_no는 숫자만 가능`);
-                if (row.item_no && seen.has(row.item_no)) errors.push(`${lineNo}행: item_no 중복 (${row.item_no})`);
+                if (row.item_no && !/^\d+$/.test(row.item_no))
+                  errors.push(`${lineNo}행: item_no는 숫자만 가능`);
+                if (row.item_no && seen.has(row.item_no))
+                  errors.push(`${lineNo}행: item_no 중복 (${row.item_no})`);
                 if (row.item_no) seen.add(row.item_no);
-                if (!row.answer_key) errors.push(`${lineNo}행: answer_key 비어 있음`);
-                if (row.choice_count && !/^\d+$/.test(row.choice_count)) errors.push(`${lineNo}행: choice_count는 숫자만 가능`);
+                if (!row.answer_key)
+                  errors.push(`${lineNo}행: answer_key 비어 있음`);
+                if (row.choice_count && !/^\d+$/.test(row.choice_count))
+                  errors.push(`${lineNo}행: choice_count는 숫자만 가능`);
               });
               if (errors.length) {
                 reject(new Error(errors.join("\n")));
                 return;
               }
-              resolve(normalized.sort((a, b) => Number(a.item_no) - Number(b.item_no)));
+              resolve(
+                normalized.sort(
+                  (a, b) => Number(a.item_no) - Number(b.item_no),
+                ),
+              );
             },
             error: (err) => reject(err),
           });
@@ -880,11 +1002,14 @@
         const { sourceType, sourceCategory } = getSourceParts();
 
         if (!title) throw new Error("문제지 제목을 입력해 주세요.");
-        if (!/^\d{3}$/.test(unitCode)) throw new Error("단원 코드는 3자리 숫자로 입력해 주세요.");
+        if (!/^\d{3}$/.test(unitCode))
+          throw new Error("단원 코드는 3자리 숫자로 입력해 주세요.");
         if (!state.csvRows.length) throw new Error("CSV를 먼저 검증해 주세요.");
         if (!subject) throw new Error("과목 값이 비어 있습니다.");
         if (state.units.length && !getSelectedUnit()) {
-          throw new Error("선택한 교육과정/학년/과목 기준으로 해당 unit_code row를 찾지 못했습니다. curriculum_units에 100/110/111 계층 row가 있는지 확인해 주세요.");
+          throw new Error(
+            "선택한 교육과정/학년/과목 기준으로 해당 unit_code row를 찾지 못했습니다. curriculum_units에 100/110/111 계층 row가 있는지 확인해 주세요.",
+          );
         }
 
         return {
@@ -922,7 +1047,8 @@
           if (error) throw error;
           const parts = ["문제지 등록 완료", `문항 수: ${rows.length}문항`];
           if (data && typeof data === "object") {
-            if (data.test_set_id) parts.push(`test_set_id: ${data.test_set_id}`);
+            if (data.test_set_id)
+              parts.push(`test_set_id: ${data.test_set_id}`);
             if (data.message) parts.push(`message: ${data.message}`);
           }
           setStatus(parts.join("\n"), "ok");
@@ -963,35 +1089,43 @@
       function setMode(mode) {
         state.mode = mode;
         const isRegister = mode === "register";
-        const isSearch   = mode === "search";
-        const isEdit     = mode === "edit";
+        const isSearch = mode === "search";
+        const isEdit = mode === "edit";
 
-        $("leftPanelTitle").textContent =
-          isSearch ? "문제지 검색" : isEdit ? "메타정보 수정" : "문제지 기본 정보";
+        $("leftPanelTitle").textContent = isSearch
+          ? "문제지 검색"
+          : isEdit
+            ? "메타정보 수정"
+            : "문제지 기본 정보";
         $("toggleModeBtn").style.display = isEdit ? "none" : "";
-        $("toggleModeBtn").textContent = isRegister ? "검색 모드" : "등록 모드로";
+        $("toggleModeBtn").textContent = isRegister
+          ? "검색 모드"
+          : "등록 모드로";
 
         const banner = $("modeBanner");
-        banner.style.display = (isSearch || isEdit) ? "" : "none";
+        banner.style.display = isSearch || isEdit ? "" : "none";
         banner.className = `mode-banner ${mode}`;
         banner.textContent = isSearch
           ? "검색 모드: 조건을 입력하고 [검색 실행]을 눌러 기존 문제지를 찾으세요."
           : isEdit
-          ? "수정 모드: 내용을 수정한 후 [저장]을 눌러 반영하세요."
-          : "";
+            ? "수정 모드: 내용을 수정한 후 [저장]을 눌러 반영하세요."
+            : "";
 
-        $("csvSection").style.display        = isRegister ? "" : "none";
-        $("uploadBtn").style.display         = isRegister ? "" : "none";
-        $("searchExecBtn").style.display     = isSearch   ? "" : "none";
-        $("resetBtn").style.display          = isEdit     ? "none" : "";
-        $("searchByIdField").style.display   = isSearch   ? "" : "none";
+        $("csvSection").style.display = isRegister ? "" : "none";
+        $("uploadBtn").style.display = isRegister ? "" : "none";
+        $("searchExecBtn").style.display = isSearch ? "" : "none";
+        $("resetBtn").style.display = isEdit ? "none" : "";
+        $("searchByIdField").style.display = isSearch ? "" : "none";
         if (!isSearch) $("searchById").value = "";
 
-        $("rightPanelTitle").textContent =
-          isSearch ? "검색 결과" : isEdit ? "수정 미리보기" : "등록 요약";
-        $("summaryCsvItem").style.display  = isRegister ? "" : "none";
-        $("searchResultArea").style.display = isSearch  ? "" : "none";
-        $("editActionBox").style.display   = isEdit     ? "" : "none";
+        $("rightPanelTitle").textContent = isSearch
+          ? "검색 결과"
+          : isEdit
+            ? "수정 미리보기"
+            : "등록 요약";
+        $("summaryCsvItem").style.display = isRegister ? "" : "none";
+        $("searchResultArea").style.display = isSearch ? "" : "none";
+        $("editActionBox").style.display = isEdit ? "" : "none";
 
         if (isEdit) {
           $("cancelBtn").textContent = "취소";
@@ -1009,7 +1143,8 @@
       function clearSearchResult() {
         state.foundTestSet = null;
         $("editBtn").disabled = true;
-        $("searchResultText").textContent = "조건이 변경되었습니다. 다시 검색하세요.";
+        $("searchResultText").textContent =
+          "조건이 변경되었습니다. 다시 검색하세요.";
         setStatus("", "info");
       }
 
@@ -1036,7 +1171,7 @@
               p_subject: byId ? null : $("subject").value,
               p_unit_code: byId ? null : unitCode,
               p_source_category: byId ? null : sourceCategory,
-              p_title: byId ? null : (titleVal || null),
+              p_title: byId ? null : titleVal || null,
             });
           if (error) throw error;
           const itemCount = (d) => d.item_count ?? "-";
@@ -1046,9 +1181,14 @@
             $("searchResultText").textContent = "검색 결과 없음";
             state.foundTestSet = null;
           } else if (data.length > 1) {
-            setStatus(`${data.length}건이 검색되었습니다. 조건을 더 구체적으로 입력해 주세요.`, "error");
+            setStatus(
+              `${data.length}건이 검색되었습니다. 조건을 더 구체적으로 입력해 주세요.`,
+              "error",
+            );
             $("editBtn").disabled = true;
-            $("searchResultText").textContent = data.map((d) => `• ${d.title} (${itemCount(d)}문항)\n  [${d.id}]`).join("\n");
+            $("searchResultText").textContent = data
+              .map((d) => `• ${d.title} (${itemCount(d)}문항)\n  [${d.id}]`)
+              .join("\n");
             state.foundTestSet = null;
           } else {
             state.foundTestSet = data[0];
@@ -1060,7 +1200,10 @@
               `단원코드: ${String(f.unit_code).padStart(3, "0")} / ${f.source_category}\n` +
               `문항수: ${itemCount(f)}문항\n` +
               `ID: ${f.id}`;
-            setStatus("검색 완료. [수정하기]를 클릭하면 수정 모드로 전환됩니다.", "ok");
+            setStatus(
+              "검색 완료. [수정하기]를 클릭하면 수정 모드로 전환됩니다.",
+              "ok",
+            );
           }
         } catch (err) {
           setStatus(normalizeError(err), "error");
@@ -1082,7 +1225,11 @@
         $("subject").value = f.subject || "";
         $("unitCode").value = String(f.unit_code || "").padStart(3, "0");
         const sourceTypeValue = `${f.source_type}|${f.source_category}`;
-        if ([...$("sourceType").options].some((opt) => opt.value === sourceTypeValue)) {
+        if (
+          [...$("sourceType").options].some(
+            (opt) => opt.value === sourceTypeValue,
+          )
+        ) {
           $("sourceType").value = sourceTypeValue;
         }
         if (state.units.length) syncSelectorsFromUnitCode();
@@ -1101,8 +1248,14 @@
         const subject = $("subject").value;
         const unitCode = normalizeUnitCode($("unitCode").value);
         const { sourceType, sourceCategory } = getSourceParts();
-        if (!title) { setStatus("문제지 제목을 입력해 주세요.", "error"); return; }
-        if (!/^\d{3}$/.test(unitCode)) { setStatus("단원 코드는 3자리 숫자로 입력해 주세요.", "error"); return; }
+        if (!title) {
+          setStatus("문제지 제목을 입력해 주세요.", "error");
+          return;
+        }
+        if (!/^\d{3}$/.test(unitCode)) {
+          setStatus("단원 코드는 3자리 숫자로 입력해 주세요.", "error");
+          return;
+        }
         const btn = $("saveBtn");
         btn.disabled = true;
         btn.textContent = "저장 중...";
@@ -1122,7 +1275,8 @@
               p_source_name: sourceCategory,
             });
           if (error) throw error;
-          if (data && data.ok === false) throw new Error(data.error || "저장 실패");
+          if (data && data.ok === false)
+            throw new Error(data.error || "저장 실패");
           success = true;
           setStatus(`저장 완료: ${data.title || title}`, "ok");
           state.foundTestSet = null;
@@ -1147,7 +1301,10 @@
       // ───────────────────────────────────────────────────────────────
 
       function wireEvents() {
-        $("resetBtn").addEventListener("click", () => { resetForm(); setMode("register"); });
+        $("resetBtn").addEventListener("click", () => {
+          resetForm();
+          setMode("register");
+        });
         $("uploadBtn").addEventListener("click", uploadTestSet);
 
         // 모드 전환 버튼
@@ -1164,14 +1321,22 @@
         $("saveBtn").addEventListener("click", saveTestSetMeta);
         $("cancelBtn").addEventListener("click", cancelEdit);
 
-        ["title", "curriculumVersion", "gradeLevel", "subject", "sourceType"].forEach((id) => {
+        [
+          "title",
+          "curriculumVersion",
+          "gradeLevel",
+          "subject",
+          "sourceType",
+        ].forEach((id) => {
           $(id).addEventListener("input", () => {
-            if (id === "curriculumVersion" || id === "gradeLevel") refreshSubjectOptionsFromUnits();
+            if (id === "curriculumVersion" || id === "gradeLevel")
+              refreshSubjectOptionsFromUnits();
             if (state.mode === "search") clearSearchResult();
             updateSummary();
           });
           $(id).addEventListener("change", () => {
-            if (id === "curriculumVersion" || id === "gradeLevel") refreshSubjectOptionsFromUnits();
+            if (id === "curriculumVersion" || id === "gradeLevel")
+              refreshSubjectOptionsFromUnits();
             if (id === "subject") refreshUnitSelectors();
             if (state.mode === "search") clearSearchResult();
             syncSelectorsFromUnitCode();
@@ -1199,7 +1364,7 @@
       }
 
       async function init() {
-        if (!await requireAuth()) return;
+        if (!(await requireAuth())) return;
         state.supabase = window.adminSupabase;
         populateFallbackSubjects();
         refreshUnitSelectors();
@@ -1209,7 +1374,9 @@
           const { data, error } = await state.supabase
             .schema("auto_grading")
             .from("curriculum_units")
-            .select("curriculum_version,grade_level,subject,unit_code,unit_level,major_unit_code,major_unit_name,minor_unit_code,minor_unit_name,nano_unit_code,nano_unit_name,is_active")
+            .select(
+              "curriculum_version,grade_level,subject,unit_code,unit_level,major_unit_code,major_unit_name,minor_unit_code,minor_unit_name,nano_unit_code,nano_unit_name,is_active",
+            )
             .eq("is_active", true)
             .order("grade_level", { ascending: true })
             .order("curriculum_version", { ascending: false })

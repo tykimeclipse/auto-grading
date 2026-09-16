@@ -295,8 +295,8 @@
           <div class="panel-body">
             <div class="search-grid">
               <div class="field">
-                <label for="courseSelect">수강과정</label>
-                <select id="courseSelect"><option value="">전체</option></select>
+                <label for="courseSelect">수강과정 <span style="color:var(--danger);">(필수)</span></label>
+                <select id="courseSelect"><option value="">강좌를 선택하세요</option></select>
               </div>
               <div class="field">
                 <label for="studentGradeFilter">학년</label>
@@ -359,7 +359,7 @@
               <div class="meta-item"><span class="k">선택 시험</span><span id="issueTestTitle" class="v">-</span></div>
               <div class="meta-item"><span class="k">선택 학생 수</span><span id="issueSelectedCount" class="v">0명</span></div>
               <div class="meta-item"><span class="k">발행 용도</span><span class="v"><select id="purposeSelect"><option value="숙제" selected>숙제</option><option value="클리닉">클리닉</option><option value="보충">보충</option></select></span></div>
-              <div class="meta-item"><span class="k">수강과정</span><span id="issueCourseName" class="v">전체</span></div>
+              <div class="meta-item"><span class="k">수강과정</span><span id="issueCourseName" class="v">미선택</span></div>
             </div>
             <div class="check-row" style="margin-top:16px;">
               <label class="chip"><input type="checkbox" checked disabled /> 발행 시 자동으로 열림 시작</label>
@@ -457,7 +457,7 @@
 
     function currentCourseName() {
       const opt = $('courseSelect').options[$('courseSelect').selectedIndex];
-      return opt ? opt.textContent : '전체';
+      return currentCourseId() && opt ? opt.textContent : '미선택';
     }
 
     function currentPurposeFilter() {
@@ -501,7 +501,7 @@
       if (error) throw error;
       state.courses = Array.isArray(data) ? data : [];
       const cur = $('courseSelect').value;
-      $('courseSelect').innerHTML = '<option value="">전체</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
+      $('courseSelect').innerHTML = '<option value="">강좌를 선택하세요</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
       if (cur && state.courses.some(c => c.course_id === cur)) $('courseSelect').value = cur;
       updateFooter();
     }
@@ -683,6 +683,7 @@
 
     async function loadStudents() {
       try {
+        if (!currentCourseId()) throw new Error('학생을 조회할 활성 강좌를 먼저 선택해 주세요.');
         const nameSearch = $('studentNameSearch').value.trim();
         const codeSearch = $('studentCodeSearch').value.trim();
         const params = {
@@ -1071,6 +1072,10 @@
     }
 
     function updateIssueWarning() {
+      if (!currentCourseId()) {
+        $('issueWarningText').textContent = '발행할 활성 강좌를 먼저 선택해 주세요. 강좌 미지정 발행은 허용되지 않습니다.';
+        return;
+      }
       const selectedRows = state.students.filter(s => state.selectedStudentIds.has(s.student_id));
       const openSame = selectedRows.filter(r => r.has_same_test_open_assignment).length;
       const sameAny = selectedRows.filter(r => r.has_same_test_assignment).length;
@@ -1088,25 +1093,27 @@
     }
 
     function updateFooter() {
-      $('issueCourseName').textContent = currentCourseName() || '전체';
+      $('issueCourseName').textContent = currentCourseName();
     }
 
     async function issueAssignments() {
       try {
         if (!state.selectedTestSetId) throw new Error('먼저 시험을 선택해 주세요.');
+        const courseId = currentCourseId();
+        if (!courseId) throw new Error('발행할 활성 강좌를 먼저 선택해 주세요.');
         const studentIds = [...state.selectedStudentIds];
         if (!studentIds.length) throw new Error('발행할 학생을 1명 이상 선택해 주세요.');
         setStatus('issueStatus', 'assignment 발행을 진행 중입니다.', 'info');
         const payload = {
           p_test_set_id: state.selectedTestSetId,
           p_student_ids: studentIds,
-          p_course_id: currentCourseId(),
+          p_course_id: courseId,
           p_purpose: $('purposeSelect').value || null,
           p_reopen_existing: $('reopenExisting').checked
         };
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_issue_assignments', payload);
         if (error) throw error;
-        setStatus('issueStatus', `발행 처리 완료\ncreated: ${data?.created_count ?? 0}\nreopened: ${data?.reopened_count ?? 0}\nskipped_existing_open: ${data?.skipped_existing_open_count ?? 0}\nskipped_existing_closed: ${data?.skipped_existing_closed_count ?? 0}`, 'ok');
+        setStatus('issueStatus', `발행 처리 완료\ncreated: ${data?.created_count ?? 0}\nreopened: ${data?.reopened_count ?? 0}\nskipped_existing_open: ${data?.skipped_existing_open_count ?? 0}\nskipped_existing_closed: ${data?.skipped_existing_closed_count ?? 0}\nskipped_other_course: ${data?.skipped_other_course_count ?? 0}\nskipped_not_in_course: ${data?.skipped_not_in_course_count ?? 0}`, 'ok');
         await Promise.all([loadStudents(), loadAssignments(), loadTestOverview(state.selectedTestSetId)]);
         renderSelectedTest();
       } catch (err) {
@@ -1150,8 +1157,16 @@
         renderStudentTable();
       });
       $('courseSelect').addEventListener('change', async () => {
+        state.selectedStudentIds.clear();
+        $('selectAllStudents').checked = false;
         updateFooter();
-        await Promise.all([loadStudents(), loadAssignments()]);
+        updateIssueWarning();
+        if (currentCourseId()) await Promise.all([loadStudents(), loadAssignments()]);
+        else {
+          state.students = [];
+          renderStudentTable();
+          await loadAssignments();
+        }
       });
       $('filterOpenOnly').addEventListener('change', loadAssignments);
       $('filterCurrentTestOnly').addEventListener('change', loadAssignments);

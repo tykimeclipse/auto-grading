@@ -235,7 +235,7 @@
         <!-- 2단계: 학생 점수 입력 -->
         <div id="mStudentArea" style="display:none;">
           <div class="modal-grid" style="grid-template-columns:1fr 1.4fr auto;">
-            <div class="field"><label for="mCourseSelect">수강과정</label><select id="mCourseSelect"><option value="">전체</option></select></div>
+            <div class="field"><label for="mCourseSelect">수강과정 (필수)</label><select id="mCourseSelect"><option value="">강좌를 선택하세요</option></select></div>
             <div class="field"><label for="mStudentSearch">학생명/학생번호</label><input id="mStudentSearch" type="text" placeholder="예: 김동하 또는 101" /></div>
             <div class="field"><label>&nbsp;</label><button id="mLoadStudentsBtn" class="btn-secondary" type="button">학생 불러오기</button></div>
           </div>
@@ -705,10 +705,13 @@
       $('mIssuedTag').style.display='none'; $('mIssuedTag').textContent='';
       $('mStudentArea').style.display='none';
       $('mStudentList').innerHTML='';
-      $('mTitle').disabled=false; $('mTotal').disabled=false; $('mDate').disabled=false; $('mIssueBtn').disabled=false;
+      $('mTitle').disabled=false; $('mTotal').disabled=false; $('mDate').disabled=false; $('mCourseSelect').disabled=false; $('mIssueBtn').disabled=false;
       setStatus('manualStatus','','info');
       // 수강과정 옵션은 메인과 동일하게 채운다
-      $('mCourseSelect').innerHTML = '<option value="">전체</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
+      $('mCourseSelect').innerHTML = '<option value="">강좌를 선택하세요</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
+      if ($('courseSelect').value && state.courses.some(c => c.course_id === $('courseSelect').value)) {
+        $('mCourseSelect').value = $('courseSelect').value;
+      }
       $('mStudentSearch').value='';
       $('manualModal').classList.add('open');
     }
@@ -718,8 +721,10 @@
       try {
         const title = $('mTitle').value.trim();
         const total = Number($('mTotal').value);
+        const courseId = $('mCourseSelect').value || null;
         if (!title) throw new Error('시험명을 입력하세요.');
         if (!Number.isInteger(total) || total <= 0) throw new Error('총 문항수는 1 이상의 정수여야 합니다.');
+        if (!courseId) throw new Error('수동 시험을 기록할 활성 강좌를 선택하세요.');
         setStatus('manualStatus','시험을 발행하는 중...','info');
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_create_manual_test_set', {
           p_title: title, p_total_items: total, p_grade_level: null, p_subject: null
@@ -727,7 +732,7 @@
         if (error) throw error;
         ensureRpcOk(data, '시험 발행에 실패했습니다.');
         manual.testSetId = data.test_set_id; manual.title = title; manual.total = total;
-        $('mTitle').disabled=true; $('mTotal').disabled=true; $('mDate').disabled=true; $('mIssueBtn').disabled=true;
+        $('mTitle').disabled=true; $('mTotal').disabled=true; $('mDate').disabled=true; $('mCourseSelect').disabled=true; $('mIssueBtn').disabled=true;
         $('mIssuedTag').textContent = `발행됨: ${title} · ${total}문항`;
         $('mIssuedTag').style.display='inline-flex';
         $('mStudentArea').style.display='block';
@@ -740,6 +745,7 @@
     async function loadManualStudents(){
       try {
         if (!manual.testSetId) throw new Error('먼저 시험을 발행하세요.');
+        if (!$('mCourseSelect').value) throw new Error('학생을 조회할 활성 강좌를 선택하세요.');
         setStatus('manualStatus','학생을 불러오는 중...','info');
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_students_for_assignment', {
           p_course_id: $('mCourseSelect').value || null,
@@ -791,8 +797,8 @@
             throw new Error(`최종 정답수는 0~${manual.total} 정수`);
         }
         stateEl.textContent='저장 중...'; stateEl.className='ms-state muted';
-        const stu = manual.students.find(x => x.student_id === studentId);
-        const courseId = (stu && stu.course_id) || $('mCourseSelect').value || null;
+        const courseId = $('mCourseSelect').value || null;
+        if (!courseId) throw new Error('점수를 기록할 활성 강좌를 선택하세요.');
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_upsert_manual_score', {
           p_test_set_id: manual.testSetId,
           p_student_id: studentId,
