@@ -3,7 +3,14 @@
 --
 -- 3단계 SQL 배포 후 쓰기 경로와 권한을 확인한다.
 -- SELECT만 수행하며 데이터와 스키마를 변경하지 않는다.
--- 결과 5행의 section / details를 공유한다.
+-- 결과 7행의 section / details를 공유한다.
+--
+-- 4단계 구현 메모:
+--   강좌 종료 확인창의 활성 수강생 수와 실제 종료 대상도 반드시
+--   coalesce(student_courses.is_active, student_courses.ended_at is null)
+--   식으로 판정한다. 목록/확인/종료의 활성 기준을 서로 혼용하지 않는다.
+--   특히 courses_v3.sql의 teacher_list_course_catalog 안 sc_counts와
+--   teacher_set_course_active의 확인·종료 대상 집계를 함께 통일한다.
 -- ============================================================================
 
 with target_functions as (
@@ -39,6 +46,37 @@ with target_functions as (
       and p.proname = 'start_attempt_by_test_set'
     )
 ),
+legacy_unassigned_assignments as (
+  select
+    a.id as assignment_id,
+    a.student_id,
+    s.student_code,
+    s.name as student_name,
+    a.test_set_id,
+    ts.title as test_title,
+    a.assigned_at,
+    a.closed_at,
+    exists (
+      select 1
+      from auto_grading.attempts at
+      where at.assignment_id = a.id
+    ) as has_attempt
+  from auto_grading.assignments a
+  join auto_grading.students s on s.id = a.student_id
+  left join auto_grading.test_sets ts on ts.id = a.test_set_id
+  where a.course_id is null
+),
+legacy_unassigned_student_rollup as (
+  select
+    student_code,
+    student_name,
+    count(*)::integer as assignment_count,
+    count(*) filter (where closed_at is null and not has_attempt)::integer
+      as open_without_attempt_count,
+    count(*) filter (where has_attempt)::integer as with_attempt_count
+  from legacy_unassigned_assignments
+  group by student_code, student_name
+),
 audit_rows as (
   select
     10 as sort_order,
@@ -51,7 +89,13 @@ audit_rows as (
           'security_definer', f.security_definer,
           'requires_course', f.prosrc ~ 'COURSE_REQUIRED',
           'rejects_inactive_course', f.prosrc ~ 'COURSE_INACTIVE',
-          'checks_active_enrollment', f.prosrc ~ 'v_student_courses_normalized',
+          'uses_direct_student_courses',
+            f.prosrc ~ 'auto_grading.student_courses',
+          'matches_normalized_active_rule',
+            f.prosrc ~* 'coalesce\s*\(\s*sc\.is_active\s*,\s*sc\.ended_at\s+is\s+null\s*\)',
+          'does_not_depend_on_normalized_view',
+            not (f.prosrc ~ 'v_student_courses_normalized'),
+          'skips_course_unassigned', f.prosrc ~ 'skipped_course_unassigned',
           'skips_other_course', f.prosrc ~ 'skipped_other_course',
           'prevents_reopen_retag', not (f.prosrc ~* 'set\s+course_id\s*=\s*coalesce'),
           'public_can_execute', f.public_can_execute,
@@ -85,6 +129,12 @@ audit_rows as (
           'requires_course_for_new_attempt', f.prosrc ~ 'COURSE_REQUIRED',
           'rejects_inactive_course_for_new_attempt', f.prosrc ~ 'COURSE_INACTIVE',
           'checks_active_enrollment_for_new_attempt', f.prosrc ~ 'STUDENT_NOT_ENROLLED_IN_COURSE',
+          'uses_direct_student_courses',
+            f.prosrc ~ 'auto_grading.student_courses',
+          'matches_normalized_active_rule',
+            f.prosrc ~* 'coalesce\s*\(\s*sc\.is_active\s*,\s*sc\.ended_at\s+is\s+null\s*\)',
+          'does_not_depend_on_normalized_view',
+            not (f.prosrc ~ 'v_student_courses_normalized'),
           'returns_course_id', f.prosrc ~* '''course_id''\s*,\s*v_attempt\.course_id',
           'anon_can_execute', f.anon_can_execute,
           'authenticated_can_execute', f.authenticated_can_execute,
@@ -112,11 +162,17 @@ audit_rows as (
           'resolves_one_active_course',
             f.prosrc ~ 'ACTIVE_COURSE_NOT_FOUND'
             and f.prosrc ~ 'MULTIPLE_ACTIVE_COURSES',
+          'uses_direct_student_courses',
+            f.prosrc ~ 'auto_grading.student_courses',
+          'matches_normalized_active_rule',
+            f.prosrc ~* 'coalesce\s*\(\s*sc\.is_active\s*,\s*sc\.ended_at\s+is\s+null\s*\)',
+          'does_not_depend_on_normalized_view',
+            not (f.prosrc ~ 'v_student_courses_normalized'),
           'stores_assignment_course_id',
             f.prosrc ~* 'insert\s+into\s+auto_grading\.assignments\s*\([^)]*course_id',
           'reuses_existing_before_active_course_resolution',
             strpos(f.prosrc, 'if v_assignment_id is not null')
-              < strpos(f.prosrc, 'count(distinct v.course_id)'),
+              < strpos(f.prosrc, 'count(distinct sc.course_id)'),
           'public_can_execute', f.public_can_execute,
           'anon_can_execute', f.anon_can_execute,
           'authenticated_can_execute', f.authenticated_can_execute,
@@ -144,6 +200,12 @@ audit_rows as (
           'requires_course', f.prosrc ~ 'COURSE_REQUIRED',
           'rejects_inactive_course', f.prosrc ~ 'COURSE_INACTIVE',
           'checks_active_enrollment', f.prosrc ~ 'STUDENT_NOT_ENROLLED_IN_COURSE',
+          'uses_direct_student_courses',
+            f.prosrc ~ 'auto_grading.student_courses',
+          'matches_normalized_active_rule',
+            f.prosrc ~* 'coalesce\s*\(\s*sc\.is_active\s*,\s*sc\.ended_at\s+is\s+null\s*\)',
+          'does_not_depend_on_normalized_view',
+            not (f.prosrc ~ 'v_student_courses_normalized'),
           'prevents_assignment_retag', f.prosrc ~ 'ASSIGNMENT_OTHER_COURSE',
           'prevents_attempt_retag', f.prosrc ~ 'ATTEMPT_OTHER_COURSE',
           'stores_attempt_course_id',
@@ -186,6 +248,67 @@ audit_rows as (
       ),
       jsonb_build_object('exists', false)
     )
+
+  union all
+
+  select
+    60,
+    'student_course_active_integrity',
+    jsonb_build_object(
+      'total_enrollments', count(*),
+      'is_active_null_count', count(*) filter (where sc.is_active is null),
+      'active_by_shared_rule', count(*) filter (
+        where coalesce(sc.is_active, sc.ended_at is null)
+      ),
+      'inactive_by_shared_rule', count(*) filter (
+        where not coalesce(sc.is_active, sc.ended_at is null)
+      ),
+      'active_with_ended_at_count', count(*) filter (
+        where coalesce(sc.is_active, sc.ended_at is null)
+          and sc.ended_at is not null
+      )
+    )
+  from auto_grading.student_courses sc
+
+  union all
+
+  select
+    70,
+    'legacy_course_unassigned_assignments',
+    jsonb_build_object(
+      'total', count(*),
+      'open_without_attempt', count(*) filter (
+        where lua.closed_at is null and not lua.has_attempt
+      ),
+      'with_attempt', count(*) filter (where lua.has_attempt),
+      'student_rollup', coalesce(
+        (
+          select jsonb_agg(to_jsonb(x) order by x.student_code, x.student_name)
+          from legacy_unassigned_student_rollup x
+        ),
+        '[]'::jsonb
+      ),
+      'open_without_attempt_details', coalesce(
+        (
+          select jsonb_agg(
+            jsonb_build_object(
+              'assignment_id', x.assignment_id,
+              'student_code', x.student_code,
+              'student_name', x.student_name,
+              'test_set_id', x.test_set_id,
+              'test_title', x.test_title,
+              'assigned_at', x.assigned_at
+            )
+            order by x.student_code, x.assigned_at, x.assignment_id
+          )
+          from legacy_unassigned_assignments x
+          where x.closed_at is null
+            and not x.has_attempt
+        ),
+        '[]'::jsonb
+      )
+    )
+  from legacy_unassigned_assignments lua
 )
 select section, details
 from audit_rows

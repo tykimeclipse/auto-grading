@@ -3,6 +3,7 @@
 --
 -- 3단계: 수동 성적 입력의 강좌 필수화 및 attempt 강좌 스냅샷 저장.
 -- 기존 manual_assessment.sql 전체를 재실행하지 않고 이 함수만 교체한다.
+-- 함수 정의의 정본은 manual_assessment.sql 이며 두 파일의 본문은 항상 동일하게 유지한다.
 -- assert_admin.sql 및 2단계 attempts.course_id 배포가 선행되어야 한다.
 -- ============================================================================
 
@@ -66,10 +67,10 @@ begin
 
   select exists (
     select 1
-    from auto_grading.v_student_courses_normalized sc
+    from auto_grading.student_courses sc
     where sc.student_id = p_student_id
       and sc.course_id = p_course_id
-      and sc.is_active
+      and coalesce(sc.is_active, sc.ended_at is null)
   ) into v_has_active_enrollment;
 
   if not coalesce(v_has_active_enrollment, false) then

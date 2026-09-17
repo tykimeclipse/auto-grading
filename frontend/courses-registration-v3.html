@@ -157,6 +157,33 @@
       border-color: #bfdbfe;
       color: #1d4ed8;
     }
+    .danger-soft {
+      background: #fff1f2;
+      border-color: #fecdd3;
+      color: #be123c;
+      font-weight: 700;
+    }
+    .state-pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .state-pill.active {
+      background: #ecfdf5;
+      color: #047857;
+    }
+    .state-pill.ended {
+      background: #f1f5f9;
+      color: #475569;
+    }
+    tr.course-ended td {
+      background: #fafafa;
+      color: #64748b;
+    }
     .status {
       margin-top: 12px;
       padding: 12px;
@@ -338,6 +365,10 @@
         <button id="searchBtn" class="soft" type="button">목록 조회</button>
         <button id="deleteSelectedBtn" type="button">선택 삭제</button>
       </div>
+      <div class="hint" style="margin-top:10px;">
+        강좌 종료 시 활성 수강 연결과 열린 과제는 함께 종료됩니다. 이미 시작한 학생 응시는 계속 제출할 수 있고,
+        교사 검토 대기 성적도 종료 후 확정할 수 있습니다. 강좌를 재개해도 과거 수강과 과제는 자동 복원되지 않습니다.
+      </div>
       <div id="listStatus" class="status info"></div>
       <div class="table-wrap">
         <table>
@@ -371,6 +402,7 @@
       supabase: null,
       courses: [],
       isCreating: false,
+      courseActionInFlight: null,
       selectedCourseIds: new Set()
     };
 
@@ -517,9 +549,12 @@
       }
     }
 
-    async function loadCourseList() {
+    async function loadCourseList(options = {}) {
+      const announce = options.announce !== false;
       try {
-        setStatus("listStatus", "수강과정 목록을 불러오는 중입니다.", "info");
+        if (announce) {
+          setStatus("listStatus", "수강과정 목록을 불러오는 중입니다.", "info");
+        }
 
         const { data, error } = await state.supabase
           .schema("auto_grading")
@@ -533,7 +568,9 @@
         if (error) throw error;
         state.courses = Array.isArray(data) ? data : [];
         renderCourseTable();
-        setStatus("listStatus", `수강과정 ${state.courses.length}건을 불러왔습니다.`, "ok");
+        if (announce) {
+          setStatus("listStatus", `수강과정 ${state.courses.length}건을 불러왔습니다.`, "ok");
+        }
       } catch (err) {
         setStatus("listStatus", normalizeError(err), "error");
         throw err;
@@ -548,16 +585,16 @@
       }
 
       body.innerHTML = state.courses.map((row) => `
-        <tr>
+        <tr class="${row.is_active ? "" : "course-ended"}">
           <td><input type="checkbox" class="course-check" data-course-id="${row.course_id}" ${state.selectedCourseIds.has(row.course_id) ? 'checked' : ''} /></td>
           <td>${escapeHtml(row.course_no ?? "-")}</td>
           <td>${escapeHtml(row.course_code ?? "-")}</td>
           <td><strong>${escapeHtml(row.course_name ?? "-")}</strong></td>
           <td>${escapeHtml(row.active_student_count ?? 0)}명</td>
           <td>${escapeHtml(row.start_date ?? "-")} ~ ${escapeHtml(row.end_date ?? "-")}</td>
-          <td>${row.is_active ? "Y" : "N"}</td>
+          <td><span class="state-pill ${row.is_active ? "active" : "ended"}">${row.is_active ? "운영 중" : "종료"}</span></td>
           <td>${escapeHtml(row.note ?? "-")}</td>
-          <td><button type="button" class="soft course-toggle" data-course-id="${row.course_id}" data-target="${row.is_active ? 'false' : 'true'}">${row.is_active ? '종료' : '재개'}</button></td>
+          <td><button type="button" class="${row.is_active ? "danger-soft" : "soft"} course-toggle" data-course-id="${row.course_id}" data-target="${row.is_active ? 'false' : 'true'}" ${state.courseActionInFlight ? "disabled" : ""}>${row.is_active ? '강좌 종료' : '강좌 재개'}</button></td>
         </tr>
       `).join("");
 
@@ -576,12 +613,110 @@
       });
     }
 
+    function countValue(value) {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : 0;
+    }
+
+    function setCourseActionBusy(courseId, busy) {
+      state.courseActionInFlight = busy ? courseId : null;
+      document.querySelectorAll(".course-toggle").forEach((button) => {
+        button.disabled = busy;
+      });
+    }
+
+    function findCourse(courseId) {
+      return state.courses.find((row) => row.course_id === courseId) || null;
+    }
+
+    async function loadCourseClosePreview(courseId) {
+      const { data, error } = await state.supabase
+        .schema("auto_grading")
+        .rpc("teacher_get_course_close_preview", {
+          p_course_ids: [courseId]
+        });
+
+      if (error) throw error;
+      if (data?.ok === false) throw new Error(data.error || "강좌 종료 영향도 확인 실패");
+      if (countValue(data?.existing_count) !== 1 || countValue(data?.not_found_count) !== 0) {
+        throw new Error("종료할 강좌를 찾을 수 없습니다. 목록을 새로고침해 주세요.");
+      }
+
+      const item = Array.isArray(data?.items)
+        ? data.items.find((row) => row.course_id === courseId)
+        : null;
+
+      if (!item?.found) {
+        throw new Error("강좌 종료 영향도 상세를 확인할 수 없습니다.");
+      }
+
+      return item;
+    }
+
+    function buildCloseConfirmation(course, preview) {
+      const courseName = preview.course_name || course?.course_name || "선택한 강좌";
+      return [
+        `[${courseName}] 강좌를 종료합니다.`,
+        "",
+        `• 활성 수강생: ${countValue(preview.active_student_count)}명`,
+        `• 종료될 활성 수강 연결: ${countValue(preview.active_enrollment_row_count)}건`,
+        `• 마감될 열린 과제: ${countValue(preview.open_assignment_count)}건`,
+        `• 1차 작성 중: ${countValue(preview.in_progress_count)}건 (종료 후에도 제출 가능)`,
+        `• 2차 제출 대기: ${countValue(preview.awaiting_retry_count)}건 (종료 후에도 제출 가능)`,
+        `• 교사 검토 대기: ${countValue(preview.needs_review_count)}건 (수동 성적 포함, 종료 후 확정 가능)`,
+        "",
+        "재개하더라도 위 수강 연결과 과제는 자동 복원되지 않습니다.",
+        "계속 진행할까요?"
+      ].join("\n");
+    }
+
+    function buildCourseActionResult(data, targetActive) {
+      if (targetActive) {
+        return [
+          "강좌를 재개했습니다.",
+          `강좌 상태 변경: ${countValue(data?.updated_count)}건`,
+          "과거 수강 연결 자동 복원: 0건",
+          "과거 과제 자동 재오픈: 0건"
+        ].join("\n");
+      }
+
+      return [
+        "강좌 종료 처리를 완료했습니다.",
+        `강좌 상태 변경: ${countValue(data?.updated_count)}건`,
+        `종료된 활성 수강 연결: ${countValue(data?.enrollments_ended_count)}건`,
+        `마감된 열린 과제: ${countValue(data?.assignments_closed_count)}건`,
+        `계속 가능한 기존 응시 — 1차 작성 중 ${countValue(data?.in_progress_count)}건 / 2차 제출 대기 ${countValue(data?.awaiting_retry_count)}건`,
+        `교사 검토 대기: ${countValue(data?.needs_review_count)}건`
+      ].join("\n");
+    }
+
     async function toggleCourseActive(courseId, targetActive) {
+      if (state.courseActionInFlight) return;
+
       try {
+        const course = findCourse(courseId);
         const actionLabel = targetActive ? "재개" : "종료";
-        if (!targetActive && !confirm("이 수강과정을 종료 처리할까요?\n(학생 연결은 유지되며, 나중에 재개할 수 있습니다.)")) {
+        setCourseActionBusy(courseId, true);
+
+        let confirmed = false;
+        if (targetActive) {
+          confirmed = window.confirm([
+            `[${course?.course_name || "선택한 강좌"}] 강좌를 재개할까요?`,
+            "",
+            "강좌만 운영 상태로 바뀝니다.",
+            "종료된 수강 연결과 과제는 자동으로 복원되지 않습니다."
+          ].join("\n"));
+        } else {
+          setStatus("listStatus", "강좌 종료 영향도를 확인하는 중입니다.", "info");
+          const preview = await loadCourseClosePreview(courseId);
+          confirmed = window.confirm(buildCloseConfirmation(course, preview));
+        }
+
+        if (!confirmed) {
+          setStatus("listStatus", `강좌 ${actionLabel}를 취소했습니다.`, "info");
           return;
         }
+
         setStatus("listStatus", `수강과정을 ${actionLabel} 처리하는 중입니다.`, "info");
 
         const { data, error } = await state.supabase
@@ -594,10 +729,12 @@
         if (error) throw error;
         if (data?.ok === false) throw new Error(data.error || `수강과정 ${actionLabel} 실패`);
 
-        setStatus("listStatus", `수강과정을 ${actionLabel} 처리했습니다. (변경 ${data?.updated_count ?? 0}건)`, "ok");
-        await loadCourseList();
+        await loadCourseList({ announce: false });
+        setStatus("listStatus", buildCourseActionResult(data, targetActive), "ok");
       } catch (err) {
         setStatus("listStatus", normalizeError(err), "error");
+      } finally {
+        setCourseActionBusy(null, false);
       }
     }
 

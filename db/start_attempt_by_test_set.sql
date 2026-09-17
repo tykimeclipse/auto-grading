@@ -111,15 +111,15 @@ begin
   --      과정과 수강 연결이 모두 활성인 강좌만 후보로 인정한다.
   -- -------------------------------------------------------
   select
-    count(distinct v.course_id)::integer,
-    min(v.course_id::text)::uuid
+    count(distinct sc.course_id)::integer,
+    min(sc.course_id::text)::uuid
     into v_active_course_count, v_active_course_id
-  from auto_grading.v_student_courses_normalized v
+  from auto_grading.student_courses sc
   join auto_grading.courses c
-    on c.id = v.course_id
+    on c.id = sc.course_id
    and c.is_active
-  where v.student_id = v_student_id
-    and v.is_active;
+  where sc.student_id = v_student_id
+    and coalesce(sc.is_active, sc.ended_at is null);
 
   if v_active_course_count = 0 then
     raise exception 'ACTIVE_COURSE_NOT_FOUND' using errcode = 'P0001';

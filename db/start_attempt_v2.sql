@@ -158,11 +158,11 @@ select exists (
   select
     1
   from
-    auto_grading.v_student_courses_normalized as sc
+    auto_grading.student_courses as sc
   where
     sc.student_id = v_assignment.student_id
     and sc.course_id = v_assignment.course_id
-    and sc.is_active
+    and coalesce(sc.is_active, sc.ended_at is null)
 ) into v_has_active_enrollment;
 
 

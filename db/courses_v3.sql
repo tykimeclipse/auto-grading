@@ -510,9 +510,7 @@ $function$;
 --     - legacy 의존성 최소화
 -- =========================================================
 -- 반환 컬럼(active_student_count) 추가로 시그니처가 바뀌므로 먼저 drop.
--- ⚠️ 의존성: 아래 활성 학생수 집계는 auto_grading.v_student_courses_normalized 뷰를
---    참조한다. 이 뷰는 teacher_list_courses.sql 에서 생성되므로, 신규/부분 배포 시
---    반드시 teacher_list_courses.sql 을 먼저 적용해야 이 함수 생성이 성공한다.
+-- 활성 판정은 3단계 쓰기 경로 및 4단계 종료 RPC와 같은 식을 사용한다.
 drop function if exists auto_grading.teacher_list_course_catalog(text, boolean, integer, integer);
 
 create or replace function auto_grading.teacher_list_course_catalog(
@@ -542,10 +540,12 @@ set search_path to 'auto_grading', 'public'
 as $function$
 with sc_counts as (
   select
-    v.course_id,
-    count(distinct v.student_id) filter (where v.is_active)::integer as active_student_count
-  from auto_grading.v_student_courses_normalized v
-  group by v.course_id
+    sc.course_id,
+    count(distinct sc.student_id) filter (
+      where coalesce(sc.is_active, sc.ended_at is null)
+    )::integer as active_student_count
+  from auto_grading.student_courses sc
+  group by sc.course_id
 ),
 base as (
   select
@@ -564,8 +564,7 @@ base as (
   from auto_grading.courses c
   left join sc_counts sc
     on sc.course_id = c.id
-  where 1 = 1
-    and (
+  where (
       p_search is null
       or btrim(p_search) = ''
       or coalesce(c.course_name, '') ilike '%' || p_search || '%'
@@ -602,12 +601,168 @@ offset greatest(coalesce(p_offset, 0), 0);
 $function$;
 
 -- =========================================================
--- 12) 과정 종료/재개 토글 RPC (canonical 위치)
---     - is_active=false 로 종료(소프트). end_date 가 비어 있으면 오늘로 자동 기입
---     - is_active=true  로 재개(end_date 는 이력 보존 위해 건드리지 않음)
---     - 삭제와 달리 사용중이어도 처리 가능(학생 연결/이력 유지가 목적)
---     - assert_admin() 게이트 내장(신규 함수는 정본부터 게이트 포함)
---     - 이미 목표 상태인 행은 갱신하지 않아 updated_count 가 실제 변경분만 센다
+-- 12) 활성 수강은 활성 강좌에만 연결 가능
+--     - 모든 학생-강좌 쓰기 경로를 동일하게 보호
+--     - FOR SHARE로 강좌 종료 RPC의 FOR UPDATE와 직렬화
+-- =========================================================
+create or replace function auto_grading.trg_student_courses_require_active_course()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'auto_grading', 'public'
+as $function$
+declare
+  v_course_is_active boolean;
+begin
+  if coalesce(new.is_active, new.ended_at is null) then
+    select c.is_active
+      into v_course_is_active
+    from auto_grading.courses c
+    where c.id = new.course_id
+    for share;
+
+    if not found then
+      raise exception 'COURSE_NOT_FOUND';
+    end if;
+
+    if not coalesce(v_course_is_active, false) then
+      raise exception 'COURSE_INACTIVE';
+    end if;
+  end if;
+
+  return new;
+end;
+$function$;
+
+drop trigger if exists trg_student_courses_require_active_course
+  on auto_grading.student_courses;
+
+create trigger trg_student_courses_require_active_course
+before insert or update of student_id, course_id, is_active, ended_at
+on auto_grading.student_courses
+for each row
+execute function auto_grading.trg_student_courses_require_active_course();
+
+-- =========================================================
+-- 13) 과정 종료 전 확인 RPC
+--     - 데이터는 변경하지 않고 활성 수강생·열린 과제·진행 중 응시를 집계
+-- =========================================================
+create or replace function auto_grading.teacher_get_course_close_preview(
+  p_course_ids uuid[]
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'auto_grading', 'public'
+as $function$
+declare
+  v_result jsonb;
+begin
+  perform auto_grading.assert_admin();
+
+  if coalesce(cardinality(p_course_ids), 0) = 0 then
+    raise exception 'p_course_ids is required';
+  end if;
+
+  perform 1
+  from unnest(p_course_ids) as x(course_id)
+  where x.course_id is not null
+  limit 1;
+
+  if not found then
+    raise exception 'p_course_ids must contain at least one non-null uuid';
+  end if;
+
+  with input_ids as (
+    select distinct x.course_id
+    from unnest(p_course_ids) as x(course_id)
+    where x.course_id is not null
+  ),
+  course_rows as (
+    select
+      i.course_id,
+      c.id is not null as found,
+      c.course_name,
+      c.is_active,
+      coalesce(sc.active_student_count, 0) as active_student_count,
+      coalesce(sc.active_enrollment_row_count, 0) as active_enrollment_row_count,
+      coalesce(a.open_assignment_count, 0) as open_assignment_count,
+      coalesce(atc.in_progress_count, 0) as in_progress_count,
+      coalesce(atc.awaiting_retry_count, 0) as awaiting_retry_count,
+      coalesce(atc.needs_review_count, 0) as needs_review_count
+    from input_ids i
+    left join auto_grading.courses c on c.id = i.course_id
+    left join lateral (
+      select
+        count(distinct s.student_id)::integer as active_student_count,
+        count(*)::integer as active_enrollment_row_count
+      from auto_grading.student_courses s
+      where s.course_id = c.id
+        and coalesce(s.is_active, s.ended_at is null)
+    ) sc on c.id is not null
+    left join lateral (
+      select count(*)::integer as open_assignment_count
+      from auto_grading.assignments x
+      where x.course_id = c.id
+        and x.closed_at is null
+    ) a on c.id is not null
+    left join lateral (
+      select
+        count(*) filter (where x.status = 'in_progress')::integer as in_progress_count,
+        count(*) filter (where x.status = 'awaiting_retry')::integer as awaiting_retry_count,
+        count(*) filter (where x.status = 'needs_review')::integer as needs_review_count
+      from auto_grading.attempts x
+      where x.course_id = c.id
+    ) atc on c.id is not null
+  )
+  select jsonb_build_object(
+    'ok', true,
+    'requested_count', count(*)::integer,
+    'existing_count', count(*) filter (where cr.found)::integer,
+    'not_found_count', count(*) filter (where not cr.found)::integer,
+    'active_course_count', count(*) filter (where cr.found and cr.is_active)::integer,
+    'already_inactive_course_count', count(*) filter (
+      where cr.found and not coalesce(cr.is_active, false)
+    )::integer,
+    'active_student_count', coalesce(sum(cr.active_student_count), 0)::integer,
+    'active_enrollment_row_count', coalesce(sum(cr.active_enrollment_row_count), 0)::integer,
+    'open_assignment_count', coalesce(sum(cr.open_assignment_count), 0)::integer,
+    'in_progress_count', coalesce(sum(cr.in_progress_count), 0)::integer,
+    'awaiting_retry_count', coalesce(sum(cr.awaiting_retry_count), 0)::integer,
+    'needs_review_count', coalesce(sum(cr.needs_review_count), 0)::integer,
+    'items', coalesce(
+      jsonb_agg(
+        jsonb_strip_nulls(
+          jsonb_build_object(
+            'course_id', cr.course_id,
+            'found', cr.found,
+            'course_name', cr.course_name,
+            'is_active', cr.is_active,
+            'active_student_count', cr.active_student_count,
+            'active_enrollment_row_count', cr.active_enrollment_row_count,
+            'open_assignment_count', cr.open_assignment_count,
+            'in_progress_count', cr.in_progress_count,
+            'awaiting_retry_count', cr.awaiting_retry_count,
+            'needs_review_count', cr.needs_review_count
+          )
+        )
+        order by cr.course_name nulls last, cr.course_id
+      ),
+      '[]'::jsonb
+    )
+  )
+  into v_result
+  from course_rows cr;
+
+  return v_result;
+end;
+$function$;
+
+-- =========================================================
+-- 14) 과정 종료/재개 RPC (canonical 위치)
+--     - 종료: 강좌 비활성 + 활성 수강 종료 + 열린 과제 course_closed 마감
+--     - 기존 진행 응시는 변경하지 않아 계속 완료 가능
+--     - 재개: 강좌만 활성화하며 과거 수강/과제를 자동 복원하지 않음
 -- =========================================================
 create or replace function auto_grading.teacher_set_course_active(
   p_course_ids uuid[],
@@ -622,6 +777,15 @@ declare
   v_requested_count integer := 0;
   v_existing_count integer := 0;
   v_updated_count integer := 0;
+  v_active_student_count integer := 0;
+  v_active_enrollment_row_count integer := 0;
+  v_open_assignment_count integer := 0;
+  v_in_progress_count integer := 0;
+  v_awaiting_retry_count integer := 0;
+  v_needs_review_count integer := 0;
+  v_enrollments_ended_count integer := 0;
+  v_assignments_closed_count integer := 0;
+  v_items jsonb := '[]'::jsonb;
 begin
   perform auto_grading.assert_admin();
 
@@ -633,54 +797,216 @@ begin
     raise exception 'p_course_ids is required';
   end if;
 
-  with input_ids as (
-    select distinct x.course_id
-    from unnest(p_course_ids) as x(course_id)
-    where x.course_id is not null
-  ),
-  existing as (
-    select i.course_id
-    from input_ids i
-    join auto_grading.courses c
-      on c.id = i.course_id
-  ),
-  updated as (
-    update auto_grading.courses c
-    set is_active = p_is_active,
-        end_date = case
-          when p_is_active = false and c.end_date is null then current_date
-          else c.end_date
-        end
-    from input_ids i
-    where c.id = i.course_id
-      and c.is_active is distinct from p_is_active
-    returning c.id
+  drop table if exists pg_temp.tmp_course_action_input;
+  drop table if exists pg_temp.tmp_course_action;
+
+  create temporary table pg_temp.tmp_course_action_input (
+    course_id uuid primary key
+  ) on commit drop;
+
+  create temporary table pg_temp.tmp_course_action (
+    course_id uuid primary key,
+    course_name text,
+    previous_is_active boolean,
+    active_student_count integer not null default 0,
+    active_enrollment_row_count integer not null default 0,
+    open_assignment_count integer not null default 0,
+    in_progress_count integer not null default 0,
+    awaiting_retry_count integer not null default 0,
+    needs_review_count integer not null default 0
+  ) on commit drop;
+
+  insert into pg_temp.tmp_course_action_input(course_id)
+  select distinct x.course_id
+  from unnest(p_course_ids) as x(course_id)
+  where x.course_id is not null;
+
+  select count(*)::integer
+    into v_requested_count
+  from pg_temp.tmp_course_action_input;
+
+  if v_requested_count = 0 then
+    raise exception 'p_course_ids must contain at least one non-null uuid';
+  end if;
+
+  perform c.id
+  from auto_grading.courses c
+  join pg_temp.tmp_course_action_input i on i.course_id = c.id
+  order by c.id
+  for update;
+
+  insert into pg_temp.tmp_course_action (
+    course_id,
+    course_name,
+    previous_is_active,
+    active_student_count,
+    active_enrollment_row_count,
+    open_assignment_count,
+    in_progress_count,
+    awaiting_retry_count,
+    needs_review_count
   )
   select
-    (select count(*) from input_ids),
-    (select count(*) from existing),
-    (select count(*) from updated)
-  into v_requested_count, v_existing_count, v_updated_count;
+    c.id,
+    c.course_name,
+    c.is_active,
+    (
+      select count(distinct sc.student_id)::integer
+      from auto_grading.student_courses sc
+      where sc.course_id = c.id
+        and coalesce(sc.is_active, sc.ended_at is null)
+    ),
+    (
+      select count(*)::integer
+      from auto_grading.student_courses sc
+      where sc.course_id = c.id
+        and coalesce(sc.is_active, sc.ended_at is null)
+    ),
+    (
+      select count(*)::integer
+      from auto_grading.assignments a
+      where a.course_id = c.id
+        and a.closed_at is null
+    ),
+    (
+      select count(*)::integer
+      from auto_grading.attempts at
+      where at.course_id = c.id
+        and at.status = 'in_progress'
+    ),
+    (
+      select count(*)::integer
+      from auto_grading.attempts at
+      where at.course_id = c.id
+        and at.status = 'awaiting_retry'
+    ),
+    (
+      select count(*)::integer
+      from auto_grading.attempts at
+      where at.course_id = c.id
+        and at.status = 'needs_review'
+    )
+  from auto_grading.courses c
+  join pg_temp.tmp_course_action_input i on i.course_id = c.id;
+
+  select count(*)::integer
+    into v_existing_count
+  from pg_temp.tmp_course_action;
+
+  select
+    count(*) filter (where a.previous_is_active is distinct from p_is_active)::integer,
+    coalesce(sum(a.active_student_count), 0)::integer,
+    coalesce(sum(a.active_enrollment_row_count), 0)::integer,
+    coalesce(sum(a.open_assignment_count), 0)::integer,
+    coalesce(sum(a.in_progress_count), 0)::integer,
+    coalesce(sum(a.awaiting_retry_count), 0)::integer,
+    coalesce(sum(a.needs_review_count), 0)::integer
+  into
+    v_updated_count,
+    v_active_student_count,
+    v_active_enrollment_row_count,
+    v_open_assignment_count,
+    v_in_progress_count,
+    v_awaiting_retry_count,
+    v_needs_review_count
+  from pg_temp.tmp_course_action a;
+
+  if not p_is_active then
+    update auto_grading.student_courses sc
+    set
+      is_active = false,
+      ended_at = coalesce(sc.ended_at, now()),
+      updated_at = now()
+    from pg_temp.tmp_course_action a
+    where sc.course_id = a.course_id
+      and coalesce(sc.is_active, sc.ended_at is null);
+
+    get diagnostics v_enrollments_ended_count = row_count;
+
+    update auto_grading.assignments x
+    set
+      closed_at = now(),
+      closed_reason = 'course_closed',
+      updated_at = now()
+    from pg_temp.tmp_course_action a
+    where x.course_id = a.course_id
+      and x.closed_at is null;
+
+    get diagnostics v_assignments_closed_count = row_count;
+  end if;
+
+  update auto_grading.courses c
+  set
+    is_active = p_is_active,
+    end_date = case
+      when not p_is_active and c.end_date is null then current_date
+      else c.end_date
+    end
+  from pg_temp.tmp_course_action a
+  where c.id = a.course_id
+    and c.is_active is distinct from p_is_active;
+
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'course_id', a.course_id,
+        'course_name', a.course_name,
+        'previous_is_active', a.previous_is_active,
+        'is_active', p_is_active,
+        'course_updated', a.previous_is_active is distinct from p_is_active,
+        'active_student_count', a.active_student_count,
+        'active_enrollment_row_count', a.active_enrollment_row_count,
+        'open_assignment_count', a.open_assignment_count,
+        'in_progress_count', a.in_progress_count,
+        'awaiting_retry_count', a.awaiting_retry_count,
+        'needs_review_count', a.needs_review_count
+      )
+      order by a.course_name, a.course_id
+    ),
+    '[]'::jsonb
+  )
+  into v_items
+  from pg_temp.tmp_course_action a;
 
   return jsonb_build_object(
     'ok', true,
     'is_active', p_is_active,
     'requested_count', v_requested_count,
+    'existing_count', v_existing_count,
     'updated_count', v_updated_count,
     'unchanged_count', v_existing_count - v_updated_count,
-    'skipped_not_found_count', v_requested_count - v_existing_count
+    'skipped_not_found_count', v_requested_count - v_existing_count,
+    'active_student_count', v_active_student_count,
+    'active_enrollment_row_count', v_active_enrollment_row_count,
+    'open_assignment_count', v_open_assignment_count,
+    'in_progress_count', v_in_progress_count,
+    'awaiting_retry_count', v_awaiting_retry_count,
+    'needs_review_count', v_needs_review_count,
+    'enrollments_ended_count', v_enrollments_ended_count,
+    'assignments_closed_count', v_assignments_closed_count,
+    -- 재개 정책상 아래 두 값은 계산 결과가 아니라 항상 0이다.
+    'reactivated_enrollment_count', 0,
+    'reopened_assignment_count', 0,
+    'items', v_items
   );
 end;
 $function$;
 
 grant execute on function auto_grading.teacher_get_next_course_no() to authenticated;
 grant execute on function auto_grading.teacher_create_course(text, integer, date, date, text, text) to authenticated;
-grant execute on function auto_grading.teacher_list_course_catalog(text, boolean, integer, integer) to authenticated;
+revoke execute on function auto_grading.teacher_list_course_catalog(text, boolean, integer, integer) from public, anon;
+grant execute on function auto_grading.teacher_list_course_catalog(text, boolean, integer, integer) to authenticated, service_role;
 
 -- 신규 write RPC: 생성 시 붙는 PUBLIC 기본 실행권한을 정본 파일 안에서 즉시 회수한다.
 -- (assert_admin 이 1차로 막지만, 이 repo 원칙인 "게이트 + grant/revoke 이중 방어" 유지)
 revoke execute on function auto_grading.teacher_set_course_active(uuid[], boolean) from public, anon;
-grant  execute on function auto_grading.teacher_set_course_active(uuid[], boolean) to authenticated;
+grant  execute on function auto_grading.teacher_set_course_active(uuid[], boolean) to authenticated, service_role;
+
+revoke execute on function auto_grading.teacher_get_course_close_preview(uuid[]) from public, anon;
+grant  execute on function auto_grading.teacher_get_course_close_preview(uuid[]) to authenticated, service_role;
+
+revoke execute on function auto_grading.trg_student_courses_require_active_course()
+  from public, anon, authenticated, service_role;
 
 comment on function auto_grading.teacher_get_next_course_no()
 is '참고용 다음 수강번호 조회. 실제 확정 번호는 teacher_create_course 반환값을 따른다.';
@@ -689,9 +1015,17 @@ comment on function auto_grading.teacher_create_course(text, integer, date, date
 is '현재 운영 courses 테이블 구조에 맞춘 안전한 등록 RPC. 존재하는 컬럼만 insert 하며, grade_level/subject_group이 NOT NULL이면 제목에서 추론한다.';
 
 comment on function auto_grading.teacher_list_course_catalog(text, boolean, integer, integer)
-is '과정 등록/조회 화면용 목록 RPC. 등록 페이지에 필요한 컬럼만 반환한다. 활성 학생수는 v_student_courses_normalized 뷰 기준.';
+is '과정 등록/조회 화면용 목록 RPC. 활성 학생수는 student_courses 직접 조회와 공통 활성 판정식 기준.';
 
 comment on function auto_grading.teacher_set_course_active(uuid[], boolean)
-is '수강과정 종료(is_active=false, 빈 end_date는 오늘로)/재개(is_active=true) 토글 RPC. assert_admin 게이트. 이미 목표 상태인 행은 갱신하지 않는다.';
+is '강좌 종료/재개. 종료 시 활성 수강과 열린 과제를 함께 마감하고 기존 진행 응시는 유지한다. 재개 시 수강과 과제를 자동 복원하지 않는다.';
+
+comment on function auto_grading.teacher_get_course_close_preview(uuid[])
+is '강좌 종료 전 확인용. 활성 수강생·열린 과제·진행 중 응시 건수를 반환하며 데이터는 변경하지 않는다.';
+
+comment on function auto_grading.trg_student_courses_require_active_course()
+is '활성 수강 생성·재활성화 시 강좌 활성 여부를 잠금과 함께 검증한다.';
+
+notify pgrst, 'reload schema';
 
 commit;

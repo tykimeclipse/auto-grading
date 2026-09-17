@@ -107,6 +107,11 @@ $function$;
 --    p_teacher_final_correct_count:
 --      NULL  → 1차만 입력(미확정, needs_review)
 --      값 있음 → 오답처리 후 최종 확정(트리거가 completed 로 승격)
+--
+--    정본 관계:
+--      이 함수 정의의 정본은 이 파일이다.
+--      이 함수만 부분 배포할 때는 teacher_upsert_manual_score_v2.sql 을 실행하며,
+--      두 파일의 함수 본문은 항상 동일하게 유지한다.
 -- ----------------------------------------------------------------
 -- 인자 추가(p_course_id) 시 6-arg 구버전이 오버로드로 남지 않도록 먼저 제거
 drop function if exists auto_grading.teacher_upsert_manual_score(uuid, uuid, integer, integer, date, text);
@@ -165,10 +170,10 @@ begin
 
   select exists (
     select 1
-    from auto_grading.v_student_courses_normalized sc
+    from auto_grading.student_courses sc
     where sc.student_id = p_student_id
       and sc.course_id = p_course_id
-      and sc.is_active
+      and coalesce(sc.is_active, sc.ended_at is null)
   ) into v_has_active_enrollment;
 
   if not coalesce(v_has_active_enrollment, false) then
@@ -252,11 +257,11 @@ begin
   end if;
 
   -- 기존 manual attempt 조회(assignment 당 1건 유지)
-  select id, course_id
+  select at.id, at.course_id
     into v_attempt_id, v_attempt_course_id
-  from auto_grading.attempts
-  where assignment_id = v_assignment_id
-  order by created_at asc nulls first, id asc
+  from auto_grading.attempts at
+  where at.assignment_id = v_assignment_id
+  order by at.created_at asc nulls first, at.id asc
   limit 1
   for update;
 

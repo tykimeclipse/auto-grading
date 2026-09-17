@@ -20,6 +20,7 @@ declare
   v_skipped_existing_open_count integer := 0;
   v_skipped_existing_closed_count integer := 0;
   v_skipped_existing_count integer := 0;
+  v_skipped_course_unassigned_count integer := 0;
   v_skipped_other_course_count integer := 0;
   v_skipped_not_found_count integer := 0;
   v_skipped_not_in_course_count integer := 0;
@@ -109,10 +110,10 @@ begin
 
   update pg_temp.tmp_teacher_issue_input i
      set in_course = true
-    from auto_grading.v_student_courses_normalized v
-   where v.student_id = i.student_id
-     and v.course_id = p_course_id
-     and v.is_active;
+    from auto_grading.student_courses sc
+   where sc.student_id = i.student_id
+     and sc.course_id = p_course_id
+     and coalesce(sc.is_active, sc.ended_at is null);
 
   update pg_temp.tmp_teacher_issue_input i
      set existing_assignment_id = e.assignment_id,
@@ -292,6 +293,34 @@ begin
       where r.student_id = i.student_id
     );
 
+  -- legacy 미지정 assignment는 과거 attempt 유무와 관계없이 자동 태깅하지 않는다.
+  -- 신규 배포 후에는 모든 생성 경로에서 course_id가 필수이므로 새로 늘어나지 않는다.
+  insert into pg_temp.tmp_teacher_issue_result (
+    ord,
+    student_id,
+    assignment_id,
+    course_id,
+    purpose,
+    action
+  )
+  select
+    i.ord,
+    i.student_id,
+    i.existing_assignment_id,
+    null,
+    p_purpose,
+    'skipped_course_unassigned'
+  from pg_temp.tmp_teacher_issue_input i
+  where i.student_exists
+    and i.in_course
+    and i.existing_assignment_id is not null
+    and i.existing_course_id is null
+    and not exists (
+      select 1
+      from pg_temp.tmp_teacher_issue_result r
+      where r.student_id = i.student_id
+    );
+
   insert into pg_temp.tmp_teacher_issue_result (
     ord,
     student_id,
@@ -311,7 +340,8 @@ begin
   where i.student_exists
     and i.in_course
     and i.existing_assignment_id is not null
-    and i.existing_course_id is distinct from p_course_id
+    and i.existing_course_id is not null
+    and i.existing_course_id <> p_course_id
     and not exists (
       select 1
       from pg_temp.tmp_teacher_issue_result r
@@ -383,9 +413,11 @@ begin
       where action in (
         'skipped_existing_open',
         'skipped_existing_closed',
+        'skipped_course_unassigned',
         'skipped_other_course'
       )
     )::integer,
+    count(*) filter (where action = 'skipped_course_unassigned')::integer,
     count(*) filter (where action = 'skipped_other_course')::integer,
     count(*) filter (where action = 'skipped_student_not_found')::integer,
     count(*) filter (where action = 'skipped_not_in_course')::integer,
@@ -397,7 +429,12 @@ begin
             'assignment_id', assignment_id,
             'course_id', course_id,
             'purpose', purpose,
-            'action', action
+            'action', action,
+            'message', case
+              when action = 'skipped_course_unassigned' then
+                '강좌 미지정 과거 과제입니다. 이 건은 발행되지 않았습니다. 과거 데이터이므로 개발자에게 일회성 보정을 요청하십시오.'
+              else null
+            end
           )
         )
         order by ord
@@ -411,6 +448,7 @@ begin
     v_skipped_existing_open_count,
     v_skipped_existing_closed_count,
     v_skipped_existing_count,
+    v_skipped_course_unassigned_count,
     v_skipped_other_course_count,
     v_skipped_not_found_count,
     v_skipped_not_in_course_count,
@@ -436,6 +474,14 @@ begin
     'skipped_existing_open_count', v_skipped_existing_open_count,
     'skipped_existing_closed_count', v_skipped_existing_closed_count,
     'skipped_existing_count', v_skipped_existing_count,
+    'skipped_course_unassigned_count', v_skipped_course_unassigned_count,
+    'skipped_course_unassigned_message', case
+      when v_skipped_course_unassigned_count > 0 then format(
+        '강좌 미지정 과거 과제 %s건 — 이 건은 발행되지 않았습니다. 과거 데이터이므로 개발자에게 일회성 보정을 요청하십시오.',
+        v_skipped_course_unassigned_count
+      )
+      else null
+    end,
     'skipped_other_course_count', v_skipped_other_course_count,
     'skipped_student_not_found_count', v_skipped_not_found_count,
     'skipped_not_in_course_count', v_skipped_not_in_course_count,
