@@ -43,11 +43,12 @@ begin
         'created_at',   s.created_at,
         'updated_at',   s.updated_at,
         'course_names', (
-          select string_agg(c.course_name, ', ' order by c.course_name)
+          select string_agg(distinct c.course_name, ', ' order by c.course_name)
           from   auto_grading.student_courses sc
           join   auto_grading.courses c on c.id = sc.course_id
           where  sc.student_id = s.id
-            and  sc.is_active  = true
+            and  coalesce(sc.is_active, sc.ended_at is null)
+            and  c.is_active
         )
       )
       order by s.created_at desc nulls last, s.id desc
@@ -65,6 +66,8 @@ exception
 end;
 $function$;
 
+revoke execute on function auto_grading.teacher_list_students_for_management()
+  from public, anon;
 grant execute on function auto_grading.teacher_list_students_for_management()
   to authenticated, service_role;
 
@@ -122,12 +125,20 @@ begin
   select coalesce(
     jsonb_agg(
       jsonb_build_object(
+        'student_course_id',    sc.id,
+        'course_id',            c.id,
         'course_name',          c.course_name,
+        'course_is_active',     c.is_active,
         'student_course_type',  sc.student_course_type,
-        'is_active',            sc.is_active,
+        'is_active',            coalesce(sc.is_active, sc.ended_at is null),
+        'joined_at',            sc.joined_at,
+        'ended_at',             sc.ended_at,
         'created_at',           sc.created_at
       )
-      order by sc.is_active desc, sc.created_at desc nulls last
+      order by
+        coalesce(sc.is_active, sc.ended_at is null) desc,
+        coalesce(sc.joined_at, sc.created_at) desc nulls last,
+        sc.id desc
     ),
     '[]'::jsonb
   )
@@ -149,11 +160,13 @@ exception
 end;
 $function$;
 
+revoke execute on function auto_grading.teacher_get_student_detail(uuid)
+  from public, anon;
 grant execute on function auto_grading.teacher_get_student_detail(uuid)
   to authenticated, service_role;
 
 comment on function auto_grading.teacher_get_student_detail(uuid)
-  is '학생 기본정보 + 수강이력(전체) 반환. 성취도/시험이력은 기존 RPC를 프론트에서 별도 호출.';
+  is '학생 기본정보 + 수강이력 UUID·강좌 UUID·강좌 상태·수강 시작/종료일을 포함한 전체 수강이력 반환.';
 
 
 -- ----------------------------------------------------------------

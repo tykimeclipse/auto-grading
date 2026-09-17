@@ -312,6 +312,66 @@
       padding: 9px 8px;
       text-align: left;
     }
+    .course-attach-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(120px, .8fr) auto;
+      gap: 10px;
+      align-items: end;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid #dbeafe;
+      border-radius: 12px;
+      background: #f8fbff;
+    }
+    .course-attach-hint {
+      grid-column: 1 / -1;
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .course-state {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 7px;
+      font-size: 12px;
+      white-space: nowrap;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      color: #4b5563;
+    }
+    .course-state.active {
+      background: var(--green-weak);
+      border-color: #a7f3d0;
+      color: #047857;
+    }
+    .course-state.closed {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      color: #64748b;
+    }
+    .danger-zone {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid #fecaca;
+      border-radius: 12px;
+      background: var(--danger-weak);
+    }
+    .danger-zone strong {
+      display: block;
+      margin-bottom: 3px;
+      color: #991b1b;
+      font-size: 13px;
+    }
+    .danger-zone p {
+      margin: 0;
+      color: #b91c1c;
+      font-size: 12px;
+    }
     .mobile-scroll { overflow-x: auto; }
     .stat-icon {
       width: 1.1em; height: 1.1em;
@@ -326,6 +386,9 @@
       .wrap { padding: 14px; }
       .header { flex-direction: column; }
       .search-grid, .meta-grid, .achievement-grid { grid-template-columns: 1fr 1fr; }
+      .course-attach-grid { grid-template-columns: 1fr; }
+      .course-attach-hint { grid-column: 1; }
+      .danger-zone { align-items: stretch; flex-direction: column; }
       .detail-header { flex-direction: column; }
       .detail-actions { justify-content: flex-start; }
       .student-table { min-width: 720px; }
@@ -410,7 +473,6 @@
         </div>
         <div class="toolbar">
           <button id="refreshBtn" class="btn-soft" type="button">목록 새로고침</button>
-          <button id="deleteBtn" class="btn-danger" type="button">선택 삭제</button>
           <button id="clearSearchBtn" class="btn-ghost" type="button">검색 초기화</button>
         </div>
         <div id="listStatus" class="status-box"></div>
@@ -424,11 +486,18 @@
                 <th>이름</th>
                 <th>학년</th>
                 <th>수강 강좌</th>
-                <th>활성</th>
+                <th>학생 상태</th>
               </tr>
             </thead>
             <tbody id="studentTableBody"></tbody>
           </table>
+        </div>
+        <div class="danger-zone" aria-label="학생 완전 삭제">
+          <div>
+            <strong>위험 작업: 학생 완전 삭제</strong>
+            <p>휴원이나 수강 종료와 다릅니다. 시험·수강 이력이 없는 학생만 삭제할 수 있으며, 삭제된 기본정보는 복구할 수 없습니다.</p>
+          </div>
+          <button id="deleteBtn" class="btn-danger" type="button">선택 학생 완전 삭제</button>
         </div>
       </section>
 
@@ -494,18 +563,49 @@
           </section>
 
           <section class="section">
+            <div class="panel-title-row">
+              <div>
+                <h3>수강 강좌 관리</h3>
+                <p class="note">활성 강좌를 연결하거나 학생의 개별 수강만 종료합니다. 학생 계정과 강좌 자체 상태는 변경하지 않습니다.</p>
+              </div>
+              <button id="refreshCoursesBtn" class="btn-ghost btn-small" type="button">강좌 목록 새로고침</button>
+            </div>
+            <div class="course-attach-grid">
+              <div class="field">
+                <label for="courseAttachSelect">새로 연결할 활성 강좌</label>
+                <select id="courseAttachSelect"></select>
+              </div>
+              <div class="field">
+                <label for="courseTypeSelect">수강 형태</label>
+                <select id="courseTypeSelect">
+                  <option value="학원">학원</option>
+                  <option value="과외">과외</option>
+                  <option value="내신">내신</option>
+                  <option value="특강">특강</option>
+                </select>
+              </div>
+              <button id="attachCourseBtn" class="btn-primary" type="button">강좌 연결</button>
+              <p id="courseAttachHint" class="course-attach-hint"></p>
+            </div>
+            <div class="mobile-scroll">
+              <table class="course-history">
+                <thead>
+                  <tr>
+                    <th>수강 시작</th>
+                    <th>수강강좌명</th>
+                    <th>수강형태</th>
+                    <th>강좌 상태</th>
+                    <th>수강 상태</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="courseHistoryBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="section">
             <h3>수강료 납부 관리</h3>
-            <table class="course-history">
-              <thead>
-                <tr>
-                  <th>등록일</th>
-                  <th>수강강좌명</th>
-                  <th>수강형태</th>
-                  <th>상태</th>
-                </tr>
-              </thead>
-              <tbody id="courseHistoryBody"></tbody>
-            </table>
             <div class="placeholder">납부 장부는 준비중입니다. 2차 개발에서 월별 납부 여부, 금액, 납부일, 메모를 관리하는 영역으로 확장합니다.</div>
           </section>
         </div>
@@ -531,6 +631,9 @@
       detail:     null, // teacher_get_student_detail 결과
       stats:      null, // get_student_stats_by_code 결과
       history:    [],   // get_student_assignment_history_by_code 결과
+      courses:    [],   // 연결 가능한 활성 강좌 목록
+      courseLoadError: null,
+      courseActionPending: false,
       editing:    false,
       draft:      null
     };
@@ -593,6 +696,20 @@
       return err?.message || String(err);
     }
 
+    function normalizeCourseError(err) {
+      const message = normalizeError(err);
+      if (message.includes('COURSE_INACTIVE')) {
+        return '종료된 강좌에는 새로 수강을 연결할 수 없습니다. 강좌 목록을 새로고침해 주세요.';
+      }
+      if (message.includes('COURSE_NOT_FOUND') || /course not found/i.test(message)) {
+        return '선택한 강좌를 찾을 수 없습니다. 강좌 목록을 새로고침해 주세요.';
+      }
+      if (/student not found/i.test(message)) {
+        return '선택한 학생을 찾을 수 없습니다. 학생 목록을 새로고침해 주세요.';
+      }
+      return message;
+    }
+
     function formatPhone(raw) {
       const d = raw.replace(/\D/g, '').slice(0, 11);
       if (!d) return '';
@@ -635,7 +752,30 @@
 
       // admin-auth.js가 생성한 공유 클라이언트 재사용
       state.supabase = window.adminSupabase;
-      await loadStudents();
+      await Promise.all([
+        loadStudents(),
+        loadCourses().catch(err => {
+          state.courses = [];
+          state.courseLoadError = normalizeCourseError(err);
+        })
+      ]);
+    }
+
+    // ── 활성 강좌 목록 로드 ──────────────────────────────────────
+    async function loadCourses() {
+      const { data, error } = await state.supabase
+        .schema('auto_grading')
+        .rpc('teacher_list_course_catalog', {
+          p_search: null,
+          p_only_active: true,
+          p_limit: 500,
+          p_offset: 0
+        });
+      if (error) throw error;
+
+      state.courses = Array.isArray(data) ? data.filter(c => c?.is_active !== false) : [];
+      state.courseLoadError = null;
+      if (state.detail) renderCourseHistory();
     }
 
     // ── 학생 목록 로드 ────────────────────────────────────────────
@@ -646,7 +786,10 @@
           .schema('auto_grading')
           .rpc('teacher_list_students_for_management');
         if (error) throw error;
-        state.students = Array.isArray(data) ? data : (data ? [data] : []);
+        if (data && !Array.isArray(data) && data.ok === false) {
+          throw new Error(data.error || '학생 목록 조회에 실패했습니다.');
+        }
+        state.students = Array.isArray(data) ? data : [];
         applyFilters();
         const badge = $('connectionBadge');
         badge.textContent = `연결됨 · ${state.students.length}명`;
@@ -714,7 +857,7 @@
             <td>${escapeHtml(gradeLabel(s.grade_level))}</td>
             <td>${courseTd}</td>
             <td onclick="event.stopPropagation()">
-              <label class="toggle" title="활성/휴원 전환">
+              <label class="toggle" title="${s.is_active ? '학생 계정을 휴원/비활성 처리' : '학생 계정 활성화'}">
                 <input type="checkbox" class="active-toggle" ${s.is_active ? 'checked' : ''} data-id="${escapeHtml(s.id)}" />
                 <span></span>
               </label>
@@ -786,7 +929,10 @@
       if (!s) return;
 
       $('detailName').textContent = s.name || '-';
-      const activeCourses = (s.courses || []).filter(c => c.is_active).map(c => c.course_name).join(', ') || '-';
+      const activeCourses = (s.courses || [])
+        .filter(c => c.is_active && c.course_is_active !== false)
+        .map(c => c.course_name)
+        .join(', ') || '-';
       $('detailSub').textContent = `${s.student_code} · ${gradeLabel(s.grade_level)} · ${activeCourses} · ${s.is_active ? '활성' : '휴원/비활성'}`;
 
       $('editMetaBtn').hidden   = state.editing;
@@ -915,22 +1061,175 @@
 
     function renderCourseHistory() {
       const courses = state.detail?.courses || [];
+      const activeCourseIds = new Set(
+        courses
+          .filter(c => c.is_active)
+          .map(c => String(c.course_id || ''))
+      );
+      const availableCourses = state.courses.filter(c =>
+        c?.course_id
+        && c.is_active !== false
+        && !activeCourseIds.has(String(c.course_id))
+      );
+      const courseSelect = $('courseAttachSelect');
+      const attachButton = $('attachCourseBtn');
+      const attachHint = $('courseAttachHint');
+
+      courseSelect.innerHTML = availableCourses.length
+        ? '<option value="">강좌를 선택하세요</option>' + availableCourses.map(c => {
+            const code = c.course_code ? ` · ${c.course_code}` : '';
+            return `<option value="${escapeHtml(c.course_id)}">${escapeHtml(c.course_name || c.course_id)}${escapeHtml(code)}</option>`;
+          }).join('')
+        : '<option value="">연결 가능한 활성 강좌가 없습니다</option>';
+      courseSelect.disabled = state.courseActionPending || !availableCourses.length;
+      $('courseTypeSelect').disabled = state.courseActionPending || !availableCourses.length;
+      attachButton.disabled = state.courseActionPending || !availableCourses.length;
+      $('refreshCoursesBtn').disabled = state.courseActionPending;
+
+      if (state.courseLoadError) {
+        attachHint.textContent = `활성 강좌 목록을 불러오지 못했습니다: ${state.courseLoadError}`;
+      } else if (!availableCourses.length) {
+        attachHint.textContent = '현재 수강 중인 강좌를 제외하면 새로 연결할 활성 강좌가 없습니다.';
+      } else {
+        attachHint.textContent = `연결 가능한 활성 강좌 ${availableCourses.length}개 · 기존 종료 이력과 같은 강좌도 재수강으로 새 이력이 생성됩니다.`;
+      }
+
       if (!courses.length) {
-        $('courseHistoryBody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:12px">수강 이력이 없습니다.</td></tr>';
+        $('courseHistoryBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:12px">수강 이력이 없습니다.</td></tr>';
         return;
       }
       $('courseHistoryBody').innerHTML = courses.map(c => `
-        <tr>
-          <td>${shortDate(c.created_at)}</td>
+        <tr data-student-course-id="${escapeHtml(c.student_course_id || '')}">
+          <td>${shortDate(c.joined_at || c.created_at)}</td>
           <td>${escapeHtml(c.course_name || '-')}</td>
           <td>${escapeHtml(c.student_course_type || '-')}</td>
-          <td>${c.is_active ? '수강중' : '종료'}</td>
+          <td><span class="course-state ${c.course_is_active ? 'active' : 'closed'}">${c.course_is_active ? '운영중' : '강좌 종료'}</span></td>
+          <td>${c.is_active
+            ? '<span class="course-state active">수강중</span>'
+            : `<span class="course-state closed">종료${c.ended_at ? ` · ${shortDate(c.ended_at)}` : ''}</span>`}</td>
+          <td>${c.is_active
+            ? `<button type="button" class="btn-ghost btn-small course-end-btn" data-course-id="${escapeHtml(c.course_id || '')}" data-course-name="${escapeHtml(c.course_name || '')}" ${state.courseActionPending ? 'disabled' : ''}>수강 종료</button>`
+            : '<span style="color:#9ca3af">-</span>'}</td>
         </tr>`
       ).join('');
+
+      $('courseHistoryBody').querySelectorAll('.course-end-btn').forEach(button => {
+        button.addEventListener('click', () => deactivateCourseEnrollment(
+          button.dataset.courseId,
+          button.dataset.courseName
+        ));
+      });
+    }
+
+    async function attachSelectedCourse() {
+      const student = state.detail;
+      const courseId = $('courseAttachSelect').value;
+      const serviceType = $('courseTypeSelect').value;
+      if (!student || state.courseActionPending) return;
+      if (!courseId) {
+        showDetailStatus('연결할 활성 강좌를 선택해 주세요.', 'error');
+        return;
+      }
+
+      const course = state.courses.find(c => String(c.course_id) === String(courseId));
+      if (!course) {
+        showDetailStatus('선택한 강좌 정보가 없습니다. 강좌 목록을 새로고침해 주세요.', 'error');
+        return;
+      }
+
+      const confirmed = confirm(
+        `${student.student_code} ${student.name} 학생에게 아래 강좌를 연결할까요?\n\n`
+        + `${course.course_name || course.course_id}\n수강 형태: ${serviceType}\n\n`
+        + '학생 계정의 활성/휴원 상태는 변경하지 않습니다.'
+      );
+      if (!confirmed) return;
+
+      const studentId = student.id;
+      state.courseActionPending = true;
+      renderCourseHistory();
+      clearDetailStatus();
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_attach_student_to_course', {
+            p_student_id: studentId,
+            p_course_id: courseId,
+            p_service_type: serviceType
+          });
+        if (error) throw error;
+        if (data?.ok === false) throw new Error(data.error || '강좌 연결에 실패했습니다.');
+
+        await loadStudents();
+        if (state.selectedId === studentId) await selectStudent(studentId);
+        showStatus(`${student.student_code} ${student.name} 학생에게 ${course.course_name || '강좌'}를 연결했습니다.`, 'info');
+      } catch (err) {
+        showDetailStatus(`강좌 연결 실패: ${normalizeCourseError(err)}`, 'error');
+      } finally {
+        state.courseActionPending = false;
+        if (state.detail?.id === studentId) renderCourseHistory();
+      }
+    }
+
+    async function deactivateCourseEnrollment(courseId, courseName) {
+      const student = state.detail;
+      if (!student || !courseId || state.courseActionPending) return;
+
+      const confirmed = confirm(
+        `${student.student_code} ${student.name} 학생의 아래 수강을 종료할까요?\n\n`
+        + `${courseName || courseId}\n\n`
+        + '이 학생은 해당 강좌의 새 응시를 시작할 수 없게 됩니다.\n'
+        + '이미 시작한 응시는 계속 제출할 수 있습니다.\n'
+        + '학생 계정, 강좌 자체, 기존 과제·응시 기록은 변경하지 않습니다.'
+      );
+      if (!confirmed) return;
+
+      const studentId = student.id;
+      state.courseActionPending = true;
+      renderCourseHistory();
+      clearDetailStatus();
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('teacher_deactivate_student_course', {
+            p_student_id: studentId,
+            p_course_id: courseId
+          });
+        if (error) throw error;
+        if (data?.ok === false) throw new Error(data.error || '수강 종료에 실패했습니다.');
+
+        await loadStudents();
+        if (state.selectedId === studentId) await selectStudent(studentId);
+        const changed = Number(data?.deactivated_count || 0);
+        showStatus(
+          changed > 0
+            ? `${student.student_code} ${student.name} 학생의 ${courseName || '강좌'} 수강을 종료했습니다.`
+            : `${student.student_code} ${student.name} 학생의 해당 활성 수강은 이미 종료되어 있습니다.`,
+          'info'
+        );
+      } catch (err) {
+        showDetailStatus(`수강 종료 실패: ${normalizeCourseError(err)}`, 'error');
+      } finally {
+        state.courseActionPending = false;
+        if (state.detail?.id === studentId) renderCourseHistory();
+      }
     }
 
     // ── 활성/휴원 토글 ────────────────────────────────────────────
     async function toggleActive(id, isActive) {
+      const student = state.students.find(s => s.id === id);
+      if (!isActive) {
+        const confirmed = confirm(
+          `${student?.student_code || ''} ${student?.name || '학생'}을(를) 휴원/비활성 처리할까요?\n\n`
+          + '공개 성취도 링크와 성취도·시험이력 조회가 제한됩니다.\n'
+          + '현재 수강 연결은 종료되지 않습니다.\n\n'
+          + "수강만 종료하려면 학생 상세의 '수강 종료'를 사용하십시오."
+        );
+        if (!confirmed) {
+          applyFilters();
+          return;
+        }
+      }
+
       try {
         const { data, error } = await state.supabase
           .schema('auto_grading')
@@ -938,7 +1237,6 @@
         if (error) throw error;
         if (data?.ok === false) throw new Error(data.error || '상태 변경 실패');
 
-        const student = state.students.find(s => s.id === id);
         if (student) student.is_active = isActive;
         applyFilters();
 
@@ -1015,7 +1313,12 @@
         .filter(s => ids.includes(s.id))
         .map(s => `${s.student_code} ${s.name}`)
         .join('\n');
-      if (!confirm(`아래 학생을 완전히 삭제합니다. 이 작업은 되돌릴 수 없습니다.\n\n${names}\n\n관련 시험 데이터가 있으면 삭제가 차단됩니다.`)) return;
+      if (!confirm(
+        `아래 학생을 완전히 삭제할까요?\n\n${names}\n\n`
+        + '이 작업은 휴원이나 수강 종료가 아니며 되돌릴 수 없습니다.\n'
+        + '학생 기본정보가 영구 삭제됩니다.\n'
+        + '시험·과제·수강 이력이 하나라도 있으면 안전을 위해 삭제가 차단됩니다.'
+      )) return;
 
       showStatus(`${ids.length}명 삭제 처리 중...`, 'info');
 
@@ -1040,7 +1343,7 @@
           const st = state.students.find(s => s.id === r.id);
           const label = st ? `${st.student_code} ${st.name}` : r.id;
           const c = r.counts || {};
-          return `  ${label}: 시험 ${c.attempts || 0}건·수강 ${c.courses || 0}건`;
+          return `  ${label}: 시험 ${c.attempts || 0}건·수강이력 ${c.courses || 0}건`;
         }).join('\n');
         msg += `\n\n${blocked.length}명은 연결 데이터로 차단:\n${detail}`;
       }
@@ -1111,6 +1414,23 @@
       renderDetail();
     });
     $('saveMetaBtn').addEventListener('click', saveMeta);
+    $('attachCourseBtn').addEventListener('click', attachSelectedCourse);
+    $('refreshCoursesBtn').addEventListener('click', async () => {
+      if (state.courseActionPending) return;
+      const button = $('refreshCoursesBtn');
+      button.disabled = true;
+      try {
+        await loadCourses();
+        showDetailStatus(`활성 강좌 ${state.courses.length}개를 새로 불러왔습니다.`, 'info');
+      } catch (err) {
+        state.courses = [];
+        state.courseLoadError = normalizeCourseError(err);
+        renderCourseHistory();
+        showDetailStatus(`강좌 목록 조회 실패: ${state.courseLoadError}`, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
 
     // ── 시작 ──────────────────────────────────────────────────────
     init();
