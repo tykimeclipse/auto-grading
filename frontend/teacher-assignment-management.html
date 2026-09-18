@@ -55,6 +55,7 @@
     minmax(210px,2fr)
     72px
     56px
+    minmax(170px,1.2fr)
     minmax(150px,1.1fr)
     64px
     100px
@@ -96,7 +97,7 @@
     .editor-box input{min-height:34px;padding:6px 8px}
     .editor-box .mini-note{font-size:11px;color:var(--muted)}
     @media (max-width:1400px){
-      .list-head,.list-row{min-width:1700px}
+      .list-head,.list-row{min-width:1900px}
       .list-card{overflow-x:auto}
     }
     @media (max-width:1100px){
@@ -125,6 +126,22 @@
     .ms-row input{min-height:34px;padding:6px 8px}
     .ms-saved{color:var(--success);font-weight:700;font-size:12px}
     .issued-tag{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;color:#0f766e;font-size:13px;font-weight:700}
+    .course-cell{display:grid;gap:5px;align-items:start}
+    .course-cell-name{font-size:12px;font-weight:700;line-height:1.35;white-space:normal}
+    .reassign-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+    .reassign-summary-item{padding:11px 12px;border:1px solid #e5e7eb;border-radius:12px;background:#f8fafc}
+    .reassign-summary-item .k{font-size:11px;color:var(--muted);margin-bottom:4px}
+    .reassign-summary-item .v{font-size:14px;font-weight:700;word-break:break-word}
+    .reassign-form{display:grid;gap:12px;padding:14px;border:1px solid #dbeafe;border-radius:14px;background:#f8fbff}
+    .audit-title{margin:18px 0 8px;font-size:15px}
+    .audit-list{display:grid;gap:8px}
+    .audit-item{padding:11px 12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;font-size:12px;line-height:1.5}
+    .audit-item strong{font-size:13px}
+    .audit-meta{color:var(--muted);margin-top:3px;word-break:break-word}
+    @media (max-width:640px){
+      .reassign-summary{grid-template-columns:1fr}
+      .modal-overlay{padding:18px 10px}
+    }
   </style>
 </head>
 <body>
@@ -132,7 +149,7 @@
     <div class="page-header">
       <div class="title-wrap">
         <h1>교사용 발행상황 관리 페이지</h1>
-        <p>assignment 조회, 학생용 링크 복사, 1차/2차/최종 점수 확인, 교사 최종점수 입력, 열림 상태 토글을 한 화면에서 관리하는 초안입니다.</p>
+        <p>과제 조회, 학생용 링크, 성취도·최종점수, 열림 상태와 강좌 재귀속 이력을 한 화면에서 관리합니다.</p>
       </div>
       <div class="top-summary">
         <div class="summary-card"><span class="label">표시 중 assignment</span><div id="sumAssignments" class="value">0건</div></div>
@@ -197,6 +214,7 @@
             <div>시험 제목</div>
             <div>학생</div>
             <div>학년</div>
+            <div>강좌 / 재귀속</div>
             <div>링크</div>
             <div>복사</div>
             <div>1차</div>
@@ -252,11 +270,57 @@
     </div>
   </div>
 
+  <!-- assignment 강좌 재귀속 및 감사 이력 모달 -->
+  <div id="reassignModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reassignModalTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="reassignModalTitle">과제 강좌 재귀속</h3>
+        <button id="reassignCloseBtn" class="btn-ghost" type="button">닫기</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-sub">잘못 귀속된 과제와 연결 응시를 학생의 다른 수강 강좌로 함께 이동합니다. 변경 사유와 이전·이후 강좌는 감사 이력에 남습니다.</p>
+        <div class="reassign-summary">
+          <div class="reassign-summary-item"><div class="k">학생 · 시험</div><div id="reassignStudentTest" class="v">-</div></div>
+          <div class="reassign-summary-item"><div class="k">현재 귀속 강좌</div><div id="reassignCurrentCourse" class="v">-</div></div>
+        </div>
+        <div class="reassign-form">
+          <div class="field">
+            <label for="reassignTargetCourse">변경할 강좌</label>
+            <select id="reassignTargetCourse"><option value="">수강 이력을 불러오는 중...</option></select>
+          </div>
+          <div class="field">
+            <label for="reassignReason">변경 사유 (필수)</label>
+            <textarea id="reassignReason" placeholder="예: 2학기 재수강 과제가 이전 강좌로 잘못 발행됨"></textarea>
+          </div>
+          <div id="reassignStatus" class="status info"></div>
+        </div>
+        <h4 class="audit-title">이 과제의 재귀속 감사 이력</h4>
+        <div id="reassignAuditList" class="audit-list"><div class="muted">불러오는 중...</div></div>
+      </div>
+      <div class="modal-foot">
+        <button id="reassignCancelBtn" class="btn-secondary" type="button">취소</button>
+        <button id="reassignSubmitBtn" class="btn-primary" type="button" disabled>강좌 재귀속</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin-auth.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
-    const state = { supabase:null, courses:[], testSets:[], assignments:[], editingAssignmentId:null, resetingAssignmentId:null };
+    const state = {
+      supabase:null,
+      courses:[],
+      testSets:[],
+      assignments:[],
+      editingAssignmentId:null,
+      resetingAssignmentId:null,
+      reassignmentAssignmentId:null,
+      reassignCourses:[],
+      reassignAudit:[],
+      reassignPending:false,
+      reassignRequestId:null
+    };
     const GRADE_LABELS = { E1:'초1', E2:'초2', E3:'초3', E4:'초4', E5:'초5', E6:'초6', M1:'중1', M2:'중2', M3:'중3', H1:'고1', H2:'고2', H3:'고3' };
 
     function setStatus(id, msg, type='info') {
@@ -449,6 +513,19 @@
         </div>`;
     }
 
+    function renderCourseReassignment(row){
+      const blocked = ['in_progress', 'awaiting_retry'].includes(row?.status);
+      const title = blocked
+        ? '진행 중이거나 2차 대기 중인 응시가 있어 현재 재귀속할 수 없습니다. 감사 이력은 확인할 수 있습니다.'
+        : '현재 강좌 확인, 재귀속, 감사 이력 조회';
+      return `
+        <div class="course-cell">
+          <span class="course-cell-name">${escapeHtml(row.course_name || '강좌 미지정')}</span>
+          <button class="mini-btn ${blocked ? 'warn' : ''} reassign-open-btn" type="button"
+            data-assignment-id="${escapeHtml(row.assignment_id)}" title="${escapeHtml(title)}">${blocked ? '이력 확인' : '강좌 변경'}</button>
+        </div>`;
+    }
+
     function renderAssignmentList(){
       const body = $('assignmentListBody');
       if (!state.assignments.length) {
@@ -488,6 +565,7 @@
             <div>${titleHtml}</div>
             <div>${escapeHtml(row.student_name || '-')}</div>
             <div>${escapeHtml(gradeLabel(row.student_grade))}</div>
+            <div>${renderCourseReassignment(row)}</div>
             ${linkCell}
             ${copyCell}
             ${round1Cell}
@@ -519,6 +597,7 @@
       body.querySelectorAll('.cancel-reset-btn').forEach(btn => btn.addEventListener('click', () => { state.resetingAssignmentId = null; renderAssignmentList(); }));
       body.querySelectorAll('.reset-r2-btn').forEach(btn => btn.addEventListener('click', async () => { await resetAttemptRound2(btn.dataset.assignmentId); }));
       body.querySelectorAll('.reset-full-btn').forEach(btn => btn.addEventListener('click', async () => { await resetAttemptFull(btn.dataset.assignmentId); }));
+      body.querySelectorAll('.reassign-open-btn').forEach(btn => btn.addEventListener('click', () => openReassignModal(btn.dataset.assignmentId)));
       body.querySelectorAll('.score-count').forEach(el => {
         el.addEventListener('mouseenter', () => showWrongTip(el));
         el.addEventListener('mouseleave', hideWrongTip);
@@ -650,6 +729,188 @@
         await loadAssignments();
       } catch (err) {
         setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    function normalizeReassignError(err){
+      const message = normalizeError(err);
+      if (message.includes('ACTIVE_ATTEMPT_REASSIGNMENT_BLOCKED')) {
+        return '진행 중이거나 2차 입력 대기 중인 응시가 있어 강좌를 변경할 수 없습니다. 응시를 먼저 완료하거나 초기화한 뒤 다시 시도하세요.';
+      }
+      if (message.includes('TARGET_COURSE_NOT_IN_STUDENT_HISTORY')) {
+        return '선택한 강좌가 이 학생의 수강 이력에 없습니다. 학생 수강 정보를 확인하세요.';
+      }
+      if (message.includes('REASSIGN_REASON_REQUIRED')) return '변경 사유를 입력하세요.';
+      if (message.includes('ASSIGNMENT_COURSE_CHANGED_RETRY')) return '다른 작업에서 강좌가 먼저 변경되었습니다. 목록을 새로 불러온 뒤 다시 시도하세요.';
+      if (message.includes('ASSIGNMENT_ATTEMPT_ATTRIBUTION_MISMATCH')) return '과제와 응시의 기존 귀속 정보가 일치하지 않아 변경을 중단했습니다.';
+      if (message.includes('COURSE_NOT_FOUND')) return '선택한 강좌를 찾을 수 없습니다.';
+      if (message.includes('ASSIGNMENT_NOT_FOUND')) return '선택한 과제를 찾을 수 없습니다.';
+      return message;
+    }
+
+    function activeReassignRow(){
+      return state.assignments.find(r => r.assignment_id === state.reassignmentAssignmentId) || null;
+    }
+
+    function uniqueEnrollmentCourses(courses){
+      const byId = new Map();
+      for (const course of courses || []) {
+        const id = course?.course_id ? String(course.course_id) : '';
+        if (!id || byId.has(id)) continue;
+        byId.set(id, course);
+      }
+      return [...byId.values()];
+    }
+
+    function renderReassignAudit(){
+      const box = $('reassignAuditList');
+      if (!state.reassignAudit.length) {
+        box.innerHTML = '<div class="muted">아직 이 과제의 재귀속 이력이 없습니다.</div>';
+        return;
+      }
+      box.innerHTML = state.reassignAudit.map(item => `
+        <div class="audit-item">
+          <strong>${escapeHtml(item.from_course_name || '강좌 미지정')} → ${escapeHtml(item.to_course_name || '-')}</strong>
+          <div>${escapeHtml(item.reason || '사유 없음')}</div>
+          <div class="audit-meta">${escapeHtml(fmtDateTime(item.changed_at) || '-')} · ${escapeHtml(item.changed_by_email || '관리자')} · 연결 응시 ${Number(item.attempt_count || 0)}건</div>
+        </div>`).join('');
+    }
+
+    function renderReassignContext(){
+      const row = activeReassignRow();
+      if (!row) return;
+      const currentCourseId = row.course_id ? String(row.course_id) : '';
+      const candidates = state.reassignCourses.filter(c => String(c.course_id) !== currentCourseId);
+      const selectedTarget = $('reassignTargetCourse').value;
+      $('reassignTargetCourse').innerHTML = candidates.length
+        ? '<option value="">변경할 강좌를 선택하세요</option>' + candidates.map(course => {
+            const status = course.is_active
+              ? '수강 중'
+              : (course.course_is_active === false ? '종료 강좌 이력' : '수강 종료 이력');
+            return `<option value="${escapeHtml(course.course_id)}">${escapeHtml(course.course_name || course.course_id)} · ${status}</option>`;
+          }).join('')
+        : '<option value="">변경 가능한 다른 수강 강좌가 없습니다</option>';
+      if (selectedTarget && candidates.some(c => String(c.course_id) === selectedTarget)) {
+        $('reassignTargetCourse').value = selectedTarget;
+      }
+
+      const blocked = ['in_progress', 'awaiting_retry'].includes(row.status);
+      $('reassignTargetCourse').disabled = state.reassignPending || blocked || !candidates.length;
+      $('reassignReason').disabled = state.reassignPending || blocked || !candidates.length;
+      $('reassignSubmitBtn').disabled = state.reassignPending || blocked || !candidates.length;
+      $('reassignCloseBtn').disabled = state.reassignPending;
+      $('reassignCancelBtn').disabled = state.reassignPending;
+
+      if (blocked) {
+        setStatus('reassignStatus', '진행 중이거나 2차 입력 대기 중인 응시가 있어 재귀속할 수 없습니다. 응시 완료 또는 입력 초기화 후 다시 시도하세요.', 'error');
+      } else if (!candidates.length) {
+        setStatus('reassignStatus', '이 학생에게 현재 강좌 외 다른 수강 이력이 없어 재귀속할 수 없습니다.', 'info');
+      } else if (!state.reassignPending) {
+        setStatus('reassignStatus', '대상 강좌와 변경 사유를 입력하세요. 과제와 연결된 모든 응시가 함께 이동합니다.', 'info');
+      }
+      renderReassignAudit();
+    }
+
+    async function openReassignModal(assignmentId){
+      const row = state.assignments.find(r => r.assignment_id === assignmentId);
+      if (!row) {
+        setStatus('assignmentStatus', '선택한 과제 정보를 찾지 못했습니다. 목록을 다시 불러오세요.', 'error');
+        return;
+      }
+      state.reassignmentAssignmentId = assignmentId;
+      state.reassignCourses = [];
+      state.reassignAudit = [];
+      state.reassignPending = false;
+      const requestId = Symbol();
+      state.reassignRequestId = requestId;
+      $('reassignStudentTest').textContent = `${row.student_code || ''} ${row.student_name || '-'} · ${row.test_title || '-'}`;
+      $('reassignCurrentCourse').textContent = row.course_name || '강좌 미지정';
+      $('reassignReason').value = '';
+      $('reassignTargetCourse').innerHTML = '<option value="">수강 이력을 불러오는 중...</option>';
+      $('reassignTargetCourse').disabled = true;
+      $('reassignSubmitBtn').disabled = true;
+      $('reassignAuditList').innerHTML = '<div class="muted">감사 이력을 불러오는 중...</div>';
+      setStatus('reassignStatus', '학생 수강 이력과 감사 이력을 불러오는 중...', 'info');
+      $('reassignModal').classList.add('open');
+
+      try {
+        const [detailRes, auditRes] = await Promise.all([
+          state.supabase.schema('auto_grading').rpc('teacher_get_student_detail', {
+            p_student_id: row.student_id
+          }),
+          state.supabase.schema('auto_grading').rpc('teacher_list_assignment_course_reassignments', {
+            p_student_id: null,
+            p_assignment_id: row.assignment_id,
+            p_limit: 100
+          })
+        ]);
+        if (state.reassignRequestId !== requestId) return;
+        if (detailRes.error) throw detailRes.error;
+        if (detailRes.data?.ok === false) throw new Error(detailRes.data.error || '학생 수강 이력 조회에 실패했습니다.');
+        if (auditRes.error) throw auditRes.error;
+        const detail = Array.isArray(detailRes.data) ? detailRes.data[0] : detailRes.data;
+        state.reassignCourses = uniqueEnrollmentCourses(detail?.courses || []);
+        state.reassignAudit = Array.isArray(auditRes.data) ? auditRes.data : [];
+        renderReassignContext();
+      } catch (err) {
+        if (state.reassignRequestId !== requestId) return;
+        setStatus('reassignStatus', `재귀속 정보 조회 실패: ${normalizeReassignError(err)}`, 'error');
+        $('reassignAuditList').innerHTML = '<div class="muted">감사 이력을 불러오지 못했습니다.</div>';
+      }
+    }
+
+    function closeReassignModal(){
+      if (state.reassignPending) return;
+      state.reassignRequestId = Symbol();
+      state.reassignmentAssignmentId = null;
+      state.reassignCourses = [];
+      state.reassignAudit = [];
+      $('reassignModal').classList.remove('open');
+    }
+
+    async function submitReassignment(){
+      const row = activeReassignRow();
+      if (!row || state.reassignPending) return;
+      const targetCourseId = $('reassignTargetCourse').value;
+      const reason = $('reassignReason').value.trim();
+      const target = state.reassignCourses.find(c => String(c.course_id) === String(targetCourseId));
+      if (!targetCourseId || !target) {
+        setStatus('reassignStatus', '변경할 강좌를 선택하세요.', 'error');
+        return;
+      }
+      if (!reason) {
+        setStatus('reassignStatus', '감사 이력에 남길 변경 사유를 입력하세요.', 'error');
+        $('reassignReason').focus();
+        return;
+      }
+      const confirmed = confirm(
+        `${row.student_code || ''} ${row.student_name || '학생'}의 아래 과제 귀속을 변경할까요?\n\n`
+        + `${row.test_title || '-'}\n`
+        + `${row.course_name || '강좌 미지정'} → ${target.course_name || target.course_id}\n\n`
+        + `연결된 응시도 함께 이동하며 변경 사유가 감사 이력에 저장됩니다.\n사유: ${reason}`
+      );
+      if (!confirmed) return;
+
+      state.reassignPending = true;
+      renderReassignContext();
+      setStatus('reassignStatus', '과제와 연결 응시의 강좌 귀속을 변경하는 중...', 'info');
+      try {
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_reassign_assignment_course', {
+          p_assignment_id: row.assignment_id,
+          p_target_course_id: targetCourseId,
+          p_reason: reason
+        });
+        if (error) throw error;
+        ensureRpcOk(data, '강좌 재귀속에 실패했습니다.');
+        const attemptCount = Number(data?.attempt_count || 0);
+        state.reassignPending = false;
+        closeReassignModal();
+        await loadAssignments();
+        setStatus('assignmentStatus', `${row.student_name || '학생'}의 과제를 ${target.course_name || '선택 강좌'}로 재귀속했습니다. 연결 응시 ${attemptCount}건도 함께 이동했고 감사 이력을 남겼습니다.`, 'ok');
+      } catch (err) {
+        state.reassignPending = false;
+        renderReassignContext();
+        setStatus('reassignStatus', `강좌 재귀속 실패: ${normalizeReassignError(err)}`, 'error');
       }
     }
 
@@ -846,6 +1107,11 @@
       $('manualDoneBtn').addEventListener('click', async () => { closeManualModal(); await loadAssignments(); });
       $('manualModal').addEventListener('click', (e) => { if (e.target === $('manualModal')) closeManualModal(); });
       $('mStudentSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadManualStudents(); });
+      // 과제 강좌 재귀속 모달
+      $('reassignCloseBtn').addEventListener('click', closeReassignModal);
+      $('reassignCancelBtn').addEventListener('click', closeReassignModal);
+      $('reassignSubmitBtn').addEventListener('click', submitReassignment);
+      $('reassignModal').addEventListener('click', (e) => { if (e.target === $('reassignModal')) closeReassignModal(); });
     }
 
     (async () => {

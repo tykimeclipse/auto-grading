@@ -744,7 +744,7 @@
                 roundBadge.classList.remove('hidden');
 
                 gateInline.classList.add('hidden');
-                // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 패널 임시 숨김.
+                // [stage6] 누적 통계 UI와 조회 호출은 비활성 상태다. 롤백/향후 재노출 검토용 코드는 유지한다.
                 // statsRow.classList.remove('hidden');
                 statsRow.classList.add('hidden');
             } else {
@@ -770,7 +770,7 @@
 
         function hideGateInline() {
             document.getElementById('gateInline').classList.add('hidden');
-            // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 패널 임시 숨김.
+            // [stage6] 누적 통계 UI는 비활성 상태다. 롤백/향후 재노출 검토용 코드는 유지한다.
             // document.getElementById('studentStats').classList.remove('hidden');
             document.getElementById('roundBadge').classList.remove('hidden');
             document.getElementById('examShell').classList.remove('hidden');
@@ -1324,6 +1324,7 @@
             return unwrapped;
         }
 
+        // [stage6] 현재 호출부 3곳이 모두 비활성이다. 롤백/향후 재노출 검토용으로 구현을 유지한다.
         async function loadStudentStats() {
             if (CONFIG.USE_MOCK) {
                 state.studentStats = {
@@ -1529,7 +1530,7 @@
                     applyRound1Result(result);
                 }
 
-                // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 조회 임시 비활성화.
+                // [stage6] 누적 통계 조회 비활성 상태 유지.
                 // await loadStudentStats();
                 success = true;
                 logDebug('submit result', result);
@@ -1567,7 +1568,7 @@
             try {
                 await startAttempt();
                 restoreLocalAnswers();
-                // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 조회 임시 비활성화.
+                // [stage6] 누적 통계 조회 비활성 상태 유지.
                 // await loadStudentStats();
                 hideGateInline();
                 renderPage();
@@ -1614,7 +1615,7 @@
                 try {
                     await startAttempt();
                     restoreLocalAnswers();
-                    // [security-migration] 보안 개편 중 token 기반 RPC로 재연결 예정. 누적 통계 조회 임시 비활성화.
+                    // [stage6] 누적 통계 조회 비활성 상태 유지.
                     // await loadStudentStats();
                     hideGateInline();
                     renderPage();

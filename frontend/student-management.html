@@ -269,6 +269,24 @@
       gap: 10px;
       margin-top: 12px;
     }
+    .achievement-toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.2fr) minmax(220px, 1fr);
+      gap: 10px;
+      align-items: end;
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid #dbeafe;
+      border-radius: 12px;
+      background: #f8fbff;
+    }
+    .achievement-status {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      text-align: right;
+    }
+    .achievement-status.error { color: #b91c1c; }
     .metric-card {
       border: 1px solid #e5e7eb;
       border-radius: 14px;
@@ -386,6 +404,8 @@
       .wrap { padding: 14px; }
       .header { flex-direction: column; }
       .search-grid, .meta-grid, .achievement-grid { grid-template-columns: 1fr 1fr; }
+      .achievement-toolbar { grid-template-columns: 1fr; }
+      .achievement-status { text-align: left; }
       .course-attach-grid { grid-template-columns: 1fr; }
       .course-attach-hint { grid-column: 1; }
       .danger-zone { align-items: stretch; flex-direction: column; }
@@ -536,8 +556,17 @@
             <div class="panel-title-row">
               <div>
                 <h3>성취도 정보</h3>
-                <p class="note">학생 개인 성취도 페이지의 핵심 정보를 관리 화면 안에서 요약해 보여주는 영역입니다.</p>
+                <p class="note">전체 누적 또는 강좌별 성취도와 시험 기록을 확인합니다.</p>
               </div>
+            </div>
+            <div class="achievement-toolbar">
+              <div class="field">
+                <label for="achievementScopeSelect">조회 범위</label>
+                <select id="achievementScopeSelect">
+                  <option value="all">전체 누적</option>
+                </select>
+              </div>
+              <div id="achievementStatus" class="achievement-status">전체 강좌의 누적 성취도입니다.</div>
             </div>
             <div id="achievementGrid" class="achievement-grid"></div>
             <div class="mobile-scroll">
@@ -629,8 +658,13 @@
       filtered:   [],   // 필터/정렬 후
       selectedId: null,
       detail:     null, // teacher_get_student_detail 결과
-      stats:      null, // get_student_stats_by_code 결과
-      history:    [],   // get_student_assignment_history_by_code 결과
+      stats:      null, // 선택한 범위의 성취도 통계
+      history:    [],   // 선택한 범위의 시험 기록
+      achievementCourses: [],
+      achievementCourse: null,
+      achievementScope: 'all',
+      achievementLoadError: null,
+      achievementRequestId: null,
       courses:    [],   // 연결 가능한 활성 강좌 목록
       courseLoadError: null,
       courseActionPending: false,
@@ -879,10 +913,19 @@
       state.selectedId = id;
       state.editing    = false;
       state.draft      = null;
+      state.detail = null;
+      state.stats = null;
+      state.history = [];
+      state.achievementScope = 'all';
+      state.achievementCourses = [];
+      state.achievementCourse = null;
+      state.achievementLoadError = null;
+      state.achievementRequestId = Symbol();
       renderList();
 
       $('emptyDetail').hidden   = true;
       $('studentDetail').hidden = false;
+      $('achievementScopeSelect').disabled = true;
       showDetailStatus('상세 정보를 불러오는 중...', 'info');
 
       const listRow = state.students.find(s => s.id === id);
@@ -893,10 +936,17 @@
       state.lastRequestId = requestId;
 
       try {
-        const [detailRes, statsRes, histRes] = await Promise.all([
-          state.supabase.schema('auto_grading').rpc('teacher_get_student_detail',                     { p_student_id:   id }),
-          state.supabase.schema('auto_grading').rpc('get_student_stats_by_code',                      { p_student_code: listRow.student_code }),
-          state.supabase.schema('auto_grading').rpc('get_student_assignment_history_by_code',         { p_student_code: listRow.student_code, p_limit: 50 })
+        const [detailRes, courseRes, achievementRes] = await Promise.all([
+          state.supabase.schema('auto_grading').rpc('teacher_get_student_detail', { p_student_id: id }),
+          state.supabase.schema('auto_grading').rpc('get_student_achievement_courses_by_code', {
+            p_student_code: listRow.student_code
+          }),
+          state.supabase.schema('auto_grading').rpc('get_student_achievement_by_code', {
+            p_student_code: listRow.student_code,
+            p_scope: 'all',
+            p_course_id: null,
+            p_limit: 50
+          })
         ]);
 
         // 응답이 돌아왔을 때 선택된 학생이 바뀌었으면 무시
@@ -911,9 +961,19 @@
         state.detail = raw?.student
           ? { ...raw.student, courses: raw.courses ?? [] }
           : raw;
-        // 비활성 학생 등은 stats/history RPC가 실패할 수 있어 null 처리
-        state.stats   = statsRes.error   ? null : (Array.isArray(statsRes.data)  ? statsRes.data[0]  : statsRes.data);
-        state.history = histRes.error    ? []   : (histRes.data || []);
+        // 비활성 학생 등은 성취도 RPC가 실패할 수 있어 상세 정보는 유지하고 별도 안내한다.
+        state.achievementCourses = courseRes.error
+          ? []
+          : (Array.isArray(courseRes.data) ? courseRes.data : []);
+        const achievement = achievementRes.error
+          ? null
+          : (Array.isArray(achievementRes.data) ? achievementRes.data[0] : achievementRes.data);
+        state.stats = achievement?.stats || null;
+        state.history = Array.isArray(achievement?.history) ? achievement.history : [];
+        state.achievementCourse = achievement?.course || null;
+        state.achievementLoadError = courseRes.error || achievementRes.error
+          ? normalizeError(courseRes.error || achievementRes.error)
+          : null;
 
         renderDetail();
         clearDetailStatus();
@@ -1006,6 +1066,7 @@
     }
 
     function renderAchievementSection() {
+      renderAchievementScopeOptions();
       const st = state.stats;
       const totalSolved = st?.total_solved ?? null;
       const r1  = st?.round1_accuracy ?? null;
@@ -1024,6 +1085,99 @@
       ).join('');
 
       renderHistory();
+    }
+
+    function renderAchievementScopeOptions() {
+      const select = $('achievementScopeSelect');
+      const options = ['<option value="all">전체 누적</option>'];
+      const realCourses = state.achievementCourses.filter(course => !course.is_unassigned && course.course_id);
+      for (const course of state.achievementCourses) {
+        if (course.is_unassigned) {
+          if (!realCourses.length) continue;
+          const count = Number(course.achievement_attempt_count || 0);
+          options.push(`<option value="unassigned">강좌 미지정 과거 기록 · 성취도 ${count}건</option>`);
+          continue;
+        }
+        if (!course.course_id) continue;
+        const status = course.enrollment_is_active
+          ? '수강 중'
+          : (course.course_is_active ? '수강 종료' : '종료 강좌');
+        const count = Number(course.achievement_attempt_count || 0);
+        options.push(
+          `<option value="course:${escapeHtml(course.course_id)}">${escapeHtml(course.course_name || '이름 없는 강좌')} · ${status} · 성취도 ${count}건</option>`
+        );
+      }
+      select.innerHTML = options.join('');
+      select.value = state.achievementScope;
+      if (!select.value) {
+        state.achievementScope = 'all';
+        select.value = 'all';
+      }
+      select.disabled = !state.detail;
+
+      const status = $('achievementStatus');
+      if (state.achievementLoadError) {
+        status.className = 'achievement-status error';
+        status.textContent = `성취도 조회 실패: ${state.achievementLoadError}`;
+        return;
+      }
+      const label = state.achievementCourse?.course_name || '전체 누적';
+      const scopeText = state.achievementScope === 'all'
+        ? '모든 강좌와 미지정 기록 합산'
+        : (state.achievementScope === 'unassigned'
+          ? '강좌 정보가 없는 과거 기록'
+          : (state.achievementCourse?.course_is_active ? '운영 중 강좌' : '종료된 강좌'));
+      status.className = 'achievement-status';
+      status.textContent = `${label} · ${scopeText} · 시험 기록 ${state.history.length}건`;
+    }
+
+    function parseAchievementScope(value) {
+      if (value === 'unassigned') return { scope: 'unassigned', courseId: null };
+      if (value?.startsWith('course:')) {
+        return { scope: 'course', courseId: value.slice('course:'.length) };
+      }
+      return { scope: 'all', courseId: null };
+    }
+
+    async function loadAchievementScope() {
+      const student = state.detail;
+      if (!student) return;
+      const selectedValue = $('achievementScopeSelect').value || 'all';
+      const { scope, courseId } = parseAchievementScope(selectedValue);
+      const studentId = student.id;
+      const requestId = Symbol();
+      state.achievementRequestId = requestId;
+      state.achievementScope = selectedValue;
+      state.achievementLoadError = null;
+      $('achievementScopeSelect').disabled = true;
+      $('achievementStatus').className = 'achievement-status';
+      $('achievementStatus').textContent = '선택한 범위의 성취도를 불러오는 중입니다...';
+
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('get_student_achievement_by_code', {
+            p_student_code: student.student_code,
+            p_scope: scope,
+            p_course_id: courseId,
+            p_limit: 50
+          });
+        if (error) throw error;
+        if (state.achievementRequestId !== requestId || state.detail?.id !== studentId) return;
+        const achievement = Array.isArray(data) ? data[0] : data;
+        state.stats = achievement?.stats || null;
+        state.history = Array.isArray(achievement?.history) ? achievement.history : [];
+        state.achievementCourse = achievement?.course || null;
+        renderAchievementSection();
+      } catch (err) {
+        if (state.achievementRequestId !== requestId || state.detail?.id !== studentId) return;
+        state.achievementLoadError = normalizeError(err);
+        renderAchievementScopeOptions();
+      } finally {
+        if (state.achievementRequestId === requestId && state.detail?.id === studentId) {
+          $('achievementScopeSelect').disabled = false;
+        }
+      }
     }
 
     function renderHistory() {
@@ -1414,6 +1568,7 @@
       renderDetail();
     });
     $('saveMetaBtn').addEventListener('click', saveMeta);
+    $('achievementScopeSelect').addEventListener('change', loadAchievementScope);
     $('attachCourseBtn').addEventListener('click', attachSelectedCourse);
     $('refreshCoursesBtn').addEventListener('click', async () => {
       if (state.courseActionPending) return;

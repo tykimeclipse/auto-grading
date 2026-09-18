@@ -49,6 +49,52 @@
         color: #6b7280;
         margin: 0;
       }
+      .scope-box {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        margin-bottom: 18px;
+      }
+      .scope-field {
+        display: grid;
+        gap: 7px;
+        flex: 1;
+        max-width: 560px;
+      }
+      .scope-field label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #374151;
+      }
+      .scope-field select {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        padding: 9px 11px;
+        background: #fff;
+        color: #1f2937;
+        font-size: 14px;
+      }
+      .scope-field select:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+      .scope-field select:disabled { opacity: 0.65; }
+      .scope-status {
+        flex: 1;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.5;
+        text-align: right;
+      }
+      .scope-status.error { color: #b91c1c; }
       .cards {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -154,6 +200,12 @@
         .cards {
           grid-template-columns: 1fr 1fr;
         }
+        .scope-box {
+          align-items: stretch;
+          flex-direction: column;
+        }
+        .scope-field { max-width: none; }
+        .scope-status { text-align: left; }
         .student-name {
           font-size: 20px;
         }
@@ -176,6 +228,16 @@
         <div class="student-box">
           <h2 id="studentName" class="student-name">-</h2>
           <p id="studentMeta" class="student-meta">-</p>
+        </div>
+
+        <div class="scope-box">
+          <div class="scope-field">
+            <label for="achievementScope">조회 범위</label>
+            <select id="achievementScope" disabled>
+              <option value="all">전체 누적</option>
+            </select>
+          </div>
+          <div id="scopeStatus" class="scope-status">전체 강좌의 누적 성취도입니다.</div>
         </div>
 
         <div class="cards">
@@ -238,6 +300,14 @@
       const avgRound2El = document.getElementById("avgRound2");
       const avgFinalEl = document.getElementById("avgFinal");
       const historyBody = document.getElementById("historyBody");
+      const achievementScopeEl = document.getElementById("achievementScope");
+      const scopeStatusEl = document.getElementById("scopeStatus");
+
+      const pageState = {
+        token: "",
+        courses: [],
+        scopeRequestId: 0,
+      };
 
       function showMessage(type, text) {
         contentArea.style.display = "none";
@@ -351,32 +421,113 @@
         return row ?? null;
       }
 
-      async function fetchStats(token) {
+      async function fetchAchievementCourses(token) {
         const { data, error } = await supabase
           .schema("auto_grading")
-          .rpc("get_student_stats_by_token", {
+          .rpc("get_student_achievement_courses_by_token", {
             p_token: token,
           });
 
         if (error) throw error;
-        // Supabase RPC는 가끔 배열 / 객체 형태가 달라질 수 있으므로 안전 처리
-        if (Array.isArray(data)) {
-          return data[0] ?? null;
-        }
-
-        return data ?? null;
+        return Array.isArray(data) ? data : [];
       }
 
-      async function fetchHistory(token) {
+      async function fetchAchievement(token, scope, courseId) {
         const { data, error } = await supabase
           .schema("auto_grading")
-          .rpc("get_student_assignment_history_by_token", {
+          .rpc("get_student_achievement_by_token", {
             p_token: token,
+            p_scope: scope,
+            p_course_id: courseId,
             p_limit: 200,
           });
 
         if (error) throw error;
-        return data || [];
+        if (!data) throw new Error("unauthorized");
+        return Array.isArray(data) ? data[0] : data;
+      }
+
+      function renderScopeOptions(courses) {
+        const options = ['<option value="all">전체 누적</option>'];
+        const realCourses = courses.filter(course => !course.is_unassigned && course.course_id);
+        for (const course of courses) {
+          if (course.is_unassigned) {
+            if (!realCourses.length) continue;
+            const count = Number(course.achievement_attempt_count || 0);
+            options.push(`<option value="unassigned">강좌 미지정 과거 기록 · 성취도 ${count}건</option>`);
+            continue;
+          }
+          if (!course.course_id) continue;
+          const status = course.enrollment_is_active
+            ? "수강 중"
+            : (course.course_is_active ? "수강 종료" : "종료 강좌");
+          const count = Number(course.achievement_attempt_count || 0);
+          options.push(
+            `<option value="course:${escapeHtml(course.course_id)}">${escapeHtml(course.course_name || "이름 없는 강좌")} · ${status} · 성취도 ${count}건</option>`,
+          );
+        }
+        achievementScopeEl.innerHTML = options.join("");
+        achievementScopeEl.disabled = false;
+      }
+
+      function selectedScope() {
+        const value = achievementScopeEl.value || "all";
+        if (value === "unassigned") return { scope: "unassigned", courseId: null };
+        if (value.startsWith("course:")) {
+          return { scope: "course", courseId: value.slice("course:".length) };
+        }
+        return { scope: "all", courseId: null };
+      }
+
+      function renderAchievement(result) {
+        const stats = result?.stats || null;
+        const history = Array.isArray(result?.history) ? result.history : [];
+        const totalSolved = stats?.total_solved ?? null;
+        totalSolvedEl.innerHTML = totalSolved != null
+          ? `${totalSolved}${getShieldIcon(totalSolved)}`
+          : "-";
+
+        const r1Acc = stats?.round1_accuracy ?? null;
+        const r2Acc = stats?.round2_accuracy ?? null;
+        const rfAcc = stats?.final_accuracy ?? null;
+        avgRound1El.innerHTML = r1Acc != null
+          ? `${Number(r1Acc).toFixed(1)}%${getRibbonIcon(r1Acc)}`
+          : "-";
+        avgRound2El.innerHTML = r2Acc != null
+          ? `${Number(r2Acc).toFixed(1)}%${getRibbonIcon(r2Acc)}`
+          : "-";
+        avgFinalEl.innerHTML = rfAcc != null
+          ? `${Number(rfAcc).toFixed(1)}%${getRibbonIcon(rfAcc)}`
+          : "-";
+
+        renderHistory(history);
+        const course = result?.course || {};
+        const label = course.course_name || "선택 범위";
+        const suffix = result?.scope === "course"
+          ? (course.course_is_active ? "운영 중 강좌" : "종료된 강좌")
+          : (result?.scope === "unassigned" ? "강좌 정보가 없는 과거 기록" : "모든 강좌와 미지정 기록 합산");
+        scopeStatusEl.className = "scope-status";
+        scopeStatusEl.textContent = `${label} · ${suffix} · 시험 기록 ${history.length}건`;
+      }
+
+      async function loadSelectedAchievement() {
+        const requestId = ++pageState.scopeRequestId;
+        const { scope, courseId } = selectedScope();
+        achievementScopeEl.disabled = true;
+        scopeStatusEl.className = "scope-status";
+        scopeStatusEl.textContent = "선택한 범위의 성취도를 불러오는 중입니다...";
+        try {
+          const result = await fetchAchievement(pageState.token, scope, courseId);
+          if (requestId !== pageState.scopeRequestId) return;
+          renderAchievement(result);
+        } catch (err) {
+          if (requestId !== pageState.scopeRequestId) return;
+          console.error(err);
+          scopeStatusEl.className = "scope-status error";
+          scopeStatusEl.textContent = normalizeErrorMessage(err);
+        } finally {
+          if (requestId === pageState.scopeRequestId) achievementScopeEl.disabled = false;
+        }
       }
 
       function renderHistory(rows) {
@@ -484,35 +635,19 @@
             return;
           }
 
-          // 2단계: 토큰으로 통계·기록 조회 (RPC 내부에서 토큰 재검증)
-          const [stats, history] = await Promise.all([
-            fetchStats(token),
-            fetchHistory(token),
+          // 2단계: 토큰으로 범위 목록과 전체 누적 조회 (RPC 내부에서 토큰 재검증)
+          const [courses, achievement] = await Promise.all([
+            fetchAchievementCourses(token),
+            fetchAchievement(token, "all", null),
           ]);
+
+          pageState.token = token;
+          pageState.courses = courses;
 
           studentNameEl.textContent = studentInfo.name || "이름 없음";
           studentMetaEl.textContent = `학생코드 ${studentInfo.student_code || "-"} · ${formatGradeLevel(studentInfo.grade_level)}`;
-
-          const totalSolved = (stats && stats.total_solved != null) ? stats.total_solved : null;
-          totalSolvedEl.innerHTML =
-            totalSolved != null
-              ? `${totalSolved}${getShieldIcon(totalSolved)}`
-              : "-";
-
-          const r1Acc = stats?.round1_accuracy ?? null;
-          const r2Acc = stats?.round2_accuracy ?? null;
-          const rfAcc = stats?.final_accuracy   ?? null;
-
-          avgRound1El.innerHTML =
-            r1Acc != null ? `${Number(r1Acc).toFixed(1)}%${getRibbonIcon(r1Acc)}` : "-";
-
-          avgRound2El.innerHTML =
-            r2Acc != null ? `${Number(r2Acc).toFixed(1)}%${getRibbonIcon(r2Acc)}` : "-";
-
-          avgFinalEl.innerHTML =
-            rfAcc != null ? `${Number(rfAcc).toFixed(1)}%${getRibbonIcon(rfAcc)}` : "-";
-
-          renderHistory(history);
+          renderScopeOptions(courses);
+          renderAchievement(achievement);
 
           clearMessage();
           contentArea.style.display = "block";
@@ -522,6 +657,7 @@
         }
       }
 
+      achievementScopeEl.addEventListener("change", loadSelectedAchievement);
       loadPage();
     </script>
   </body>
