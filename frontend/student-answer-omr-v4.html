@@ -248,35 +248,6 @@
             color: inherit;
         }
 
-        .mistake-note-cta {
-            margin-top: 14px;
-            padding: 14px;
-            background: #f3f0ff;
-            border: 1px solid #c7bfff;
-            border-radius: 10px;
-            text-align: center;
-        }
-
-        .btn-mistake-note {
-            background: #5b3df0;
-            color: #ffffff;
-            border: none;
-            padding: 12px 28px;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        .btn-mistake-note:hover { background: #4a2fe0; }
-        .btn-mistake-note:disabled { background: #9b91d0; cursor: default; }
-
-        .mistake-note-hint {
-            margin-top: 8px;
-            font-size: 13px;
-            color: #5b5b8a;
-        }
-
         .result-line.negative {
             color: var(--danger);
         }
@@ -885,94 +856,6 @@
                 appendSummaryLine(el, `남은 문항: ${s.remainingItemNos.join(', ')}`, 'negative');
             } else {
                 appendSummaryLine(el, '1차,2차 정답처리가 끝났습니다.');
-            }
-            // 2차 채점이 끝나면 오답 유무와 관계없이 항상 표시.
-            // 만점이어도 헷갈렸던 문제를 스스로 오답노트에 남길 수 있도록.
-            appendMistakeNoteCta(el);
-        }
-
-        function appendMistakeNoteCta(el) {
-            // 운영 배포 게이트: create_mistake_note_via_omr_bridge RPC 는 운영 DB
-            // 에서 revoke 상태다. app-config 플래그가 켜진 환경(로컬/테스트)에서만
-            // 버튼을 노출해 '눌렀는데 실패' UX 를 막는다.
-            if (window.APP_CONFIG?.ENABLE_OMR_MISTAKE_NOTE_BRIDGE !== true) {
-                return;
-            }
-            // 2차 후에도 남은 오답이 있는 경우에만 표시.
-            // assignment_id / student_code / attempt_id 가 모두 있어야 RPC 호출 가능.
-            if (!state.assignmentId || !state.studentCode || !state.attemptId) {
-                return;
-            }
-            const wrap = document.createElement('div');
-            wrap.className = 'mistake-note-cta';
-
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.id = 'createMistakeNoteBtn';
-            btn.className = 'btn-mistake-note';
-            btn.textContent = '오답노트 만들기';
-            btn.addEventListener('click', handleCreateMistakeNote);
-            wrap.appendChild(btn);
-
-            const hint = document.createElement('div');
-            hint.className = 'mistake-note-hint';
-            hint.textContent = '틀린 문제나 헷갈렸던 문제를 사진으로 찍어 오답노트에 저장합니다.';
-            wrap.appendChild(hint);
-
-            el.appendChild(wrap);
-        }
-
-        async function handleCreateMistakeNote() {
-            const btn = document.getElementById('createMistakeNoteBtn');
-            const setBusy = (busy) => {
-                if (!btn) return;
-                btn.disabled = busy;
-                btn.textContent = busy ? '준비 중...' : '오답노트 만들기';
-            };
-
-            setBusy(true);
-            try {
-                const { data, error } = await sbClient
-                    .schema('auto_grading')
-                    .rpc('create_mistake_note_via_omr_bridge', {
-                        p_assignment_id: state.assignmentId,
-                        p_student_code:  state.studentCode,
-                        p_attempt_id:    state.attemptId,
-                    });
-                if (error) throw error;
-
-                const result = unwrapRpcData(data, 'create_mistake_note_via_omr_bridge');
-                if (!result || result.ok !== true) {
-                    alert(mistakeNoteErrorMessage(result && result.error));
-                    setBusy(false);
-                    return;
-                }
-
-                // 같은 탭으로 작성 페이지 이동 (back 으로 OMR 결과 복귀 가능)
-                const url = new URL(location.href);
-                const base = url.pathname.replace(/[^/]+$/, 'mistake-note-write-v1.html');
-                const next = `${url.origin}${base}`
-                    + `?token=${encodeURIComponent(result.token)}`
-                    + `&note_id=${encodeURIComponent(result.note_id)}`;
-                location.href = next;
-            } catch (err) {
-                console.error(err);
-                alert('오답노트 작성 준비 중 오류가 발생했습니다.');
-                setBusy(false);
-            }
-        }
-
-        function mistakeNoteErrorMessage(code) {
-            switch (code) {
-                case 'invalid_input':         return '필수 정보가 누락되었습니다. 페이지를 새로고침 후 다시 시도해 주세요.';
-                case 'assignment_not_owned':  return '학생 정보가 일치하지 않습니다. 학생 코드를 확인해 주세요.';
-                case 'attempt_not_found':
-                case 'attempt_not_owned':     return '시험 기록을 찾을 수 없습니다.';
-                case 'attempt_not_eligible':  return '2차 채점이 끝난 시험에서만 오답노트를 만들 수 있습니다.';
-                case 'already_submitted':     return '이미 제출된 오답노트가 있습니다.';
-                case 'token_issue_failed':    return '인증 토큰 발급에 실패했습니다. 잠시 후 다시 시도해 주세요.';
-                case 'conflict':              return '다른 창에서 동시에 진행 중인 작업이 있습니다. 잠시 후 다시 시도해 주세요.';
-                default:                      return '오답노트 작성을 시작할 수 없습니다.';
             }
         }
 
