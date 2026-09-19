@@ -1,16 +1,23 @@
 -- ================================================================
 -- teacher_get_attempt_wrong_answers.sql
 -- 과제 관리 화면(teacher-assignment-management)의 '맞은 갯수' 셀 hover 시
--- 해당 발행(assignment)의 틀린 문항 번호 / 학생답 / 정답을 라운드별로 조회.
+-- 해당 발행(assignment)의 틀린 문항 표시정보 / 학생답 / 정답을 라운드별로 조회.
 --
 -- lazy 호출 전용: 교사가 셀에 hover 할 때만 1건씩 조회된다.
 -- security definer + assert_admin (관리자 화면), anon/public 차단.
 --
 -- 반환: jsonb 배열. 각 원소
---   { round_no, item_no, selected, correct }
+--   {
+--     round_no, item_no,
+--     display_item_no, section_order, section_title, display_order,
+--     selected, correct
+--   }
+--   - item_no는 응답 식별용 내부 불변 번호
+--   - display_* / section_*은 교사용 화면 표시 전용
 --   - is_correct=false 인 응답만 (틀린 문항)
 --   - selected 가 null 이면 무응답
 --   - 프론트는 round_no 로 1차/2차 셀에 나눠 표로 렌더
+--   - 라운드 안에서는 display_order, item_no 순으로 반환
 -- 대상 attempt 는 해당 assignment 의 최신(attempt_no desc) 1건.
 -- ================================================================
 
@@ -46,12 +53,16 @@ begin
   select coalesce(
            jsonb_agg(
              jsonb_build_object(
-               'round_no', r.round_no,
-               'item_no',  ti.item_no,
-               'selected', r.selected_answer_normalized,
-               'correct',  ti.answer_key_normalized
+               'round_no',       r.round_no,
+               'item_no',        ti.item_no,
+               'display_item_no', ti.display_item_no,
+               'section_order',   ti.section_order,
+               'section_title',   ti.section_title,
+               'display_order',   ti.display_order,
+               'selected',       r.selected_answer_normalized,
+               'correct',        ti.answer_key_normalized
              )
-             order by r.round_no, ti.item_no
+             order by r.round_no, ti.display_order, ti.item_no
            ),
            '[]'::jsonb
          )
@@ -65,6 +76,7 @@ begin
 end;
 $function$;
 
--- 관리자 전용 조회: anon/public 차단, authenticated 만 호출 가능
+-- 관리자 전용 조회: anon/public 차단, authenticated/service_role 호출 가능
 revoke execute on function auto_grading.teacher_get_attempt_wrong_answers(uuid) from public, anon;
-grant  execute on function auto_grading.teacher_get_attempt_wrong_answers(uuid) to authenticated;
+grant  execute on function auto_grading.teacher_get_attempt_wrong_answers(uuid)
+  to authenticated, service_role;

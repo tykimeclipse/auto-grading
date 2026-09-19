@@ -1019,6 +1019,7 @@
             return toPositiveInteger(item?.display_item_no, Number(item?.item_no));
         }
 
+        // teacher-assignment-management.html의 동일 함수와 출력 형식을 맞춘다.
         function getItemReferenceText(item) {
             const displayItemNo = getDisplayItemNo(item);
             const sectionTitle = normalizeSectionTitle(item?.section_title);

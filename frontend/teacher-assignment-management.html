@@ -80,6 +80,7 @@
                box-shadow:0 6px 20px rgba(0,0,0,.28);pointer-events:none}
     .wrong-tip table{border-collapse:collapse;width:100%}
     .wrong-tip th,.wrong-tip td{padding:2px 8px;text-align:center;white-space:nowrap}
+    .wrong-tip td.item-label{text-align:left;white-space:normal;overflow-wrap:anywhere}
     .wrong-tip th{color:#aeb6c4;font-weight:600;border-bottom:1px solid #3a4150}
     .wrong-tip td.wrong{color:#ff9a9a}
     .wrong-tip td.ok{color:#9be7a6}
@@ -341,6 +342,36 @@
       return `${correct}/${total} · ${Number(percent).toFixed(0)}%`;
     }
 
+    function toPositiveInteger(value, fallback){
+      const number = Number(value);
+      return Number.isInteger(number) && number > 0 ? number : fallback;
+    }
+
+    function normalizeSectionTitle(value){
+      const title = value == null ? '' : String(value).trim();
+      return title || null;
+    }
+
+    function getDisplayItemNo(item){
+      return toPositiveInteger(item?.display_item_no, Number(item?.item_no));
+    }
+
+    // student-answer-omr-v4.html의 동일 함수와 출력 형식을 맞춘다.
+    function getItemReferenceText(item){
+      const displayItemNo = getDisplayItemNo(item);
+      const sectionTitle = normalizeSectionTitle(item?.section_title);
+      return sectionTitle
+        ? `${sectionTitle} - ${displayItemNo}번`
+        : `${displayItemNo}번`;
+    }
+
+    function compareWrongAnswersByDisplayOrder(a, b){
+      return Number(a?.round_no) - Number(b?.round_no)
+        || toPositiveInteger(a?.display_order, Number(a?.item_no))
+          - toPositiveInteger(b?.display_order, Number(b?.item_no))
+        || Number(a?.item_no) - Number(b?.item_no);
+    }
+
     // 점수 셀: '맞은 갯수'(틀린답/정답 표 hover) + '%'(작성시간 title) 로 분리 렌더
     function scoreCellHtml(correct, total, percent, submittedAt, assignmentId, roundNo){
       if (correct == null || total == null || percent == null) return '<div class="score-cell blank">-</div>';
@@ -363,7 +394,8 @@
           const { data, error } = await state.supabase.schema('auto_grading')
             .rpc('teacher_get_attempt_wrong_answers', { p_assignment_id: assignmentId });
           if (error) throw error;
-          return Array.isArray(data) ? data : (data || []);
+          const rows = Array.isArray(data) ? data : [];
+          return [...rows].sort(compareWrongAnswersByDisplayOrder);
         })().catch(err => { wrongCache.delete(assignmentId); throw err; }));
       }
       return wrongCache.get(assignmentId);
@@ -383,7 +415,7 @@
       const list = (rows || []).filter(x => Number(x.round_no) === Number(roundNo));
       if (!list.length) return '<div class="tip-empty">틀린 문항 없음</div>';
       const trs = list.map(x =>
-        `<tr><td>${escapeHtml(String(x.item_no))}</td>`
+        `<tr><td class="item-label">${escapeHtml(getItemReferenceText(x))}</td>`
         + `<td class="wrong">${escapeHtml(x.selected == null ? '—' : String(x.selected))}</td>`
         + `<td class="ok">${escapeHtml(x.correct == null ? '—' : String(x.correct))}</td></tr>`
       ).join('');
