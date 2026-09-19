@@ -277,6 +277,43 @@
             gap: 20px;
         }
 
+        .omr-layout.sectioned {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .omr-section {
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        .omr-section-title {
+            margin: 0 0 10px;
+            padding: 0 0 8px;
+            border-bottom: 1px solid #dbe2f2;
+            color: var(--brand);
+            font-size: 16px;
+            font-weight: 800;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .omr-section-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .omr-section-grid.two-col {
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
         .omr-column {
             display: flex;
             flex-direction: column;
@@ -448,6 +485,14 @@
                 gap: 6px;
             }
 
+            .omr-section {
+                padding: 10px;
+            }
+
+            .omr-section-title {
+                font-size: 15px;
+            }
+
             .omr-choices {
                 gap: 3px;
                 grid-auto-columns: minmax(31px, 34px);
@@ -542,7 +587,10 @@
     <script src="app-config.js"></script>
     <script>
         const isLocalhost = ['localhost', '127.0.0.1'].includes(location.hostname);
-        const forceMock = new URLSearchParams(location.search).get('mock') === '1';
+        const mockParams = new URLSearchParams(location.search);
+        const forceMock = mockParams.get('mock') === '1';
+        const forceSectionMock = mockParams.get('mock_sections') === '1';
+        const forceRound2Mock = mockParams.get('mock_round') === '2';
 
         const CONFIG = {
             SUPABASE_URL: 'https://gspsquuyqkydqphbcuel.supabase.co',
@@ -831,7 +879,7 @@
                 el.appendChild(title);
 
                 if (Array.isArray(s.retryItemNos) && s.retryItemNos.length) {
-                    appendSummaryLine(el, `다시 풀 문제: ${s.retryItemNos.join(', ')}`, 'negative');
+                    appendSummaryLine(el, `다시 풀 문제: ${formatItemReferences(s.retryItemNos)}`, 'negative');
                 } else {
                     appendSummaryLine(el, '모든 문항이 정답 처리되었습니다.');
                 }
@@ -853,7 +901,7 @@
             appendSummaryScoreLine(el, '2차 정답', s.finalCorrectCount, s.totalItems, finalPercent);
 
             if (Array.isArray(s.remainingItemNos) && s.remainingItemNos.length) {
-                appendSummaryLine(el, `남은 문항: ${s.remainingItemNos.join(', ')}`, 'negative');
+                appendSummaryLine(el, `남은 문항: ${formatItemReferences(s.remainingItemNos)}`, 'negative');
             } else {
                 appendSummaryLine(el, '1차,2차 정답처리가 끝났습니다.');
             }
@@ -937,6 +985,63 @@
             });
         }
 
+        function toPositiveInteger(value, fallback) {
+            const number = Number(value);
+            return Number.isInteger(number) && number > 0 ? number : fallback;
+        }
+
+        function normalizeSectionTitle(value) {
+            const title = value == null ? '' : String(value).trim();
+            return title || null;
+        }
+
+        function normalizeStartAttemptItem(item) {
+            const itemNo = Number(item?.item_no);
+
+            return {
+                item_no: itemNo,
+                display_item_no: toPositiveInteger(item?.display_item_no, itemNo),
+                section_order: toPositiveInteger(item?.section_order, 1),
+                section_title: normalizeSectionTitle(item?.section_title),
+                display_order: toPositiveInteger(item?.display_order, itemNo),
+                choice_count: Number(item?.choice_count || (item?.answer_type === 'ox' ? 2 : 5) || 5),
+                allows_multiple: Boolean(item?.allows_multiple || false),
+                selected_answer: item?.selected_answer == null ? '' : String(item.selected_answer)
+            };
+        }
+
+        function compareItemsByDisplayOrder(a, b) {
+            return Number(a.display_order) - Number(b.display_order)
+                || Number(a.item_no) - Number(b.item_no);
+        }
+
+        function getDisplayItemNo(item) {
+            return toPositiveInteger(item?.display_item_no, Number(item?.item_no));
+        }
+
+        function getItemReferenceText(item) {
+            const displayItemNo = getDisplayItemNo(item);
+            const sectionTitle = normalizeSectionTitle(item?.section_title);
+            return sectionTitle
+                ? `${sectionTitle} - ${displayItemNo}번`
+                : `${displayItemNo}번`;
+        }
+
+        function getItemAriaLabel(item) {
+            return getItemReferenceText(item);
+        }
+
+        function formatItemReferences(itemNos) {
+            const itemByInternalNo = new Map(
+                state.items.map(item => [String(item.item_no), item])
+            );
+
+            return itemNos.map(itemNo => {
+                const item = itemByInternalNo.get(String(itemNo));
+                return item ? getItemReferenceText(item) : `${itemNo}번`;
+            }).join(', ');
+        }
+
         function isChoiceSelected(item, value) {
             const key = String(item.item_no);
             const current = state.answers[key] || '';
@@ -949,6 +1054,8 @@
         function getVisibleItems() {
             if (state.currentRound === 2 && Array.isArray(state.retryItemNos) && state.retryItemNos.length) {
                 const retrySet = new Set(state.retryItemNos.map(n => String(n)));
+                // retry_item_nos는 멤버십에만 사용한다. 화면 순서는 항상
+                // display_order로 정렬된 state.items를 따라야 한다.
                 return state.items.filter(item => retrySet.has(String(item.item_no)));
             }
             return [...state.items];
@@ -992,7 +1099,8 @@
 
             const no = document.createElement('div');
             no.className = 'omr-no';
-            no.textContent = String(item.item_no);
+            no.textContent = String(getDisplayItemNo(item));
+            no.setAttribute('aria-label', getItemAriaLabel(item));
 
             const choices = document.createElement('div');
             choices.className = 'omr-choices';
@@ -1006,6 +1114,10 @@
                 btn.textContent = choice.label;
                 btn.dataset.value = choice.value;
                 btn.setAttribute('aria-pressed', isChoiceSelected(item, choice.value) ? 'true' : 'false');
+                btn.setAttribute(
+                    'aria-label',
+                    `${getItemAriaLabel(item)} 답 ${choice.label}`
+                );
 
                 if (isChoiceSelected(item, choice.value)) {
                     btn.classList.add('selected');
@@ -1043,6 +1155,73 @@
             });
         }
 
+        function appendItemColumns(container, items, isWide) {
+            if (!isWide) {
+                const col = document.createElement('div');
+                col.className = 'omr-column';
+                items.forEach(item => col.appendChild(renderItemRow(item)));
+                container.appendChild(col);
+                return;
+            }
+
+            const mid = Math.ceil(items.length / 2);
+            const left = document.createElement('div');
+            const right = document.createElement('div');
+            left.className = 'omr-column';
+            right.className = 'omr-column';
+
+            items.slice(0, mid).forEach(item => left.appendChild(renderItemRow(item)));
+            items.slice(mid).forEach(item => right.appendChild(renderItemRow(item)));
+
+            container.appendChild(left);
+            container.appendChild(right);
+        }
+
+        function groupItemsBySection(items) {
+            const groups = [];
+
+            items.forEach(item => {
+                const sectionOrder = toPositiveInteger(item.section_order, 1);
+                const sectionTitle = normalizeSectionTitle(item.section_title);
+                const key = `${sectionOrder}\u0000${sectionTitle || ''}`;
+                const previous = groups[groups.length - 1];
+
+                if (!previous || previous.key !== key) {
+                    groups.push({
+                        key,
+                        sectionOrder,
+                        sectionTitle,
+                        items: []
+                    });
+                }
+
+                groups[groups.length - 1].items.push(item);
+            });
+
+            return groups;
+        }
+
+        function renderSection(group, index, isWide) {
+            const section = document.createElement('section');
+            section.className = 'omr-section';
+            section.dataset.sectionOrder = String(group.sectionOrder);
+
+            const heading = document.createElement('h2');
+            const headingId = `omrSectionTitle${index + 1}`;
+            heading.id = headingId;
+            heading.className = 'omr-section-title';
+            heading.textContent = group.sectionTitle || `섹션 ${group.sectionOrder}`;
+            section.setAttribute('aria-labelledby', headingId);
+            section.appendChild(heading);
+
+            const grid = document.createElement('div');
+            grid.className = isWide ? 'omr-section-grid two-col' : 'omr-section-grid';
+            appendItemColumns(grid, group.items, isWide);
+            section.appendChild(grid);
+
+            return section;
+        }
+
         function renderOMRGrid() {
             const root = document.getElementById('omrRoot');
             root.replaceChildren();
@@ -1056,31 +1235,20 @@
             root.classList.remove('hidden');
 
             const isWide = currentWideMq ? currentWideMq.matches : window.matchMedia('(min-width: 820px)').matches;
-            root.className = isWide ? 'omr-layout two-col' : 'omr-layout';
+            const hasSections = state.activeItems.some(
+                item => normalizeSectionTitle(item.section_title) !== null
+            );
 
-            if (!isWide) {
-                const col = document.createElement('div');
-                col.className = 'omr-column';
-                state.activeItems.forEach(item => col.appendChild(renderItemRow(item)));
-                root.appendChild(col);
+            if (hasSections) {
+                root.className = 'omr-layout sectioned';
+                groupItemsBySection(state.activeItems).forEach((group, index) => {
+                    root.appendChild(renderSection(group, index, isWide));
+                });
                 return;
             }
 
-            const mid = Math.ceil(state.activeItems.length / 2);
-            const leftItems = state.activeItems.slice(0, mid);
-            const rightItems = state.activeItems.slice(mid);
-
-            const left = document.createElement('div');
-            left.className = 'omr-column';
-
-            const right = document.createElement('div');
-            right.className = 'omr-column';
-
-            leftItems.forEach(item => left.appendChild(renderItemRow(item)));
-            rightItems.forEach(item => right.appendChild(renderItemRow(item)));
-
-            root.appendChild(left);
-            root.appendChild(right);
+            root.className = isWide ? 'omr-layout two-col' : 'omr-layout';
+            appendItemColumns(root, state.activeItems, isWide);
         }
 
         function renderPage() {
@@ -1118,6 +1286,7 @@
 
         function buildSubmissionPayload() {
             return state.activeItems.map(item => ({
+                // display_item_no는 화면 전용이며 제출·채점 키는 내부 item_no다.
                 item_no: String(item.item_no),
                 answer: state.answers[String(item.item_no)] || ''
             }));
@@ -1327,12 +1496,11 @@
             state.currentRound = Number(result.current_round || 1);
             state.totalItems = Number(result.total_items || 0);
             state.retryItemNos = (result.retry_item_nos || []).map(n => String(n));
-            state.items = Array.isArray(result.items) ? result.items.map(item => ({
-                item_no: Number(item.item_no),
-                choice_count: Number(item.choice_count || (item.answer_type === 'ox' ? 2 : 5) || 5),
-                allows_multiple: Boolean(item.allows_multiple || false),
-                selected_answer: item.selected_answer == null ? '' : String(item.selected_answer)
-            })) : [];
+            state.items = Array.isArray(result.items)
+                ? result.items
+                    .map(normalizeStartAttemptItem)
+                    .sort(compareItemsByDisplayOrder)
+                : [];
             state.testTitle = result.title || result.test_title || 'OMR 입력';
             state.studentName = result.student_name || '';
 
@@ -1363,23 +1531,24 @@
             });
         }
 
-        function getMissingItemNos() {
+        function getMissingItems() {
             return state.activeItems
-                .map(item => String(item.item_no))
-                .filter(itemNo => {
-                    const v = state.answers[itemNo];
+                .filter(item => {
+                    const v = state.answers[String(item.item_no)];
                     return !v || String(v).trim() === '';
                 });
         }
 
         function confirmBeforeSubmit() {
-            const missing = getMissingItemNos();
-            if (!missing.length) {
+            const missingItems = getMissingItems();
+            if (!missingItems.length) {
                 return window.confirm(state.currentRound === 2 ? '수정 답안을 제출하시겠습니까?' : '답안을 제출하시겠습니까?');
             }
 
+            const missingReferences = missingItems.map(getItemReferenceText);
+
             return window.confirm(
-                `입력되지 않은 문항: ${missing.join(', ')}\n그래도 제출하시겠습니까?`
+                `입력되지 않은 문항: ${missingReferences.join(', ')}\n그래도 제출하시겠습니까?`
             );
         }
 
@@ -1529,8 +1698,15 @@
         function buildMockItems() {
             const items = [];
             for (let i = 1; i <= 25; i += 1) {
+                const sectionOrder = i <= 12 ? 1 : 2;
+                const displayItemNo = sectionOrder === 1 ? i : i - 12;
+
                 items.push({
                     item_no: i,
+                    display_item_no: forceSectionMock ? displayItemNo : i,
+                    section_order: forceSectionMock ? sectionOrder : 1,
+                    section_title: forceSectionMock ? `Level ${sectionOrder}` : null,
+                    display_order: i,
                     choice_count: i === 12 ? 2 : 5,
                     allows_multiple: false,
                     selected_answer: ''
@@ -1541,14 +1717,17 @@
 
         async function mockStartAttempt() {
             const items = buildMockItems();
+            const retryItemNos = forceRound2Mock ? ['2', '14', '18'] : [];
 
             return {
                 attempt_id: 'mock-attempt-001',
-                status: 'in_progress',
-                current_round: 1,
+                status: forceRound2Mock ? 'awaiting_retry' : 'in_progress',
+                current_round: forceRound2Mock ? 2 : 1,
                 total_items: items.length,
-                retry_item_nos: [],
-                title: '중3 과학 OMR 입력 테스트',
+                retry_item_nos: retryItemNos,
+                title: forceSectionMock
+                    ? '중3 과학 섹션 OMR 입력 테스트'
+                    : '중3 과학 OMR 입력 테스트',
                 student_name: '테스트학생',
                 items
             };

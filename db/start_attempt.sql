@@ -1,12 +1,27 @@
-﻿create or replace function auto_grading.start_attempt(
+-- ============================================================================
+-- start_attempt.sql / start_attempt_v2.sql
+--
+-- 학생 응시를 시작하거나 진행 중 응시를 복원한다.
+-- 두 파일은 같은 운영 함수 정의를 유지한다.
+--
+-- 문항 응답 계약:
+--   - item_no는 제출·채점에 사용하는 내부 불변 번호다.
+--   - display_item_no/section_order/section_title/display_order는 화면 전용이다.
+--   - 1차와 2차 모두 같은 표시 메타데이터를 반환한다.
+--   - 문항과 재풀이 번호는 display_order, item_no 순으로 정렬한다.
+-- ============================================================================
+
+begin;
+
+create or replace function auto_grading.start_attempt(
   p_assignment_id uuid,
   p_student_code text
 )
 returns jsonb
 language plpgsql
 security definer
-set search_path = auto_grading, public
-as $$
+set search_path to 'auto_grading', 'public'
+as $function$
 declare
   v_assignment           auto_grading.assignments%rowtype;
   v_student              auto_grading.students%rowtype;
@@ -18,58 +33,55 @@ declare
   v_message              text;
   v_should_lock          boolean := false;
   v_return_current_round integer;
+  v_course_is_active     boolean;
+  v_has_active_enrollment boolean;
 begin
   if p_assignment_id is null then
-    raise exception 'INVALID_ASSIGNMENT'
-      using errcode = 'P0001';
+    raise exception 'INVALID_ASSIGNMENT' using errcode = 'P0001';
   end if;
 
   if p_student_code is null or btrim(p_student_code) = '' then
-    raise exception 'INVALID_STUDENT_CODE'
-      using errcode = 'P0001';
+    raise exception 'INVALID_STUDENT_CODE' using errcode = 'P0001';
   end if;
 
   select a.*
-    into v_assignment
+  into v_assignment
   from auto_grading.assignments as a
   where a.id = p_assignment_id;
 
   if not found then
-    raise exception 'INVALID_ASSIGNMENT'
-      using errcode = 'P0001';
+    raise exception 'INVALID_ASSIGNMENT' using errcode = 'P0001';
   end if;
 
   select s.*
-    into v_student
+  into v_student
   from auto_grading.students as s
   where s.student_code = p_student_code;
 
   if not found then
-    raise exception 'STUDENT_NOT_FOUND'
-      using errcode = 'P0001';
+    raise exception 'STUDENT_NOT_FOUND' using errcode = 'P0001';
   end if;
 
   if v_assignment.student_id <> v_student.id then
-    raise exception 'WRONG_STUDENT'
-      using errcode = 'P0001';
+    raise exception 'WRONG_STUDENT' using errcode = 'P0001';
   end if;
 
   select ts.*
-    into v_test_set
+  into v_test_set
   from auto_grading.test_sets as ts
   where ts.id = v_assignment.test_set_id;
 
   if not found then
-    raise exception 'TEST_SET_NOT_FOUND'
-      using errcode = 'P0001';
+    raise exception 'TEST_SET_NOT_FOUND' using errcode = 'P0001';
   end if;
 
   /*
-    현재 학생+시험세트에 대한 최신 attempt 조회
-    기존 row가 있으면 FOR UPDATE로 잠금
+    현재 구조상 latest attempt 탐색은 기존 로직을 유지한다.
+    새 attempt에는 assignment_id/course_id/total_items를 반드시 저장한다.
+    과거 legacy attempt는 현재 assignment 기준으로 자동 보정하지 않는다.
   */
   select a.*
-    into v_attempt
+  into v_attempt
   from auto_grading.attempts as a
   where a.student_id = v_assignment.student_id
     and a.test_set_id = v_assignment.test_set_id
@@ -77,17 +89,52 @@ begin
   limit 1
   for update;
 
-  /*
-    최신 attempt가 없으면 새 attempt 생성
-    동시 요청 충돌 시 unique_violation을 잡고 최신 attempt를 다시 읽어옴
-  */
   if not found then
+    if v_assignment.closed_at is not null then
+      raise exception 'ASSIGNMENT_CLOSED' using errcode = 'P0001';
+    end if;
+
+    if v_assignment.course_id is null then
+      raise exception 'COURSE_REQUIRED' using errcode = 'P0001';
+    end if;
+
+    select c.is_active
+    into v_course_is_active
+    from auto_grading.courses as c
+    where c.id = v_assignment.course_id
+    for share;
+
+    if not found then
+      raise exception 'COURSE_NOT_FOUND' using errcode = 'P0001';
+    end if;
+
+    if not coalesce(v_course_is_active, false) then
+      raise exception 'COURSE_INACTIVE' using errcode = 'P0001';
+    end if;
+
+    select exists (
+      select 1
+      from auto_grading.student_courses as sc
+      where sc.student_id = v_assignment.student_id
+        and sc.course_id = v_assignment.course_id
+        and coalesce(sc.is_active, sc.ended_at is null)
+    )
+    into v_has_active_enrollment;
+
+    if not coalesce(v_has_active_enrollment, false) then
+      raise exception 'STUDENT_NOT_ENROLLED_IN_COURSE'
+        using errcode = 'P0001';
+    end if;
+
     v_next_attempt_no := 1;
 
     begin
       insert into auto_grading.attempts (
+        assignment_id,
+        course_id,
         student_id,
         test_set_id,
+        total_items,
         attempt_no,
         status,
         current_round,
@@ -95,20 +142,22 @@ begin
         final_score_percent
       )
       values (
+        v_assignment.id,
+        v_assignment.course_id,
         v_assignment.student_id,
         v_assignment.test_set_id,
+        v_test_set.total_items,
         v_next_attempt_no,
         'in_progress',
         1,
         0,
         0
       )
-      returning *
-      into v_attempt;
+      returning * into v_attempt;
     exception
       when unique_violation then
         select a.*
-          into v_attempt
+        into v_attempt
         from auto_grading.attempts as a
         where a.student_id = v_assignment.student_id
           and a.test_set_id = v_assignment.test_set_id
@@ -117,15 +166,10 @@ begin
         for update;
 
         if not found then
-          raise exception 'ATTEMPT_CREATE_FAILED'
-            using errcode = 'P0001';
+          raise exception 'ATTEMPT_CREATE_FAILED' using errcode = 'P0001';
         end if;
     end;
   end if;
-
-  /*
-    이하부터는 v_attempt의 실제 상태를 기준으로 공통 분기 처리
-  */
 
   if v_attempt.status in ('completed', 'needs_review') then
     v_should_lock := true;
@@ -140,34 +184,39 @@ begin
     v_message := '틀린 문항만 다시 입력하세요.';
 
     select coalesce(
-             array_agg(ti.item_no order by ti.item_no),
-             '{}'::integer[]
-           )
-      into v_retry_item_nos
+      array_agg(
+        ti.item_no
+        order by ti.display_order, ti.item_no
+      ),
+      '{}'::integer[]
+    )
+    into v_retry_item_nos
     from auto_grading.responses as r
-    join auto_grading.test_items as ti
-      on ti.id = r.test_item_id
+    join auto_grading.test_items as ti on ti.id = r.test_item_id
     where r.attempt_id = v_attempt.id
       and r.round_no = 1
       and r.is_correct = false
       and ti.test_set_id = v_test_set.id;
 
-    /*
-      정책: round2 복구 시 이전 오답은 보이지 않도록 selected_answer는 빈 문자열
-    */
+    -- 2차에서도 전체 메타데이터를 반환한다. 화면은 retry_item_nos로 오답만 추린다.
     select coalesce(
-             jsonb_agg(
-               jsonb_build_object(
-                 'item_no', ti.item_no,
-                 'choice_count', ti.choice_count,
-                 'allows_multiple', position('|' in coalesce(ti.answer_key_normalized, '')) > 0,
-                 'selected_answer', ''
-               )
-               order by ti.item_no
-             ),
-             '[]'::jsonb
-           )
-      into v_items_json
+      jsonb_agg(
+        jsonb_build_object(
+          'item_no', ti.item_no,
+          'display_item_no', ti.display_item_no,
+          'section_order', ti.section_order,
+          'section_title', ti.section_title,
+          'display_order', ti.display_order,
+          'choice_count', ti.choice_count,
+          'allows_multiple',
+            position('|' in coalesce(ti.answer_key_normalized, '')) > 0,
+          'selected_answer', ''
+        )
+        order by ti.display_order, ti.item_no
+      ),
+      '[]'::jsonb
+    )
+    into v_items_json
     from auto_grading.test_items as ti
     where ti.test_set_id = v_test_set.id;
 
@@ -181,22 +230,25 @@ begin
     end;
     v_retry_item_nos := '{}'::integer[];
 
-    /*
-      정책: round1 진행 중 복구 시 저장된 답안은 selected_answer로 복원
-    */
+    -- 1차 진행 중 복구 시 저장된 답안과 전체 표시 메타데이터를 반환한다.
     select coalesce(
-             jsonb_agg(
-               jsonb_build_object(
-                 'item_no', ti.item_no,
-                 'choice_count', ti.choice_count,
-                 'allows_multiple', position('|' in coalesce(ti.answer_key_normalized, '')) > 0,
-                 'selected_answer', coalesce(r.selected_answer_raw, '')
-               )
-               order by ti.item_no
-             ),
-             '[]'::jsonb
-           )
-      into v_items_json
+      jsonb_agg(
+        jsonb_build_object(
+          'item_no', ti.item_no,
+          'display_item_no', ti.display_item_no,
+          'section_order', ti.section_order,
+          'section_title', ti.section_title,
+          'display_order', ti.display_order,
+          'choice_count', ti.choice_count,
+          'allows_multiple',
+            position('|' in coalesce(ti.answer_key_normalized, '')) > 0,
+          'selected_answer', coalesce(r.selected_answer_raw, '')
+        )
+        order by ti.display_order, ti.item_no
+      ),
+      '[]'::jsonb
+    )
+    into v_items_json
     from auto_grading.test_items as ti
     left join auto_grading.responses as r
       on r.attempt_id = v_attempt.id
@@ -211,6 +263,8 @@ begin
 
   return jsonb_build_object(
     'attempt_id', v_attempt.id,
+    'assignment_id', v_attempt.assignment_id,
+    'course_id', v_attempt.course_id,
     'student_id', v_student.id,
     'student_name', v_student.name,
     'test_set_id', v_test_set.id,
@@ -221,9 +275,11 @@ begin
     'final_score_percent', coalesce(v_attempt.final_score_percent, 0),
     'message', v_message,
     'should_lock', v_should_lock,
-    'total_items', v_test_set.total_items,
+    'total_items', coalesce(v_attempt.total_items, v_test_set.total_items),
     'retry_item_nos', to_jsonb(v_retry_item_nos),
     'items', v_items_json
   );
 end;
-$$;
+$function$;
+
+commit;

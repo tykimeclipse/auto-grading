@@ -407,6 +407,12 @@
                 <div class="pill">선택 컬럼: topic_tag</div>
                 <div class="pill">선택 컬럼: note</div>
               </div>
+              <div class="hint" style="margin-top: 10px">
+                섹션 제목을 사용하려면 item_no 칸에 제목을 적고 나머지 칸은
+                비워 주세요. 각 섹션의 첫 문항은 1번이어야 하며, 제목 없는
+                기존 CSV도 그대로 사용할 수 있습니다. 숫자만 입력한 제목은
+                문항번호로 인식되므로 제목에는 문자를 포함해 주세요.
+              </div>
               <div style="margin-top: 14px">
                 <input id="csvFile" type="file" accept=".csv,text/csv" />
               </div>
@@ -517,9 +523,53 @@
         units: [],
         csvRows: [],
         csvFileName: "",
+        csvSectionCount: 0,
+        csvUsesSections: false,
+        csvWarnings: [],
         unitSyncLock: false,
         mode: "register", // "register" | "search" | "edit"
         foundTestSet: null, // 검색으로 찾은 test_set 데이터
+      };
+
+      // DB chk_test_items_section_title 및 create_test_set_from_json과
+      // 반드시 같은 값으로 유지한다.
+      const SECTION_TITLE_MAX_CHARACTERS = 120;
+      // DB chk_test_items_choice_count 및 create_test_set_from_json과
+      // 반드시 같은 값으로 유지한다.
+      const MIN_CHOICE_COUNT = 2;
+      const MAX_CHOICE_COUNT = 20;
+
+      const DB_ERROR_MESSAGES = {
+        P_ITEMS_ROWS_MUST_BE_OBJECTS:
+          "문항 데이터 형식이 올바르지 않습니다. CSV를 다시 검증해 주세요.",
+        P_ITEMS_REQUIRED_FIELDS_MISSING:
+          "문항번호 또는 정답이 비어 있는 행이 있습니다.",
+        P_ITEMS_ITEM_NO_INVALID:
+          "내부 문항번호가 올바른 양의 정수가 아닙니다.",
+        P_ITEMS_DISPLAY_METADATA_INVALID:
+          "표시번호, 섹션 순서 또는 출력순서가 올바른 양의 정수가 아닙니다.",
+        P_ITEMS_CHOICE_COUNT_INVALID:
+          "선택지 수는 2~20 사이의 정수여야 합니다.",
+        P_ITEMS_SECTION_TITLE_INVALID:
+          "섹션 제목은 앞뒤 공백을 제외하고 120자 이하여야 합니다.",
+        P_ITEMS_ITEM_NO_DUPLICATE:
+          "문제지 안에서 내부 문항번호가 중복되었습니다.",
+        P_ITEMS_SECTION_DISPLAY_ITEM_NO_DUPLICATE:
+          "같은 섹션 안에서 표시 문항번호가 중복되었습니다.",
+        P_ITEMS_DISPLAY_ORDER_DUPLICATE:
+          "문제지 안에서 출력순서가 중복되었습니다.",
+        SECTION_FIRST_DISPLAY_ITEM_NO_INVALID:
+          "각 섹션의 첫 문항번호는 1이어야 합니다.",
+        chk_test_items_answer_key_normalized_not_empty:
+          "정답 형식을 인식할 수 없는 문항이 있습니다. 정답은 숫자로 입력하고, 복수정답은 | 또는 쉼표로 구분해 주세요.",
+        TEST_ITEM_SECTION_TITLE_MODE_MISMATCH:
+          "한 문제지에서 섹션 제목이 있는 문항과 없는 문항을 섞을 수 없습니다.",
+        UNTITLED_TEST_ITEM_SECTION_ORDER_INVALID:
+          "제목 없는 문제지는 하나의 기본 섹션으로만 등록할 수 있습니다.",
+        TEST_ITEM_SECTION_TITLE_MISMATCH:
+          "같은 섹션에 서로 다른 제목이 지정되었습니다. CSV 제목 행을 확인해 주세요.",
+        TEST_ITEM_IDENTITY_IMMUTABLE:
+          "이미 생성된 문항의 내부번호나 소속 문제지는 변경할 수 없습니다.",
       };
 
       const UNIT_LEVEL_LABELS = {
@@ -543,14 +593,25 @@
       }
 
       function normalizeError(err) {
-        if (!err) return "알 수 없는 오류가 발생했습니다.";
-        if (typeof err === "string") return err;
-        if (err.message) return err.message;
-        try {
-          return JSON.stringify(err, null, 2);
-        } catch (_) {
-          return "알 수 없는 오류가 발생했습니다.";
+        let message = "";
+        if (!err) {
+          message = "알 수 없는 오류가 발생했습니다.";
+        } else if (typeof err === "string") {
+          message = err;
+        } else if (err.message) {
+          message = err.message;
+        } else {
+          try {
+            message = JSON.stringify(err, null, 2);
+          } catch (_) {
+            message = "알 수 없는 오류가 발생했습니다.";
+          }
         }
+
+        for (const [code, localized] of Object.entries(DB_ERROR_MESSAGES)) {
+          if (message.includes(code)) return localized;
+        }
+        return message;
       }
 
       function escapeHtml(value) {
@@ -910,10 +971,234 @@
         $("summarySource").textContent = getSourceLabel() || "-";
         $("summarySubmittedTitle").textContent = buildSummaryRegistrationKey();
         const file = $("csvFile").files[0];
+        const warningSummary = state.csvWarnings.length
+          ? `, 확인 필요 ${state.csvWarnings.length}건`
+          : "";
         $("summaryCsv").textContent = file
-          ? `${file.name} (${state.csvRows.length || "검증 전"}문항)`
+          ? `${file.name} (${formatCsvItemSummary(
+              state.csvRows.length,
+              state.csvSectionCount,
+              state.csvUsesSections,
+              "검증 전",
+            )}${warningSummary})`
           : "파일 미선택";
       }
+
+      function countCharacters(value) {
+        return [...String(value ?? "")].length;
+      }
+
+      function formatCsvItemSummary(
+        itemCount,
+        sectionCount,
+        usesSections,
+        emptyLabel = "0문항",
+      ) {
+        if (!itemCount) return emptyLabel;
+        return usesSections
+          ? `${sectionCount}개 섹션, ${itemCount}문항`
+          : `${itemCount}문항`;
+      }
+
+      // CSV_PARSE_HELPERS_START
+      function parseCsvRows(rawRows, parserErrors = []) {
+        const errors = (parserErrors || []).map((error) => {
+          const lineNo = Number.isInteger(error?.row) ? error.row + 2 : null;
+          const prefix = lineNo ? `${lineNo}행: ` : "";
+          return `${prefix}CSV 형식 오류: ${error?.message || "파싱 실패"}`;
+        });
+
+        const normalized = (rawRows || [])
+          .map((row, index) => ({
+            source_line_no: index + 2,
+            item_no: String(row.item_no ?? "").trim(),
+            answer_key: String(row.answer_key ?? "").trim(),
+            choice_count: String(row.choice_count ?? "").trim(),
+            topic_tag: String(row.topic_tag ?? "").trim(),
+            note: String(row.note ?? "").trim(),
+          }))
+          .filter(
+            (row) =>
+              row.item_no ||
+              row.answer_key ||
+              row.choice_count ||
+              row.topic_tag ||
+              row.note,
+          );
+
+        if (!normalized.length) {
+          throw new Error("CSV에 데이터가 없습니다.");
+        }
+
+        const isDigits = (value) => /^\d+$/.test(value);
+        const isPositiveInteger = (value) => {
+          const number = Number(value);
+          return (
+            isDigits(value) &&
+            Number.isSafeInteger(number) &&
+            number >= 1 &&
+            number <= 2147483647
+          );
+        };
+        const hasSections = normalized.some(
+          (row) => row.item_no && !isDigits(row.item_no),
+        );
+        const titleRowSummaries = normalized
+          .filter((row) => row.item_no && !isDigits(row.item_no))
+          .map((row) => `${row.source_line_no}행 "${row.item_no}"`);
+
+        const items = [];
+        const warnings = [];
+        let sectionCount = 0;
+        let currentSectionOrder = hasSections ? 0 : 1;
+        let currentSectionTitle = null;
+        let currentSectionHasItems = false;
+        let seenDisplayItemNos = new Set();
+        let prevDisplayItemNo = null;
+
+        normalized.forEach((row) => {
+          const lineNo = row.source_line_no;
+
+          if (!row.item_no) {
+            errors.push(`${lineNo}행: item_no가 비어 있습니다.`);
+            return;
+          }
+
+          const isTitleRow = !isDigits(row.item_no);
+          if (isTitleRow) {
+            const populatedNonTitleFields = [
+              ["choice_count", row.choice_count],
+              ["answer_key", row.answer_key],
+              ["topic_tag", row.topic_tag],
+              ["note", row.note],
+            ]
+              .filter(([, value]) => Boolean(value))
+              .map(([name]) => name);
+
+            if (populatedNonTitleFields.length) {
+              errors.push(
+                `${lineNo}행: 제목 행은 item_no 외의 칸을 모두 비워야 합니다. ` +
+                  `입력된 칸: ${populatedNonTitleFields.join(", ")}`,
+              );
+            }
+            if (countCharacters(row.item_no) > SECTION_TITLE_MAX_CHARACTERS) {
+              errors.push(
+                `${lineNo}행: 섹션 제목은 ${SECTION_TITLE_MAX_CHARACTERS}자 이하여야 합니다.`,
+              );
+            }
+            if (currentSectionOrder > 0 && !currentSectionHasItems) {
+              errors.push(
+                `${lineNo}행: 이전 섹션 "${currentSectionTitle}"에 문항이 없습니다.`,
+              );
+            }
+
+            sectionCount += 1;
+            currentSectionOrder = sectionCount;
+            currentSectionTitle = row.item_no;
+            currentSectionHasItems = false;
+            seenDisplayItemNos = new Set();
+            prevDisplayItemNo = null;
+            return;
+          }
+
+          const displayItemNo = Number(row.item_no);
+          const displayItemNoIsValid = isPositiveInteger(row.item_no);
+          if (!displayItemNoIsValid) {
+            errors.push(
+              `${lineNo}행: item_no는 1~2147483647 범위의 정수여야 합니다.`,
+            );
+          }
+          if (hasSections && currentSectionOrder === 0) {
+            errors.push(
+              `${lineNo}행: 섹션 제목을 사용하는 CSV는 첫 문항 전에 제목 행이 필요합니다.`,
+            );
+          }
+          if (
+            hasSections &&
+            currentSectionOrder > 0 &&
+            !currentSectionHasItems &&
+            displayItemNo !== 1
+          ) {
+            errors.push(
+              `${lineNo}행: 섹션 "${currentSectionTitle}"의 첫 문항번호는 1이어야 합니다.`,
+            );
+          }
+          if (seenDisplayItemNos.has(displayItemNo)) {
+            const scope = hasSections
+              ? `섹션 "${currentSectionTitle}"`
+              : "CSV";
+            errors.push(
+              `${lineNo}행: ${scope} 안에서 item_no가 중복되었습니다. (${row.item_no})`,
+            );
+          }
+          if (
+            displayItemNoIsValid &&
+            prevDisplayItemNo !== null &&
+            displayItemNo < prevDisplayItemNo
+          ) {
+            warnings.push(
+              `${lineNo}행: 표시번호가 이전 문항(${prevDisplayItemNo})보다 작습니다. ` +
+                `CSV 순서대로 ${displayItemNo}번이 표시됩니다.`,
+            );
+          }
+          if (!row.answer_key) {
+            errors.push(`${lineNo}행: answer_key가 비어 있습니다.`);
+          }
+          if (row.choice_count && !isDigits(row.choice_count)) {
+            errors.push(`${lineNo}행: choice_count는 숫자만 입력해야 합니다.`);
+          } else if (
+            row.choice_count &&
+            (Number(row.choice_count) < MIN_CHOICE_COUNT ||
+              Number(row.choice_count) > MAX_CHOICE_COUNT)
+          ) {
+            errors.push(
+              `${lineNo}행: choice_count는 ${MIN_CHOICE_COUNT}~${MAX_CHOICE_COUNT}이어야 합니다.`,
+            );
+          }
+
+          seenDisplayItemNos.add(displayItemNo);
+          if (displayItemNoIsValid) prevDisplayItemNo = displayItemNo;
+          currentSectionHasItems = true;
+
+          const internalItemNo = items.length + 1;
+          items.push({
+            item_no: internalItemNo,
+            display_item_no: displayItemNo,
+            section_order: hasSections ? currentSectionOrder : 1,
+            section_title: hasSections ? currentSectionTitle : null,
+            display_order: internalItemNo,
+            answer_key: row.answer_key,
+            choice_count: row.choice_count
+              ? Number(row.choice_count)
+              : null,
+            topic_tag: row.topic_tag || null,
+            note: row.note || null,
+            source_line_no: lineNo,
+          });
+        });
+
+        if (hasSections && currentSectionOrder > 0 && !currentSectionHasItems) {
+          errors.push(
+            `마지막 섹션 "${currentSectionTitle}" 뒤에 문항이 없습니다.`,
+          );
+        }
+        if (errors.length) {
+          if (hasSections) {
+            errors.unshift(
+              `섹션 제목으로 인식된 행: ${titleRowSummaries.join(", ")}`,
+            );
+          }
+          throw new Error(errors.join("\n"));
+        }
+
+        return {
+          items,
+          hasSections,
+          sectionCount: hasSections ? sectionCount : 0,
+          warnings,
+        };
+      }
+      // CSV_PARSE_HELPERS_END
 
       async function parseCsvFile() {
         const file = $("csvFile").files[0];
@@ -921,16 +1206,11 @@
         return new Promise((resolve, reject) => {
           Papa.parse(file, {
             header: true,
-            skipEmptyLines: true,
+            // 빈 행도 data에 남겨 실제 파일 행번호와 오류 행번호를 일치시킨다.
+            skipEmptyLines: false,
+            transformHeader: (header) => String(header ?? "").trim(),
             complete: (results) => {
-              const rows = results.data || [];
-              if (!rows.length) {
-                reject(new Error("CSV에 데이터가 없습니다."));
-                return;
-              }
-              const headers = Object.keys(rows[0] || {}).map((key) =>
-                key.trim(),
-              );
+              const headers = results.meta?.fields || [];
               if (
                 !headers.includes("item_no") ||
                 !headers.includes("answer_key")
@@ -938,47 +1218,11 @@
                 reject(new Error("필수 컬럼(item_no, answer_key)이 없습니다."));
                 return;
               }
-              const normalized = rows
-                .map((row) => ({
-                  item_no: String(row.item_no ?? "").trim(),
-                  answer_key: String(row.answer_key ?? "").trim(),
-                  choice_count: String(row.choice_count ?? "").trim(),
-                  topic_tag: String(row.topic_tag ?? "").trim(),
-                  note: String(row.note ?? "").trim(),
-                }))
-                .filter(
-                  (row) =>
-                    row.item_no ||
-                    row.answer_key ||
-                    row.choice_count ||
-                    row.topic_tag ||
-                    row.note,
-                );
-
-              const errors = [];
-              const seen = new Set();
-              normalized.forEach((row, idx) => {
-                const lineNo = idx + 2;
-                if (!row.item_no) errors.push(`${lineNo}행: item_no 비어 있음`);
-                if (row.item_no && !/^\d+$/.test(row.item_no))
-                  errors.push(`${lineNo}행: item_no는 숫자만 가능`);
-                if (row.item_no && seen.has(row.item_no))
-                  errors.push(`${lineNo}행: item_no 중복 (${row.item_no})`);
-                if (row.item_no) seen.add(row.item_no);
-                if (!row.answer_key)
-                  errors.push(`${lineNo}행: answer_key 비어 있음`);
-                if (row.choice_count && !/^\d+$/.test(row.choice_count))
-                  errors.push(`${lineNo}행: choice_count는 숫자만 가능`);
-              });
-              if (errors.length) {
-                reject(new Error(errors.join("\n")));
-                return;
+              try {
+                resolve(parseCsvRows(results.data, results.errors));
+              } catch (err) {
+                reject(err);
               }
-              resolve(
-                normalized.sort(
-                  (a, b) => Number(a.item_no) - Number(b.item_no),
-                ),
-              );
             },
             error: (err) => reject(err),
           });
@@ -986,11 +1230,14 @@
       }
 
       async function validateCsvOnly() {
-        const rows = await parseCsvFile();
-        state.csvRows = rows;
+        const parsed = await parseCsvFile();
+        state.csvRows = parsed.items;
         state.csvFileName = $("csvFile").files[0]?.name || "";
+        state.csvSectionCount = parsed.sectionCount;
+        state.csvUsesSections = parsed.hasSections;
+        state.csvWarnings = parsed.warnings;
         updateSummary();
-        return rows;
+        return parsed;
       }
 
       function buildRpcPayload() {
@@ -1023,18 +1270,22 @@
           p_unit_code: unitCode,
           p_source_category: sourceCategory,
           p_items: state.csvRows.map((row) => ({
-            item_no: Number(row.item_no),
+            item_no: row.item_no,
+            display_item_no: row.display_item_no,
+            section_order: row.section_order,
+            section_title: row.section_title,
+            display_order: row.display_order,
             answer_key: row.answer_key,
-            choice_count: row.choice_count ? Number(row.choice_count) : null,
-            topic_tag: row.topic_tag || null,
-            note: row.note || null,
+            choice_count: row.choice_count,
+            topic_tag: row.topic_tag,
+            note: row.note,
           })),
         };
       }
 
       async function uploadTestSet() {
         try {
-          const rows = await validateCsvOnly();
+          const parsed = await validateCsvOnly();
           const payload = buildRpcPayload();
           const btn = $("uploadBtn");
           const prev = btn.textContent;
@@ -1045,7 +1296,18 @@
             .schema("auto_grading")
             .rpc("create_test_set_from_json", payload);
           if (error) throw error;
-          const parts = ["문제지 등록 완료", `문항 수: ${rows.length}문항`];
+          const parts = [
+            "문제지 등록 완료",
+            `문항 수: ${formatCsvItemSummary(
+              parsed.items.length,
+              parsed.sectionCount,
+              parsed.hasSections,
+            )}`,
+          ];
+          if (parsed.warnings.length) {
+            parts.push(`확인 필요: ${parsed.warnings.length}건`);
+            parts.push(...parsed.warnings);
+          }
           if (data && typeof data === "object") {
             if (data.test_set_id)
               parts.push(`test_set_id: ${data.test_set_id}`);
@@ -1074,6 +1336,9 @@
         $("csvFile").value = "";
         state.csvRows = [];
         state.csvFileName = "";
+        state.csvSectionCount = 0;
+        state.csvUsesSections = false;
+        state.csvWarnings = [];
         setStatus("", "info");
         if (state.units.length) {
           refreshSubjectOptionsFromUnits();
@@ -1353,10 +1618,25 @@
         $("nanoUnit").addEventListener("change", syncUnitCodeFromSelectors);
         $("csvFile").addEventListener("change", async () => {
           try {
-            const rows = await validateCsvOnly();
-            setStatus(`CSV 검증 완료: ${rows.length}문항`, "ok");
+            const parsed = await validateCsvOnly();
+            setStatus(
+              `CSV 검증 완료: ${formatCsvItemSummary(
+                parsed.items.length,
+                parsed.sectionCount,
+                parsed.hasSections,
+              )}${
+                parsed.warnings.length
+                  ? ` (확인 필요 ${parsed.warnings.length}건)\n${parsed.warnings.join("\n")}`
+                  : ""
+              }`,
+              "ok",
+            );
           } catch (err) {
             state.csvRows = [];
+            state.csvFileName = "";
+            state.csvSectionCount = 0;
+            state.csvUsesSections = false;
+            state.csvWarnings = [];
             setStatus(normalizeError(err), "error");
           }
           updateSummary();

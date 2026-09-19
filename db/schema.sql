@@ -112,6 +112,10 @@ create table if not exists auto_grading.test_items (
   id uuid primary key default gen_random_uuid(),
   test_set_id uuid not null references auto_grading.test_sets(id) on delete cascade,
   item_no integer not null,
+  display_item_no integer not null,
+  section_order integer not null,
+  section_title text,
+  display_order integer not null,
   choice_count integer not null default 5,
   answer_key_raw text not null,
   answer_key_normalized text not null,
@@ -121,10 +125,37 @@ create table if not exists auto_grading.test_items (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint uq_test_items_test_set_item_no unique (test_set_id, item_no),
+  constraint uq_test_items_test_set_section_display_item_no
+    unique (test_set_id, section_order, display_item_no),
+  constraint uq_test_items_test_set_display_order
+    unique (test_set_id, display_order),
   constraint chk_test_items_item_no check (item_no > 0),
+  constraint chk_test_items_display_item_no check (display_item_no > 0),
+  constraint chk_test_items_section_order check (section_order > 0),
+  constraint chk_test_items_section_title check (
+    section_title is null
+    or (
+      section_title = btrim(section_title)
+      and char_length(section_title) between 1 and 120
+    )
+  ),
+  constraint chk_test_items_untitled_section_order
+    check (section_title is not null or section_order = 1),
+  constraint chk_test_items_display_order check (display_order > 0),
   constraint chk_test_items_choice_count check (choice_count >= 2 and choice_count <= 20),
   constraint chk_test_items_answer_key_normalized_not_empty check (answer_key_normalized <> '')
 );
+
+comment on column auto_grading.test_items.item_no is
+  '제출·채점·재풀이 API가 사용하는 시험지 내부 불변 문항번호. 표시번호와 구분한다.';
+comment on column auto_grading.test_items.display_item_no is
+  '학생에게 표시하는 섹션 내부 문항번호. 같은 번호는 다른 섹션에서 반복할 수 있다.';
+comment on column auto_grading.test_items.section_order is
+  '시험지 안의 섹션 출력 순서. 제목 없는 시험지는 1이다.';
+comment on column auto_grading.test_items.section_title is
+  'CSV 제목 행에서 가져온 섹션 제목. 제목 없는 시험지는 NULL, 최대 120자.';
+comment on column auto_grading.test_items.display_order is
+  '시험지 전체 문항 출력 순서. 시험지 안에서 유일하며, item_no가 불변이므로 향후 문항 재배치는 이 값만 변경한다.';
 
 drop trigger if exists trg_test_items_updated_at on auto_grading.test_items;
 create trigger trg_test_items_updated_at
@@ -278,8 +309,103 @@ create index if not exists idx_student_public_links_student_active
   on auto_grading.student_public_links(student_id, is_active);
 
 -- =========================================================
--- 10. test_items 정답 정규화 trigger
+-- 10. test_items 표시 메타데이터·내부 식별자·정답 정규화 trigger
 -- =========================================================
+create or replace function auto_grading.trg_test_items_prepare_display_metadata()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'auto_grading', 'public'
+as $$
+begin
+  -- item_no는 제출·재풀이 API의 내부 키다. 이 함수는 item_no를 절대
+  -- 대입하거나 재번호하지 않고, 표시용 메타데이터만 보충한다.
+  if tg_op = 'INSERT' then
+    new.display_item_no := coalesce(new.display_item_no, new.item_no);
+    new.section_order := coalesce(new.section_order, 1);
+    new.display_order := coalesce(new.display_order, new.item_no);
+  end if;
+
+  new.section_title := nullif(btrim(new.section_title), '');
+
+  if new.section_title is null and new.section_order <> 1 then
+    raise exception 'UNTITLED_TEST_ITEM_SECTION_ORDER_INVALID';
+  end if;
+
+  perform 1
+  from auto_grading.test_sets ts
+  where ts.id = new.test_set_id
+  for update;
+
+  if exists (
+    select 1
+    from auto_grading.test_items ti
+    where ti.test_set_id = new.test_set_id
+      and ti.id is distinct from new.id
+      and (ti.section_title is null)
+        is distinct from (new.section_title is null)
+  ) then
+    raise exception 'TEST_ITEM_SECTION_TITLE_MODE_MISMATCH';
+  end if;
+
+  if exists (
+    select 1
+    from auto_grading.test_items ti
+    where ti.test_set_id = new.test_set_id
+      and ti.id is distinct from new.id
+      and ti.section_order = new.section_order
+      and ti.section_title is distinct from new.section_title
+  ) then
+    raise exception 'TEST_ITEM_SECTION_TITLE_MISMATCH';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_test_items_prepare_display_metadata
+  on auto_grading.test_items;
+create trigger trg_test_items_prepare_display_metadata
+before insert or update of
+  test_set_id,
+  display_item_no,
+  section_order,
+  section_title,
+  display_order
+on auto_grading.test_items
+for each row
+execute function auto_grading.trg_test_items_prepare_display_metadata();
+
+revoke execute on function auto_grading.trg_test_items_prepare_display_metadata()
+  from public, anon, authenticated, service_role;
+
+create or replace function auto_grading.trg_test_items_protect_identity()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'auto_grading', 'public'
+as $$
+begin
+  if new.test_set_id is distinct from old.test_set_id
+     or new.item_no is distinct from old.item_no then
+    raise exception 'TEST_ITEM_IDENTITY_IMMUTABLE';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_test_items_protect_identity
+  on auto_grading.test_items;
+create trigger trg_test_items_protect_identity
+before update of test_set_id, item_no
+on auto_grading.test_items
+for each row
+execute function auto_grading.trg_test_items_protect_identity();
+
+revoke execute on function auto_grading.trg_test_items_protect_identity()
+  from public, anon, authenticated, service_role;
+
 create or replace function auto_grading.set_test_item_answer_key_normalized()
 returns trigger
 language plpgsql
