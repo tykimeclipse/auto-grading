@@ -1002,13 +1002,37 @@
 
       // CSV_PARSE_HELPERS_START
       function parseCsvRows(rawRows, parserErrors = []) {
-        const errors = (parserErrors || []).map((error) => {
-          const lineNo = Number.isInteger(error?.row) ? error.row + 2 : null;
-          const prefix = lineNo ? `${lineNo}행: ` : "";
-          return `${prefix}CSV 형식 오류: ${error?.message || "파싱 실패"}`;
-        });
+        const rows = rawRows || [];
+        const isBlankRawRow = (row) => {
+          if (!row || typeof row !== "object") return false;
+          const values = Object.values(row);
+          return (
+            values.length > 0 &&
+            values.every((value) =>
+              Array.isArray(value)
+                ? value.every((entry) => String(entry ?? "").trim() === "")
+                : String(value ?? "").trim() === "",
+            )
+          );
+        };
+        const errors = (parserErrors || [])
+          // skipEmptyLines:false는 실제 파일 행번호를 보존하지만, 완전히 빈 행에는
+          // Papa Parse가 TooFewFields를 붙인다. 빈 행만 제외하고 실제 형식 오류는 유지한다.
+          .filter(
+            (error) =>
+              !(
+                error?.code === "TooFewFields" &&
+                Number.isInteger(error?.row) &&
+                isBlankRawRow(rows[error.row])
+              ),
+          )
+          .map((error) => {
+            const lineNo = Number.isInteger(error?.row) ? error.row + 2 : null;
+            const prefix = lineNo ? `${lineNo}행: ` : "";
+            return `${prefix}CSV 형식 오류: ${error?.message || "파싱 실패"}`;
+          });
 
-        const normalized = (rawRows || [])
+        const normalized = rows
           .map((row, index) => ({
             source_line_no: index + 2,
             item_no: String(row.item_no ?? "").trim(),
