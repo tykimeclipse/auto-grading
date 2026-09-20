@@ -515,72 +515,78 @@ begin
     from auto_grading.attempts at
     where at.student_id = v_student_id
   ),
+  enrollment_activity as (
+    select
+      sc.course_id,
+      true as has_enrollment_history,
+      bool_or(coalesce(sc.is_active, sc.ended_at is null)) as enrollment_is_active,
+      max(coalesce(sc.joined_at, sc.created_at)) as last_enrollment_at,
+      max(coalesce(sc.ended_at, sc.joined_at, sc.created_at)) as legacy_enrollment_activity_at
+    from auto_grading.student_courses sc
+    where sc.student_id = v_student_id
+    group by sc.course_id
+  ),
+  assignment_activity as (
+    select
+      a.course_id,
+      count(*)::integer as assignment_count,
+      max(coalesce(a.assigned_at, a.created_at)) as last_assignment_activity_at,
+      max(coalesce(a.updated_at, a.assigned_at, a.created_at)) as legacy_assignment_activity_at
+    from auto_grading.assignments a
+    where a.student_id = v_student_id
+    group by a.course_id
+  ),
+  attempt_activity as (
+    select
+      at.course_id,
+      count(*)::integer as attempt_count,
+      count(*) filter (
+        where at.status in ('completed', 'needs_review')
+      )::integer as achievement_attempt_count,
+      max(coalesce(
+        at.completed_at,
+        at.round2_submitted_at,
+        at.round1_submitted_at,
+        at.updated_at,
+        at.started_at
+      )) filter (
+        where at.status in ('completed', 'needs_review')
+      ) as last_attempt_activity_at,
+      max(coalesce(
+        at.completed_at,
+        at.round2_submitted_at,
+        at.round1_submitted_at,
+        at.updated_at,
+        at.started_at
+      )) as legacy_attempt_activity_at
+    from auto_grading.attempts at
+    where at.student_id = v_student_id
+    group by at.course_id
+  ),
   course_rows as (
     select
       ck.course_id,
       coalesce(c.course_name, '강좌 미지정 과거 기록') as course_name,
       coalesce(c.is_active, false) as course_is_active,
       ck.course_id is null as is_unassigned,
-      exists (
-        select 1
-        from auto_grading.student_courses sc
-        where sc.student_id = v_student_id
-          and sc.course_id is not distinct from ck.course_id
-      ) as has_enrollment_history,
-      exists (
-        select 1
-        from auto_grading.student_courses sc
-        where sc.student_id = v_student_id
-          and sc.course_id is not distinct from ck.course_id
-          and coalesce(sc.is_active, sc.ended_at is null)
-      ) as enrollment_is_active,
-      (
-        select count(*)::integer
-        from auto_grading.assignments a
-        where a.student_id = v_student_id
-          and a.course_id is not distinct from ck.course_id
-      ) as assignment_count,
-      (
-        select count(*)::integer
-        from auto_grading.attempts at
-        where at.student_id = v_student_id
-          and at.course_id is not distinct from ck.course_id
-      ) as attempt_count,
-      (
-        select count(*)::integer
-        from auto_grading.attempts at
-        where at.student_id = v_student_id
-          and at.course_id is not distinct from ck.course_id
-          and at.status in ('completed', 'needs_review')
-      ) as achievement_attempt_count,
+      coalesce(ea.has_enrollment_history, false) as has_enrollment_history,
+      coalesce(ea.enrollment_is_active, false) as enrollment_is_active,
+      coalesce(aa.assignment_count, 0) as assignment_count,
+      coalesce(ta.attempt_count, 0) as attempt_count,
+      coalesce(ta.achievement_attempt_count, 0) as achievement_attempt_count,
+      ea.last_enrollment_at,
+      aa.last_assignment_activity_at,
+      ta.last_attempt_activity_at,
       greatest(
-        (
-          select max(coalesce(sc.ended_at, sc.joined_at, sc.created_at))
-          from auto_grading.student_courses sc
-          where sc.student_id = v_student_id
-            and sc.course_id is not distinct from ck.course_id
-        ),
-        (
-          select max(coalesce(a.updated_at, a.assigned_at, a.created_at))
-          from auto_grading.assignments a
-          where a.student_id = v_student_id
-            and a.course_id is not distinct from ck.course_id
-        ),
-        (
-          select max(coalesce(
-            at.completed_at,
-            at.round2_submitted_at,
-            at.round1_submitted_at,
-            at.updated_at,
-            at.started_at
-          ))
-          from auto_grading.attempts at
-          where at.student_id = v_student_id
-            and at.course_id is not distinct from ck.course_id
-        )
+        ea.legacy_enrollment_activity_at,
+        aa.legacy_assignment_activity_at,
+        ta.legacy_attempt_activity_at
       ) as last_activity_at
     from course_keys ck
     left join auto_grading.courses c on c.id = ck.course_id
+    left join enrollment_activity ea on ea.course_id is not distinct from ck.course_id
+    left join assignment_activity aa on aa.course_id is not distinct from ck.course_id
+    left join attempt_activity ta on ta.course_id is not distinct from ck.course_id
   )
   select coalesce(
     jsonb_agg(
@@ -588,7 +594,9 @@ begin
       order by
         cr.enrollment_is_active desc,
         cr.course_is_active desc,
-        cr.last_activity_at desc nulls last,
+        cr.last_attempt_activity_at desc nulls last,
+        cr.last_assignment_activity_at desc nulls last,
+        cr.last_enrollment_at desc nulls last,
         cr.course_name,
         cr.course_id
     ),

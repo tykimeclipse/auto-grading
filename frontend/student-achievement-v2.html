@@ -237,7 +237,7 @@
               <option value="all">전체 누적</option>
             </select>
           </div>
-          <div id="scopeStatus" class="scope-status">전체 강좌의 누적 성취도입니다.</div>
+          <div id="scopeStatus" class="scope-status">성취도 범위를 불러오는 중입니다.</div>
         </div>
 
         <div class="cards">
@@ -500,7 +500,12 @@
           ? `${Number(rfAcc).toFixed(1)}%${getRibbonIcon(rfAcc)}`
           : "-";
 
-        renderHistory(history);
+        renderHistory(
+          history,
+          result?.scope === "course"
+            ? "선택한 강좌에 완료된 시험 기록이 없습니다."
+            : "완료된 시험 기록이 없습니다.",
+        );
         const course = result?.course || {};
         const label = course.course_name || "선택 범위";
         const suffix = result?.scope === "course"
@@ -530,7 +535,7 @@
         }
       }
 
-      function renderHistory(rows) {
+      function renderHistory(rows, emptyMessage = "완료된 시험 기록이 없습니다.") {
         historyBody.innerHTML = "";
 
         if (!rows || rows.length === 0) {
@@ -538,7 +543,7 @@
           const td = document.createElement("td");
           td.colSpan = 6;
           td.className = "muted";
-          td.textContent = "배정된 시험 기록이 없습니다.";
+          td.textContent = emptyMessage;
           tr.appendChild(td);
           historyBody.appendChild(tr);
           return;
@@ -624,7 +629,7 @@
           return;
         }
 
-        showMessage("loading", "조회 중입니다...");
+        showMessage("loading", "성취도 범위를 불러오는 중입니다...");
 
         try {
           // 1단계: 토큰으로 학생 정보 조회
@@ -635,11 +640,22 @@
             return;
           }
 
-          // 2단계: 토큰으로 범위 목록과 전체 누적 조회 (RPC 내부에서 토큰 재검증)
-          const [courses, achievement] = await Promise.all([
-            fetchAchievementCourses(token),
-            fetchAchievement(token, "all", null),
-          ]);
+          // 2단계: 현재 수강 중인 강좌를 기본 범위로 선택한다.
+          // 강좌 목록은 최근 응시 -> 최근 발행 -> 최근 등록 순으로 정렬된다.
+          const courses = await fetchAchievementCourses(token);
+          const defaultCourse = courses.find(course =>
+            !course.is_unassigned &&
+            course.course_id &&
+            course.enrollment_is_active &&
+            course.course_is_active
+          );
+          const defaultScope = defaultCourse ? "course" : "all";
+          const defaultCourseId = defaultCourse?.course_id || null;
+          const achievement = await fetchAchievement(
+            token,
+            defaultScope,
+            defaultCourseId,
+          );
 
           pageState.token = token;
           pageState.courses = courses;
@@ -647,6 +663,9 @@
           studentNameEl.textContent = studentInfo.name || "이름 없음";
           studentMetaEl.textContent = `학생코드 ${studentInfo.student_code || "-"} · ${formatGradeLevel(studentInfo.grade_level)}`;
           renderScopeOptions(courses);
+          achievementScopeEl.value = defaultCourse
+            ? `course:${defaultCourse.course_id}`
+            : "all";
           renderAchievement(achievement);
 
           clearMessage();
