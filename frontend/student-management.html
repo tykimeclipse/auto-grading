@@ -1183,12 +1183,13 @@
     function renderHistory() {
       const rows = state.history;
       if (!rows.length) {
-        $('historyBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:12px">시험 기록이 없습니다.</td></tr>';
+        $('historyBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:12px">표시할 시험 기록이 없습니다.</td></tr>';
         return;
       }
       $('historyBody').innerHTML = rows.map(h => {
         const r1Pct    = h.round1_score_percent   != null ? Number(h.round1_score_percent)   : null;
         const r2Pct    = h.round2_score_percent   != null ? Number(h.round2_score_percent)   : null;
+        const isUnattempted = r1Pct == null && r2Pct == null && h.teacher_final_score_percent == null;
         const r1Perf   = r1Pct === 100;
         const r2Perf   = r2Pct === 100;
         // 수동시험은 teacher_final 로만 최종 확정(1차/2차 100점 자동확정 미적용)
@@ -1198,7 +1199,7 @@
         else if (!isManual && r1Perf) finalValue = 100;
         else if (!isManual && r2Perf) finalValue = 100;
 
-        const r1Cell    = r1Pct != null ? getScoreHighlight(r1Pct, `${Math.round(r1Pct)}%`) : '-';
+        const r1Cell    = r1Pct != null ? getScoreHighlight(r1Pct, `${Math.round(r1Pct)}%`) : (isUnattempted ? '미제출' : '-');
         const r2Cell    = (!r1Perf && r2Pct != null) ? getScoreHighlight(r2Pct, `${Math.round(r2Pct)}%`) : '-';
         const finalCell = finalValue != null ? getScoreHighlight(finalValue, `${Math.round(finalValue)}%`) : '-';
 

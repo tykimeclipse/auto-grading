@@ -178,8 +178,8 @@ revoke execute on function auto_grading._student_achievement_stats_core(
 -- 2. 비공개 시험 기록 코어
 --
 -- 기존 get_student_assignment_history_by_code의 반환 컬럼·타입·폴백·정렬을
--- 그대로 유지한다. stats는 attempt 기반, history는 assignment 기반이라는 기존
--- 비대칭도 의도적으로 보존한다.
+-- 유지한다. history는 열린 assignment와 완료 성취가 있는 닫힌 assignment를
+-- 반환하며, 닫힌 미완료·미응시 발행 건은 운영 이력 화면에서만 조회한다.
 -- --------------------------------------------------------------------------
 create or replace function auto_grading._student_achievement_history_core(
   p_student_id uuid,
@@ -236,6 +236,15 @@ begin
       a.updated_at as assignment_updated_at
     from auto_grading.assignments a
     where a.student_id = p_student_id
+      and (
+        a.closed_at is null
+        or exists (
+          select 1
+          from auto_grading.attempts x
+          where x.assignment_id = a.id
+            and x.status in ('completed', 'needs_review')
+        )
+      )
       and (
         v_scope = 'all'
         or (v_scope = 'course' and a.course_id = p_course_id)

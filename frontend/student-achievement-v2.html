@@ -500,12 +500,7 @@
           ? `${Number(rfAcc).toFixed(1)}%${getRibbonIcon(rfAcc)}`
           : "-";
 
-        renderHistory(
-          history,
-          result?.scope === "course"
-            ? "선택한 강좌에 완료된 시험 기록이 없습니다."
-            : "완료된 시험 기록이 없습니다.",
-        );
+        renderHistory(history);
         const course = result?.course || {};
         const label = course.course_name || "선택 범위";
         const suffix = result?.scope === "course"
@@ -535,7 +530,7 @@
         }
       }
 
-      function renderHistory(rows, emptyMessage = "완료된 시험 기록이 없습니다.") {
+      function renderHistory(rows) {
         historyBody.innerHTML = "";
 
         if (!rows || rows.length === 0) {
@@ -543,7 +538,7 @@
           const td = document.createElement("td");
           td.colSpan = 6;
           td.className = "muted";
-          td.textContent = emptyMessage;
+          td.textContent = "표시할 시험 기록이 없습니다.";
           tr.appendChild(td);
           historyBody.appendChild(tr);
           return;
@@ -571,13 +566,14 @@
 
           const r1Pct = row.round1_score_percent != null ? Number(row.round1_score_percent) : null;
           const r2Pct = row.round2_score_percent != null ? Number(row.round2_score_percent) : null;
+          const isUnattempted = r1Pct == null && r2Pct == null && row.teacher_final_score_percent == null;
           const r1Perfect = r1Pct === 100;
           const r2Perfect = r2Pct === 100;
 
           const tdR1 = document.createElement("td");
           tdR1.innerHTML = r1Pct != null
             ? getScoreHighlight(r1Pct, formatPercent(r1Pct))
-            : "-";
+            : (isUnattempted ? "미제출" : "-");
 
           // 2차: round1이 100점이면 2차 응시 없음 → '-', 아니면 제출된 경우에만 표시
           const tdR2 = document.createElement("td");
