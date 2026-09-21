@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>학생 종합 관리</title>
+  <link rel="stylesheet" href="major-unit-achievement.css" />
   <style>
     :root {
       --bg: #f6f7fb;
@@ -558,6 +559,12 @@
                 <h3>성취도 정보</h3>
                 <p class="note">전체 누적 또는 강좌별 성취도와 시험 기록을 확인합니다.</p>
               </div>
+              <div class="achievement-view-switch" aria-label="성취도 상세 보기 방식">
+                <button id="historyViewBtn" class="is-active" type="button"
+                  aria-pressed="true" aria-controls="historyView">시험 기록</button>
+                <button id="majorUnitViewBtn" type="button"
+                  aria-pressed="false" aria-controls="majorUnitView">단원별 성취도</button>
+              </div>
             </div>
             <div class="achievement-toolbar">
               <div class="field">
@@ -569,7 +576,7 @@
               <div id="achievementStatus" class="achievement-status">전체 강좌의 누적 성취도입니다.</div>
             </div>
             <div id="achievementGrid" class="achievement-grid"></div>
-            <div class="mobile-scroll">
+            <div id="historyView" class="mobile-scroll achievement-history-view">
               <table class="history-table">
                 <thead>
                   <tr>
@@ -583,6 +590,27 @@
                 </thead>
                 <tbody id="historyBody"></tbody>
               </table>
+            </div>
+            <div id="majorUnitView" class="major-unit-view" hidden>
+              <div id="majorUnitSummary" class="major-unit-summary" aria-live="polite">
+                <strong>대단원별 누적 성취도</strong>
+                <span>단원별 성취도를 불러오려면 위 버튼을 눌러 주세요.</span>
+              </div>
+              <div class="major-unit-table-wrap">
+                <table class="major-unit-table">
+                  <thead>
+                    <tr>
+                      <th>단원</th>
+                      <th>완료 평가</th>
+                      <th>1차</th>
+                      <th>2차 반영</th>
+                      <th>최종</th>
+                      <th title="반복 평가의 최근 점수와 직전 평가 대비 변화">학습 유지</th>
+                    </tr>
+                  </thead>
+                  <tbody id="majorUnitBody"></tbody>
+                </table>
+              </div>
             </div>
           </section>
 
@@ -645,6 +673,7 @@
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin-auth.js"></script>
+  <script src="major-unit-achievement-ui.js"></script>
   <script>
 
     // ── 상수 ──────────────────────────────────────────────────────
@@ -665,6 +694,11 @@
       achievementScope: 'all',
       achievementLoadError: null,
       achievementRequestId: null,
+      majorUnitRequestId: null,
+      achievementDetailView: 'history',
+      majorUnitPayload: null,
+      majorUnitRows: [],
+      expandedUnitKeys: new Set(),
       courses:    [],   // 연결 가능한 활성 강좌 목록
       courseLoadError: null,
       courseActionPending: false,
@@ -728,6 +762,20 @@
 
     function normalizeError(err) {
       return err?.message || String(err);
+    }
+
+    function normalizeAchievementError(err) {
+      const message = normalizeError(err);
+      if (message.includes('STUDENT_NOT_FOUND') || /등록되지 않은 학생 코드/.test(message)) {
+        return '휴원 또는 비활성 학생은 현재 성취도 조회 대상이 아닙니다.';
+      }
+      if (message.includes('ACHIEVEMENT_COURSE_NOT_FOUND')) {
+        return '이 학생에게 연결된 성취도 강좌 기록을 찾을 수 없습니다.';
+      }
+      if (message.includes('COURSE_NOT_FOUND')) {
+        return '선택한 강좌를 찾을 수 없습니다. 강좌 목록을 새로고침해 주세요.';
+      }
+      return message;
     }
 
     function normalizeCourseError(err) {
@@ -921,6 +969,13 @@
       state.achievementCourse = null;
       state.achievementLoadError = null;
       state.achievementRequestId = Symbol();
+      state.majorUnitRequestId = Symbol();
+      state.achievementDetailView = 'history';
+      state.majorUnitPayload = null;
+      state.majorUnitRows = [];
+      state.expandedUnitKeys = new Set();
+      $('majorUnitViewBtn').disabled = false;
+      syncAchievementView();
       renderList();
 
       $('emptyDetail').hidden   = true;
@@ -972,7 +1027,7 @@
         state.history = Array.isArray(achievement?.history) ? achievement.history : [];
         state.achievementCourse = achievement?.course || null;
         state.achievementLoadError = courseRes.error || achievementRes.error
-          ? normalizeError(courseRes.error || achievementRes.error)
+          ? normalizeAchievementError(courseRes.error || achievementRes.error)
           : null;
 
         renderDetail();
@@ -1085,6 +1140,92 @@
       ).join('');
 
       renderHistory();
+      syncAchievementView();
+    }
+
+    function resetMajorUnitAchievement() {
+      state.majorUnitPayload = null;
+      state.majorUnitRows = [];
+      state.expandedUnitKeys = new Set();
+      $('majorUnitSummary').className = 'major-unit-summary';
+      $('majorUnitSummary').innerHTML =
+        '<strong>대단원별 누적 성취도</strong><span>단원별 성취도를 불러오는 중입니다...</span>';
+      $('majorUnitBody').innerHTML =
+        '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오는 중입니다...</td></tr>';
+    }
+
+    function renderMajorUnitAchievement(payload) {
+      const ui = window.MajorUnitAchievementUI;
+      const rendered = ui.renderUnitRows(
+        payload?.units,
+        state.expandedUnitKeys,
+        { manualBadgeLabel: '수동' }
+      );
+      state.majorUnitRows = rendered.rows;
+      $('majorUnitBody').innerHTML = rendered.html;
+      $('majorUnitSummary').className = 'major-unit-summary';
+      $('majorUnitSummary').innerHTML =
+        `<strong>대단원별 누적 성취도</strong><span>${escapeHtml(ui.summaryText(payload))}</span>`;
+    }
+
+    function renderMajorUnitError(err) {
+      $('majorUnitSummary').className = 'major-unit-summary is-error';
+      $('majorUnitSummary').innerHTML =
+        `<strong>대단원별 누적 성취도</strong><span>조회 실패: ${escapeHtml(normalizeAchievementError(err))}</span>`;
+      $('majorUnitBody').innerHTML =
+        '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오지 못했습니다.</td></tr>';
+    }
+
+    function syncAchievementView() {
+      const showUnits = state.achievementDetailView === 'major-unit';
+      $('historyView').hidden = showUnits;
+      $('majorUnitView').hidden = !showUnits;
+      $('historyViewBtn').classList.toggle('is-active', !showUnits);
+      $('majorUnitViewBtn').classList.toggle('is-active', showUnits);
+      $('historyViewBtn').setAttribute('aria-pressed', String(!showUnits));
+      $('majorUnitViewBtn').setAttribute('aria-pressed', String(showUnits));
+    }
+
+    async function loadMajorUnitAchievement() {
+      const student = state.detail;
+      if (!student) return;
+      const studentId = student.id;
+      const selectedValue = $('achievementScopeSelect').value || 'all';
+      const { scope, courseId } = parseAchievementScope(selectedValue);
+      const requestId = Symbol();
+      state.majorUnitRequestId = requestId;
+      resetMajorUnitAchievement();
+      $('majorUnitViewBtn').disabled = true;
+
+      try {
+        const { data, error } = await state.supabase
+          .schema('auto_grading')
+          .rpc('get_student_major_unit_achievement_by_code', {
+            p_student_code: student.student_code,
+            p_scope: scope,
+            p_course_id: courseId
+          });
+        if (error) throw error;
+        if (state.majorUnitRequestId !== requestId || state.detail?.id !== studentId) return;
+        const payload = Array.isArray(data) ? data[0] : data;
+        state.majorUnitPayload = payload;
+        renderMajorUnitAchievement(payload);
+      } catch (err) {
+        if (state.majorUnitRequestId !== requestId || state.detail?.id !== studentId) return;
+        renderMajorUnitError(err);
+      } finally {
+        if (state.majorUnitRequestId === requestId && state.detail?.id === studentId) {
+          $('majorUnitViewBtn').disabled = false;
+        }
+      }
+    }
+
+    async function setAchievementView(view) {
+      state.achievementDetailView = view === 'major-unit' ? 'major-unit' : 'history';
+      syncAchievementView();
+      if (state.achievementDetailView === 'major-unit' && !state.majorUnitPayload) {
+        await loadMajorUnitAchievement();
+      }
     }
 
     function renderAchievementScopeOptions() {
@@ -1149,6 +1290,9 @@
       state.achievementRequestId = requestId;
       state.achievementScope = selectedValue;
       state.achievementLoadError = null;
+      state.majorUnitRequestId = Symbol();
+      $('majorUnitViewBtn').disabled = false;
+      resetMajorUnitAchievement();
       $('achievementScopeSelect').disabled = true;
       $('achievementStatus').className = 'achievement-status';
       $('achievementStatus').textContent = '선택한 범위의 성취도를 불러오는 중입니다...';
@@ -1169,9 +1313,12 @@
         state.history = Array.isArray(achievement?.history) ? achievement.history : [];
         state.achievementCourse = achievement?.course || null;
         renderAchievementSection();
+        if (state.achievementDetailView === 'major-unit') {
+          await loadMajorUnitAchievement();
+        }
       } catch (err) {
         if (state.achievementRequestId !== requestId || state.detail?.id !== studentId) return;
-        state.achievementLoadError = normalizeError(err);
+        state.achievementLoadError = normalizeAchievementError(err);
         renderAchievementScopeOptions();
       } finally {
         if (state.achievementRequestId === requestId && state.detail?.id === studentId) {
@@ -1570,6 +1717,18 @@
     });
     $('saveMetaBtn').addEventListener('click', saveMeta);
     $('achievementScopeSelect').addEventListener('change', loadAchievementScope);
+    $('historyViewBtn').addEventListener('click', () => setAchievementView('history'));
+    $('majorUnitViewBtn').addEventListener('click', () => setAchievementView('major-unit'));
+    $('majorUnitBody').addEventListener('click', event => {
+      const button = event.target.closest('.major-unit-toggle');
+      if (!button) return;
+      const row = state.majorUnitRows[Number(button.dataset.unitIndex)];
+      if (!row) return;
+      const key = window.MajorUnitAchievementUI.unitKey(row);
+      if (state.expandedUnitKeys.has(key)) state.expandedUnitKeys.delete(key);
+      else state.expandedUnitKeys.add(key);
+      renderMajorUnitAchievement(state.majorUnitPayload);
+    });
     $('attachCourseBtn').addEventListener('click', attachSelectedCourse);
     $('refreshCoursesBtn').addEventListener('click', async () => {
       if (state.courseActionPending) return;

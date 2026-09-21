@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>학생 성취도</title>
+    <link rel="stylesheet" href="major-unit-achievement.css" />
     <style>
       * {
         box-sizing: border-box;
@@ -261,9 +262,15 @@
 
         <div class="table-box">
           <div class="table-header">
-            <span>시험 기록</span>
+            <span>성취도 상세</span>
+            <div class="achievement-view-switch" aria-label="성취도 상세 보기 방식">
+              <button id="historyViewBtn" class="is-active" type="button"
+                aria-pressed="true" aria-controls="historyView">시험 기록</button>
+              <button id="majorUnitViewBtn" type="button"
+                aria-pressed="false" aria-controls="majorUnitView">단원별 성취도</button>
+            </div>
           </div>
-          <div class="table-wrap">
+          <div id="historyView" class="table-wrap achievement-history-view">
             <table>
               <thead>
                 <tr>
@@ -278,10 +285,32 @@
               <tbody id="historyBody"></tbody>
             </table>
           </div>
+          <div id="majorUnitView" class="major-unit-view" hidden>
+            <div id="majorUnitSummary" class="major-unit-summary" aria-live="polite">
+              <strong>대단원별 누적 성취도</strong>
+              <span>단원별 성취도를 불러오려면 위 버튼을 눌러 주세요.</span>
+            </div>
+            <div class="major-unit-table-wrap">
+              <table class="major-unit-table">
+                <thead>
+                  <tr>
+                    <th>단원</th>
+                    <th>완료 평가</th>
+                    <th>1차</th>
+                    <th>2차 반영</th>
+                    <th>최종</th>
+                    <th title="반복 평가의 최근 점수와 직전 평가 대비 변화">학습 유지</th>
+                  </tr>
+                </thead>
+                <tbody id="majorUnitBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
+    <script src="major-unit-achievement-ui.js"></script>
     <script type="module">
       import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
@@ -302,11 +331,22 @@
       const historyBody = document.getElementById("historyBody");
       const achievementScopeEl = document.getElementById("achievementScope");
       const scopeStatusEl = document.getElementById("scopeStatus");
+      const historyViewEl = document.getElementById("historyView");
+      const majorUnitViewEl = document.getElementById("majorUnitView");
+      const historyViewBtn = document.getElementById("historyViewBtn");
+      const majorUnitViewBtn = document.getElementById("majorUnitViewBtn");
+      const majorUnitSummaryEl = document.getElementById("majorUnitSummary");
+      const majorUnitBody = document.getElementById("majorUnitBody");
 
       const pageState = {
         token: "",
         courses: [],
         scopeRequestId: 0,
+        unitRequestId: 0,
+        detailView: "history",
+        majorUnitPayload: null,
+        majorUnitRows: [],
+        expandedUnitKeys: new Set(),
       };
 
       function showMessage(type, text) {
@@ -447,6 +487,20 @@
         return Array.isArray(data) ? data[0] : data;
       }
 
+      async function fetchMajorUnitAchievement(token, scope, courseId) {
+        const { data, error } = await supabase
+          .schema("auto_grading")
+          .rpc("get_student_major_unit_achievement_by_token", {
+            p_token: token,
+            p_scope: scope,
+            p_course_id: courseId,
+          });
+
+        if (error) throw error;
+        if (!data) throw new Error("unauthorized");
+        return Array.isArray(data) ? data[0] : data;
+      }
+
       function renderScopeOptions(courses) {
         const options = ['<option value="all">전체 누적</option>'];
         const realCourses = courses.filter(course => !course.is_unassigned && course.course_id);
@@ -510,8 +564,85 @@
         scopeStatusEl.textContent = `${label} · ${suffix} · 시험 기록 ${history.length}건`;
       }
 
+      function resetMajorUnitAchievement() {
+        pageState.majorUnitPayload = null;
+        pageState.majorUnitRows = [];
+        pageState.expandedUnitKeys = new Set();
+        majorUnitSummaryEl.className = "major-unit-summary";
+        majorUnitSummaryEl.innerHTML =
+          "<strong>대단원별 누적 성취도</strong><span>단원별 성취도를 불러오는 중입니다...</span>";
+        majorUnitBody.innerHTML =
+          '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오는 중입니다...</td></tr>';
+      }
+
+      function renderMajorUnitAchievement(payload) {
+        const ui = window.MajorUnitAchievementUI;
+        const rendered = ui.renderUnitRows(
+          payload?.units,
+          pageState.expandedUnitKeys,
+          { manualBadgeLabel: "단일 평가" },
+        );
+        pageState.majorUnitRows = rendered.rows;
+        majorUnitBody.innerHTML = rendered.html;
+        majorUnitSummaryEl.className = "major-unit-summary";
+        majorUnitSummaryEl.innerHTML =
+          `<strong>대단원별 누적 성취도</strong><span>${escapeHtml(ui.summaryText(payload))}</span>`;
+      }
+
+      function renderMajorUnitError(err) {
+        majorUnitSummaryEl.className = "major-unit-summary is-error";
+        majorUnitSummaryEl.innerHTML =
+          `<strong>대단원별 누적 성취도</strong><span>${escapeHtml(normalizeErrorMessage(err))}</span>`;
+        majorUnitBody.innerHTML =
+          '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오지 못했습니다.</td></tr>';
+      }
+
+      function syncAchievementView() {
+        const showUnits = pageState.detailView === "major-unit";
+        historyViewEl.hidden = showUnits;
+        majorUnitViewEl.hidden = !showUnits;
+        historyViewBtn.classList.toggle("is-active", !showUnits);
+        majorUnitViewBtn.classList.toggle("is-active", showUnits);
+        historyViewBtn.setAttribute("aria-pressed", String(!showUnits));
+        majorUnitViewBtn.setAttribute("aria-pressed", String(showUnits));
+      }
+
+      async function loadMajorUnitAchievement() {
+        const requestId = ++pageState.unitRequestId;
+        const { scope, courseId } = selectedScope();
+        resetMajorUnitAchievement();
+        majorUnitViewBtn.disabled = true;
+        try {
+          const payload = await fetchMajorUnitAchievement(
+            pageState.token,
+            scope,
+            courseId,
+          );
+          if (requestId !== pageState.unitRequestId) return;
+          pageState.majorUnitPayload = payload;
+          renderMajorUnitAchievement(payload);
+        } catch (err) {
+          if (requestId !== pageState.unitRequestId) return;
+          console.error(err);
+          renderMajorUnitError(err);
+        } finally {
+          if (requestId === pageState.unitRequestId) majorUnitViewBtn.disabled = false;
+        }
+      }
+
+      async function setAchievementView(view) {
+        pageState.detailView = view === "major-unit" ? "major-unit" : "history";
+        syncAchievementView();
+        if (pageState.detailView === "major-unit" && !pageState.majorUnitPayload) {
+          await loadMajorUnitAchievement();
+        }
+      }
+
       async function loadSelectedAchievement() {
         const requestId = ++pageState.scopeRequestId;
+        pageState.unitRequestId += 1;
+        majorUnitViewBtn.disabled = false;
+        resetMajorUnitAchievement();
         const { scope, courseId } = selectedScope();
         achievementScopeEl.disabled = true;
         scopeStatusEl.className = "scope-status";
@@ -520,6 +651,9 @@
           const result = await fetchAchievement(pageState.token, scope, courseId);
           if (requestId !== pageState.scopeRequestId) return;
           renderAchievement(result);
+          if (pageState.detailView === "major-unit") {
+            await loadMajorUnitAchievement();
+          }
         } catch (err) {
           if (requestId !== pageState.scopeRequestId) return;
           console.error(err);
@@ -673,6 +807,22 @@
       }
 
       achievementScopeEl.addEventListener("change", loadSelectedAchievement);
+      historyViewBtn.addEventListener("click", () => setAchievementView("history"));
+      majorUnitViewBtn.addEventListener("click", () => setAchievementView("major-unit"));
+      majorUnitBody.addEventListener("click", event => {
+        const button = event.target.closest(".major-unit-toggle");
+        if (!button) return;
+        const row = pageState.majorUnitRows[Number(button.dataset.unitIndex)];
+        if (!row) return;
+        const key = window.MajorUnitAchievementUI.unitKey(row);
+        if (pageState.expandedUnitKeys.has(key)) {
+          pageState.expandedUnitKeys.delete(key);
+        } else {
+          pageState.expandedUnitKeys.add(key);
+        }
+        renderMajorUnitAchievement(pageState.majorUnitPayload);
+      });
+      syncAchievementView();
       loadPage();
     </script>
   </body>

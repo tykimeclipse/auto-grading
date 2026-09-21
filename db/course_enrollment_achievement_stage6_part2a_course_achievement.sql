@@ -10,6 +10,15 @@
 --     결과에서 구·신 통계/시험 기록 불일치가 모두 0인지 확인한다.
 --   - 확인 전에는 part 2B를 실행하지 않는다.
 --
+-- 재실행 주의:
+--   - event_date는 stage7 part 3에서 Asia/Seoul 기준으로 교정된다.
+--   - stage7 part 3가 적용된 DB에서 이 파일을 단독 재실행하면 교정이
+--     되돌아간다. 이 파일을 재실행한 경우에는 반드시 아래 파일을 이어서
+--     실행하고 두 감사를 모두 다시 통과시킨다.
+--       1. course_enrollment_achievement_stage7_part3_history_event_date_timezone.sql
+--       2. audit_course_enrollment_achievement_stage7_part3_history_event_date_timezone.sql
+--       3. audit_course_enrollment_achievement_stage6_part2b_postcutover.sql
+--
 -- p_scope 계약:
 --   all        : p_course_id를 무시하고 학생의 모든 attempt/assignment 조회
 --   course     : p_course_id 필수, 해당 강좌만 조회
