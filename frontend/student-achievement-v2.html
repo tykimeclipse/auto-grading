@@ -310,7 +310,7 @@
       </div>
     </div>
 
-    <script src="major-unit-achievement-ui.js"></script>
+    <script src="major-unit-achievement-ui.js?v=2"></script>
     <script type="module">
       import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
@@ -348,6 +348,56 @@
         majorUnitRows: [],
         expandedUnitKeys: new Set(),
       };
+
+      let majorUnitController = null;
+      try {
+        majorUnitController = window.MajorUnitAchievementUI?.createController?.({
+          state: pageState,
+          viewStateKey: "detailView",
+          elements: {
+            historyView: historyViewEl,
+            majorUnitView: majorUnitViewEl,
+            historyButton: historyViewBtn,
+            majorUnitButton: majorUnitViewBtn,
+            summary: majorUnitSummaryEl,
+            body: majorUnitBody,
+          },
+          manualBadgeLabel: "단일 평가",
+          formatError: normalizeErrorMessage,
+        }) || null;
+      } catch (error) {
+        console.error("대단원별 성취도 컨트롤러 초기화 실패:", error);
+      }
+
+      function syncAchievementView() {
+        if (majorUnitController) {
+          majorUnitController.sync();
+          return;
+        }
+        const showUnits = pageState.detailView === "major-unit";
+        historyViewEl.hidden = showUnits;
+        majorUnitViewEl.hidden = !showUnits;
+        historyViewBtn.classList.toggle("is-active", !showUnits);
+        majorUnitViewBtn.classList.toggle("is-active", showUnits);
+        historyViewBtn.setAttribute("aria-pressed", String(!showUnits));
+        majorUnitViewBtn.setAttribute("aria-pressed", String(showUnits));
+      }
+
+      async function setAchievementView(view) {
+        if (majorUnitController) {
+          await majorUnitController.setView(view, loadMajorUnitAchievement);
+          return;
+        }
+        pageState.detailView = view === "major-unit" ? "major-unit" : "history";
+        syncAchievementView();
+        if (pageState.detailView === "major-unit") {
+          majorUnitSummaryEl.className = "major-unit-summary is-error";
+          majorUnitSummaryEl.innerHTML =
+            "<strong>대단원별 누적 성취도</strong><span>화면 구성 파일을 불러오지 못했습니다. 새로고침해 주세요.</span>";
+          majorUnitBody.innerHTML =
+            '<tr><td colspan="6" class="major-unit-empty">기존 시험 기록은 계속 확인할 수 있습니다.</td></tr>';
+        }
+      }
 
       function showMessage(type, text) {
         contentArea.style.display = "none";
@@ -564,53 +614,11 @@
         scopeStatusEl.textContent = `${label} · ${suffix} · 시험 기록 ${history.length}건`;
       }
 
-      function resetMajorUnitAchievement() {
-        pageState.majorUnitPayload = null;
-        pageState.majorUnitRows = [];
-        pageState.expandedUnitKeys = new Set();
-        majorUnitSummaryEl.className = "major-unit-summary";
-        majorUnitSummaryEl.innerHTML =
-          "<strong>대단원별 누적 성취도</strong><span>단원별 성취도를 불러오는 중입니다...</span>";
-        majorUnitBody.innerHTML =
-          '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오는 중입니다...</td></tr>';
-      }
-
-      function renderMajorUnitAchievement(payload) {
-        const ui = window.MajorUnitAchievementUI;
-        const rendered = ui.renderUnitRows(
-          payload?.units,
-          pageState.expandedUnitKeys,
-          { manualBadgeLabel: "단일 평가" },
-        );
-        pageState.majorUnitRows = rendered.rows;
-        majorUnitBody.innerHTML = rendered.html;
-        majorUnitSummaryEl.className = "major-unit-summary";
-        majorUnitSummaryEl.innerHTML =
-          `<strong>대단원별 누적 성취도</strong><span>${escapeHtml(ui.summaryText(payload))}</span>`;
-      }
-
-      function renderMajorUnitError(err) {
-        majorUnitSummaryEl.className = "major-unit-summary is-error";
-        majorUnitSummaryEl.innerHTML =
-          `<strong>대단원별 누적 성취도</strong><span>${escapeHtml(normalizeErrorMessage(err))}</span>`;
-        majorUnitBody.innerHTML =
-          '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오지 못했습니다.</td></tr>';
-      }
-
-      function syncAchievementView() {
-        const showUnits = pageState.detailView === "major-unit";
-        historyViewEl.hidden = showUnits;
-        majorUnitViewEl.hidden = !showUnits;
-        historyViewBtn.classList.toggle("is-active", !showUnits);
-        majorUnitViewBtn.classList.toggle("is-active", showUnits);
-        historyViewBtn.setAttribute("aria-pressed", String(!showUnits));
-        majorUnitViewBtn.setAttribute("aria-pressed", String(showUnits));
-      }
-
       async function loadMajorUnitAchievement() {
+        if (!majorUnitController) return;
         const requestId = ++pageState.unitRequestId;
         const { scope, courseId } = selectedScope();
-        resetMajorUnitAchievement();
+        majorUnitController.reset();
         majorUnitViewBtn.disabled = true;
         try {
           const payload = await fetchMajorUnitAchievement(
@@ -619,22 +627,13 @@
             courseId,
           );
           if (requestId !== pageState.unitRequestId) return;
-          pageState.majorUnitPayload = payload;
-          renderMajorUnitAchievement(payload);
+          majorUnitController.render(payload);
         } catch (err) {
           if (requestId !== pageState.unitRequestId) return;
           console.error(err);
-          renderMajorUnitError(err);
+          majorUnitController.renderError(err);
         } finally {
           if (requestId === pageState.unitRequestId) majorUnitViewBtn.disabled = false;
-        }
-      }
-
-      async function setAchievementView(view) {
-        pageState.detailView = view === "major-unit" ? "major-unit" : "history";
-        syncAchievementView();
-        if (pageState.detailView === "major-unit" && !pageState.majorUnitPayload) {
-          await loadMajorUnitAchievement();
         }
       }
 
@@ -642,7 +641,7 @@
         const requestId = ++pageState.scopeRequestId;
         pageState.unitRequestId += 1;
         majorUnitViewBtn.disabled = false;
-        resetMajorUnitAchievement();
+        majorUnitController?.reset();
         const { scope, courseId } = selectedScope();
         achievementScopeEl.disabled = true;
         scopeStatusEl.className = "scope-status";
@@ -810,17 +809,7 @@
       historyViewBtn.addEventListener("click", () => setAchievementView("history"));
       majorUnitViewBtn.addEventListener("click", () => setAchievementView("major-unit"));
       majorUnitBody.addEventListener("click", event => {
-        const button = event.target.closest(".major-unit-toggle");
-        if (!button) return;
-        const row = pageState.majorUnitRows[Number(button.dataset.unitIndex)];
-        if (!row) return;
-        const key = window.MajorUnitAchievementUI.unitKey(row);
-        if (pageState.expandedUnitKeys.has(key)) {
-          pageState.expandedUnitKeys.delete(key);
-        } else {
-          pageState.expandedUnitKeys.add(key);
-        }
-        renderMajorUnitAchievement(pageState.majorUnitPayload);
+        majorUnitController?.handleBodyClick(event);
       });
       syncAchievementView();
       loadPage();

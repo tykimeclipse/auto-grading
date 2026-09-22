@@ -251,7 +251,122 @@
     return `완료 평가 ${testCount}건 · 단원 ${unitCount}개 · 문항 수 가중 평균${dateRange}`;
   }
 
+  function createController(options) {
+    const state = options?.state;
+    const elements = options?.elements || {};
+    if (!state) throw new Error("major-unit controller state is required");
+
+    const requiredElements = [
+      "historyView",
+      "majorUnitView",
+      "historyButton",
+      "majorUnitButton",
+      "summary",
+      "body",
+    ];
+    for (const name of requiredElements) {
+      if (!elements[name]) {
+        throw new Error(`major-unit controller element is required: ${name}`);
+      }
+    }
+
+    const viewStateKey = options.viewStateKey || "detailView";
+    const payloadStateKey = options.payloadStateKey || "majorUnitPayload";
+    const rowsStateKey = options.rowsStateKey || "majorUnitRows";
+    const expandedKeysStateKey = options.expandedKeysStateKey || "expandedUnitKeys";
+    const manualBadgeLabel = options.manualBadgeLabel || "단일 평가";
+    const formatError = typeof options.formatError === "function"
+      ? options.formatError
+      : error => error?.message || String(error || "조회 중 오류가 발생했습니다.");
+
+    function expandedKeys() {
+      if (!(state[expandedKeysStateKey] instanceof Set)) {
+        state[expandedKeysStateKey] = new Set();
+      }
+      return state[expandedKeysStateKey];
+    }
+
+    function reset() {
+      state[payloadStateKey] = null;
+      state[rowsStateKey] = [];
+      state[expandedKeysStateKey] = new Set();
+      elements.summary.className = "major-unit-summary";
+      elements.summary.innerHTML =
+        "<strong>대단원별 누적 성취도</strong><span>단원별 성취도를 불러오는 중입니다...</span>";
+      elements.body.innerHTML =
+        '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오는 중입니다...</td></tr>';
+    }
+
+    function render(payload) {
+      const rendered = renderUnitRows(
+        payload?.units,
+        expandedKeys(),
+        { manualBadgeLabel },
+      );
+      state[payloadStateKey] = payload;
+      state[rowsStateKey] = rendered.rows;
+      elements.body.innerHTML = rendered.html;
+      elements.summary.className = "major-unit-summary";
+      elements.summary.innerHTML =
+        `<strong>대단원별 누적 성취도</strong><span>${escapeHtml(summaryText(payload))}</span>`;
+    }
+
+    function renderError(error) {
+      elements.summary.className = "major-unit-summary is-error";
+      elements.summary.innerHTML =
+        `<strong>대단원별 누적 성취도</strong><span>${escapeHtml(formatError(error))}</span>`;
+      elements.body.innerHTML =
+        '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오지 못했습니다.</td></tr>';
+    }
+
+    function sync() {
+      const showUnits = state[viewStateKey] === "major-unit";
+      elements.historyView.hidden = showUnits;
+      elements.majorUnitView.hidden = !showUnits;
+      elements.historyButton.classList.toggle("is-active", !showUnits);
+      elements.majorUnitButton.classList.toggle("is-active", showUnits);
+      elements.historyButton.setAttribute("aria-pressed", String(!showUnits));
+      elements.majorUnitButton.setAttribute("aria-pressed", String(showUnits));
+    }
+
+    async function setView(view, load) {
+      state[viewStateKey] = view === "major-unit" ? "major-unit" : "history";
+      sync();
+      if (
+        state[viewStateKey] === "major-unit"
+        && !state[payloadStateKey]
+        && typeof load === "function"
+      ) {
+        await load();
+      }
+    }
+
+    function handleBodyClick(event) {
+      const button = event?.target?.closest?.(".major-unit-toggle");
+      if (!button) return false;
+      const row = state[rowsStateKey]?.[Number(button.dataset.unitIndex)];
+      if (!row) return false;
+
+      const key = unitKey(row);
+      const keys = expandedKeys();
+      if (keys.has(key)) keys.delete(key);
+      else keys.add(key);
+      render(state[payloadStateKey]);
+      return true;
+    }
+
+    return Object.freeze({
+      handleBodyClick,
+      render,
+      renderError,
+      reset,
+      setView,
+      sync,
+    });
+  }
+
   global.MajorUnitAchievementUI = Object.freeze({
+    createController,
     formatDate,
     renderUnitRows,
     sortUnits,

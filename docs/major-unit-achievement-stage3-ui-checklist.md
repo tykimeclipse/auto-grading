@@ -9,7 +9,10 @@
 5. `db/course_enrollment_achievement_stage7_part3_history_event_date_timezone.sql`
 6. `db/audit_course_enrollment_achievement_stage7_part3_history_event_date_timezone.sql`
 
-학생 공개 성취도와 교사 학생관리 화면은 같은 공통 렌더러와 표 구조를 사용한다.
+학생 공개 성취도와 교사 학생관리 화면은 같은 공통 렌더러·보기 컨트롤러와
+표 구조를 사용한다. 화면별 코드는 RPC 요청과 문구 차이만 담당한다.
+공통 JavaScript 참조는 현재 `?v=2`로 캐시를 갱신한다. 이후 파일을 수정할
+때에도 두 HTML의 버전 값을 함께 올린다.
 
 ## 선행 조건
 

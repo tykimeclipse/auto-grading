@@ -673,7 +673,7 @@
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="admin-auth.js"></script>
-  <script src="major-unit-achievement-ui.js"></script>
+  <script src="major-unit-achievement-ui.js?v=2"></script>
   <script>
 
     // ── 상수 ──────────────────────────────────────────────────────
@@ -708,6 +708,56 @@
 
     // ── 유틸리티 ──────────────────────────────────────────────────
     const $ = id => document.getElementById(id);
+
+    let majorUnitController = null;
+    try {
+      majorUnitController = window.MajorUnitAchievementUI?.createController?.({
+        state,
+        viewStateKey: 'achievementDetailView',
+        elements: {
+          historyView: $('historyView'),
+          majorUnitView: $('majorUnitView'),
+          historyButton: $('historyViewBtn'),
+          majorUnitButton: $('majorUnitViewBtn'),
+          summary: $('majorUnitSummary'),
+          body: $('majorUnitBody')
+        },
+        manualBadgeLabel: '수동',
+        formatError: error => `조회 실패: ${normalizeAchievementError(error)}`
+      }) || null;
+    } catch (error) {
+      console.error('대단원별 성취도 컨트롤러 초기화 실패:', error);
+    }
+
+    function syncAchievementView() {
+      if (majorUnitController) {
+        majorUnitController.sync();
+        return;
+      }
+      const showUnits = state.achievementDetailView === 'major-unit';
+      $('historyView').hidden = showUnits;
+      $('majorUnitView').hidden = !showUnits;
+      $('historyViewBtn').classList.toggle('is-active', !showUnits);
+      $('majorUnitViewBtn').classList.toggle('is-active', showUnits);
+      $('historyViewBtn').setAttribute('aria-pressed', String(!showUnits));
+      $('majorUnitViewBtn').setAttribute('aria-pressed', String(showUnits));
+    }
+
+    async function setAchievementView(view) {
+      if (majorUnitController) {
+        await majorUnitController.setView(view, loadMajorUnitAchievement);
+        return;
+      }
+      state.achievementDetailView = view === 'major-unit' ? 'major-unit' : 'history';
+      syncAchievementView();
+      if (state.achievementDetailView === 'major-unit') {
+        $('majorUnitSummary').className = 'major-unit-summary is-error';
+        $('majorUnitSummary').innerHTML =
+          '<strong>대단원별 누적 성취도</strong><span>화면 구성 파일을 불러오지 못했습니다. 새로고침해 주세요.</span>';
+        $('majorUnitBody').innerHTML =
+          '<tr><td colspan="6" class="major-unit-empty">기존 시험 기록은 계속 확인할 수 있습니다.</td></tr>';
+      }
+    }
 
     function gradeLabel(code) { return GRADE_LABELS[code] || code || '-'; }
 
@@ -1143,50 +1193,8 @@
       syncAchievementView();
     }
 
-    function resetMajorUnitAchievement() {
-      state.majorUnitPayload = null;
-      state.majorUnitRows = [];
-      state.expandedUnitKeys = new Set();
-      $('majorUnitSummary').className = 'major-unit-summary';
-      $('majorUnitSummary').innerHTML =
-        '<strong>대단원별 누적 성취도</strong><span>단원별 성취도를 불러오는 중입니다...</span>';
-      $('majorUnitBody').innerHTML =
-        '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오는 중입니다...</td></tr>';
-    }
-
-    function renderMajorUnitAchievement(payload) {
-      const ui = window.MajorUnitAchievementUI;
-      const rendered = ui.renderUnitRows(
-        payload?.units,
-        state.expandedUnitKeys,
-        { manualBadgeLabel: '수동' }
-      );
-      state.majorUnitRows = rendered.rows;
-      $('majorUnitBody').innerHTML = rendered.html;
-      $('majorUnitSummary').className = 'major-unit-summary';
-      $('majorUnitSummary').innerHTML =
-        `<strong>대단원별 누적 성취도</strong><span>${escapeHtml(ui.summaryText(payload))}</span>`;
-    }
-
-    function renderMajorUnitError(err) {
-      $('majorUnitSummary').className = 'major-unit-summary is-error';
-      $('majorUnitSummary').innerHTML =
-        `<strong>대단원별 누적 성취도</strong><span>조회 실패: ${escapeHtml(normalizeAchievementError(err))}</span>`;
-      $('majorUnitBody').innerHTML =
-        '<tr><td colspan="6" class="major-unit-empty">단원별 성취도를 불러오지 못했습니다.</td></tr>';
-    }
-
-    function syncAchievementView() {
-      const showUnits = state.achievementDetailView === 'major-unit';
-      $('historyView').hidden = showUnits;
-      $('majorUnitView').hidden = !showUnits;
-      $('historyViewBtn').classList.toggle('is-active', !showUnits);
-      $('majorUnitViewBtn').classList.toggle('is-active', showUnits);
-      $('historyViewBtn').setAttribute('aria-pressed', String(!showUnits));
-      $('majorUnitViewBtn').setAttribute('aria-pressed', String(showUnits));
-    }
-
     async function loadMajorUnitAchievement() {
+      if (!majorUnitController) return;
       const student = state.detail;
       if (!student) return;
       const studentId = student.id;
@@ -1194,7 +1202,7 @@
       const { scope, courseId } = parseAchievementScope(selectedValue);
       const requestId = Symbol();
       state.majorUnitRequestId = requestId;
-      resetMajorUnitAchievement();
+      majorUnitController.reset();
       $('majorUnitViewBtn').disabled = true;
 
       try {
@@ -1208,23 +1216,14 @@
         if (error) throw error;
         if (state.majorUnitRequestId !== requestId || state.detail?.id !== studentId) return;
         const payload = Array.isArray(data) ? data[0] : data;
-        state.majorUnitPayload = payload;
-        renderMajorUnitAchievement(payload);
+        majorUnitController.render(payload);
       } catch (err) {
         if (state.majorUnitRequestId !== requestId || state.detail?.id !== studentId) return;
-        renderMajorUnitError(err);
+        majorUnitController.renderError(err);
       } finally {
         if (state.majorUnitRequestId === requestId && state.detail?.id === studentId) {
           $('majorUnitViewBtn').disabled = false;
         }
-      }
-    }
-
-    async function setAchievementView(view) {
-      state.achievementDetailView = view === 'major-unit' ? 'major-unit' : 'history';
-      syncAchievementView();
-      if (state.achievementDetailView === 'major-unit' && !state.majorUnitPayload) {
-        await loadMajorUnitAchievement();
       }
     }
 
@@ -1292,7 +1291,7 @@
       state.achievementLoadError = null;
       state.majorUnitRequestId = Symbol();
       $('majorUnitViewBtn').disabled = false;
-      resetMajorUnitAchievement();
+      majorUnitController?.reset();
       $('achievementScopeSelect').disabled = true;
       $('achievementStatus').className = 'achievement-status';
       $('achievementStatus').textContent = '선택한 범위의 성취도를 불러오는 중입니다...';
@@ -1720,14 +1719,7 @@
     $('historyViewBtn').addEventListener('click', () => setAchievementView('history'));
     $('majorUnitViewBtn').addEventListener('click', () => setAchievementView('major-unit'));
     $('majorUnitBody').addEventListener('click', event => {
-      const button = event.target.closest('.major-unit-toggle');
-      if (!button) return;
-      const row = state.majorUnitRows[Number(button.dataset.unitIndex)];
-      if (!row) return;
-      const key = window.MajorUnitAchievementUI.unitKey(row);
-      if (state.expandedUnitKeys.has(key)) state.expandedUnitKeys.delete(key);
-      else state.expandedUnitKeys.add(key);
-      renderMajorUnitAchievement(state.majorUnitPayload);
+      majorUnitController?.handleBodyClick(event);
     });
     $('attachCourseBtn').addEventListener('click', attachSelectedCourse);
     $('refreshCoursesBtn').addEventListener('click', async () => {

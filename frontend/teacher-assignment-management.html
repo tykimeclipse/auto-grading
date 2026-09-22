@@ -28,7 +28,7 @@
     .search-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
     .field{display:grid;gap:6px}
     .field label{font-size:12px;color:var(--muted);font-weight:600}
-    input[type="text"],input[type="number"],select,textarea{width:100%;min-height:42px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px;background:#fff;color:var(--text)}
+    input[type="text"],input[type="number"],input[type="date"],select,textarea{width:100%;min-height:42px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px;background:#fff;color:var(--text)}
     textarea{min-height:76px}
     .toolbar,.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     .check-row{display:flex;gap:8px;flex-wrap:wrap;margin:0}
@@ -115,11 +115,15 @@
                    z-index:2000;overflow-y:auto;padding:40px 16px}
     .modal-overlay.open{display:flex}
     .modal{background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:760px;max-width:100%;overflow:hidden}
+    .modal.manual-modal{width:960px}
     .modal-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:linear-gradient(to bottom,#fff,#fbfcff)}
     .modal-head h3{margin:0;font-size:18px}
     .modal-body{padding:18px 20px;max-height:70vh;overflow-y:auto}
     .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
     .modal-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:8px}
+    .manual-meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
+    .manual-unit-field{grid-column:span 2}
+    .manual-student-grid{display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:8px}
     .modal-sub{font-size:13px;color:var(--muted);margin:0 0 12px}
     .ms-row{display:grid;grid-template-columns:minmax(120px,1.6fr) 90px 90px 70px minmax(80px,1fr);gap:8px;align-items:center;
             padding:8px 0;border-bottom:1px solid #eef2f7;font-size:13px}
@@ -141,6 +145,8 @@
     .audit-meta{color:var(--muted);margin-top:3px;word-break:break-word}
     @media (max-width:640px){
       .reassign-summary{grid-template-columns:1fr}
+      .modal-grid,.manual-meta-grid,.manual-student-grid{grid-template-columns:1fr}
+      .manual-unit-field{grid-column:auto}
       .modal-overlay{padding:18px 10px}
     }
   </style>
@@ -233,7 +239,7 @@
 
   <!-- 수동 시험 점수 입력 모달 -->
   <div id="manualModal" class="modal-overlay" role="dialog" aria-modal="true">
-    <div class="modal">
+    <div class="modal manual-modal">
       <div class="modal-head">
         <h3>수동 시험 점수 입력</h3>
         <button id="manualCloseBtn" class="btn-ghost" type="button">닫기</button>
@@ -248,6 +254,29 @@
           <div class="field"><label for="mDate">평가일</label><input id="mDate" type="date" /></div>
           <div class="field"><label for="mTotal">총 문항수</label><input id="mTotal" type="number" min="1" placeholder="예: 20" /></div>
         </div>
+        <div class="manual-meta-grid">
+          <div class="field">
+            <label for="mCourseSelect">수강과정 (필수)</label>
+            <select id="mCourseSelect"><option value="">강좌를 선택하세요</option></select>
+          </div>
+          <div class="field">
+            <label for="mCurriculumVersion">교육과정 (필수)</label>
+            <select id="mCurriculumVersion"><option value="">교육과정을 선택하세요</option></select>
+          </div>
+          <div class="field">
+            <label for="mGradeLevel">학년 (필수)</label>
+            <select id="mGradeLevel" disabled><option value="">학년을 선택하세요</option></select>
+          </div>
+          <div class="field">
+            <label for="mSubject">과목 (필수)</label>
+            <select id="mSubject" disabled><option value="">과목을 선택하세요</option></select>
+          </div>
+          <div class="field manual-unit-field">
+            <label for="mUnitCode">단원 (필수)</label>
+            <select id="mUnitCode" disabled><option value="">단원을 선택하세요</option></select>
+          </div>
+        </div>
+        <p class="modal-sub">신규 수동 시험은 단원별 누적 성취도에 포함되므로 교육과정·학년·과목·단원을 반드시 지정합니다.</p>
         <div class="actions" style="margin-bottom:14px;">
           <button id="mIssueBtn" class="btn-primary" type="button">시험 발행</button>
           <span id="mIssuedTag" class="issued-tag" style="display:none;"></span>
@@ -255,8 +284,7 @@
 
         <!-- 2단계: 학생 점수 입력 -->
         <div id="mStudentArea" style="display:none;">
-          <div class="modal-grid" style="grid-template-columns:1fr 1.4fr auto;">
-            <div class="field"><label for="mCourseSelect">수강과정 (필수)</label><select id="mCourseSelect"><option value="">강좌를 선택하세요</option></select></div>
+          <div class="manual-student-grid">
             <div class="field"><label for="mStudentSearch">학생명/학생번호</label><input id="mStudentSearch" type="text" placeholder="예: 김동하 또는 101" /></div>
             <div class="field"><label>&nbsp;</label><button id="mLoadStudentsBtn" class="btn-secondary" type="button">학생 불러오기</button></div>
           </div>
@@ -312,6 +340,10 @@
     const state = {
       supabase:null,
       courses:[],
+      curriculumUnits:[],
+      curriculumUnitsStatus:'idle',
+      curriculumUnitsError:null,
+      curriculumUnitsLoadPromise:null,
       testSets:[],
       assignments:[],
       editingAssignmentId:null,
@@ -323,6 +355,7 @@
       reassignRequestId:null
     };
     const GRADE_LABELS = { E1:'초1', E2:'초2', E3:'초3', E4:'초4', E5:'초5', E6:'초6', M1:'중1', M2:'중2', M3:'중3', H1:'고1', H2:'고2', H3:'고3' };
+    const GRADE_ORDER = ['E1','E2','E3','E4','E5','E6','M1','M2','M3','H1','H2','H3'];
 
     function setStatus(id, msg, type='info') {
       const el = $(id); if (!el) return;
@@ -334,6 +367,103 @@
     function gradeLabel(v){ return GRADE_LABELS[String(v)] || (v || '-'); }
     function fmtDate(v){ if(!v) return '-'; const d=new Date(v); if(Number.isNaN(d.getTime())) return v; return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
     function fmtDateTime(v){ if(!v) return ''; const d=new Date(v); if(Number.isNaN(d.getTime())) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+
+    function uniqueValues(rows, key){
+      return [...new Set((rows || []).map(row => String(row?.[key] || '').trim()).filter(Boolean))];
+    }
+
+    function fillManualSelect(id, values, placeholder, labeler, selectedValue=''){
+      const select = $(id);
+      const options = values.map(value => ({ value, label: labeler(value) }));
+      select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>`
+        + options.map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join('');
+      select.value = options.some(option => option.value === selectedValue) ? selectedValue : '';
+      return options.length;
+    }
+
+    function manualUnitLabel(unit){
+      const names = [unit?.major_unit_name];
+      if (String(unit?.minor_unit_code || '0') !== '0') names.push(unit?.minor_unit_name);
+      if (String(unit?.nano_unit_code || '0') !== '0') names.push(unit?.nano_unit_name);
+      const path = names.map(value => String(value || '').trim()).filter(Boolean).join(' > ');
+      return `${String(unit?.unit_code || '').padStart(3,'0')} · ${path || '단원명 미지정'}`;
+    }
+
+    function resetManualCurriculumSelectors(){
+      const versions = uniqueValues(state.curriculumUnits, 'curriculum_version')
+        .sort((a,b) => b.localeCompare(a, 'ko', { numeric:true }));
+      fillManualSelect('mCurriculumVersion', versions, '교육과정을 선택하세요', value => `${value} 교육과정`);
+      fillManualSelect('mGradeLevel', [], '학년을 선택하세요', gradeLabel);
+      fillManualSelect('mSubject', [], '과목을 선택하세요', value => value);
+      fillManualSelect('mUnitCode', [], '단원을 선택하세요', value => value);
+      $('mCurriculumVersion').disabled = versions.length === 0;
+      $('mGradeLevel').disabled = true;
+      $('mSubject').disabled = true;
+      $('mUnitCode').disabled = true;
+    }
+
+    function refreshManualGrades(){
+      const version = $('mCurriculumVersion').value;
+      const grades = uniqueValues(
+        state.curriculumUnits.filter(unit => unit.curriculum_version === version),
+        'grade_level'
+      ).sort((a,b) => {
+        const aIndex = GRADE_ORDER.indexOf(a);
+        const bIndex = GRADE_ORDER.indexOf(b);
+        return (aIndex < 0 ? 999 : aIndex) - (bIndex < 0 ? 999 : bIndex) || a.localeCompare(b, 'ko');
+      });
+      fillManualSelect('mGradeLevel', grades, '학년을 선택하세요', gradeLabel);
+      fillManualSelect('mSubject', [], '과목을 선택하세요', value => value);
+      fillManualSelect('mUnitCode', [], '단원을 선택하세요', value => value);
+      $('mGradeLevel').disabled = !version || grades.length === 0;
+      $('mSubject').disabled = true;
+      $('mUnitCode').disabled = true;
+    }
+
+    function refreshManualSubjects(){
+      const version = $('mCurriculumVersion').value;
+      const grade = $('mGradeLevel').value;
+      const subjects = uniqueValues(
+        state.curriculumUnits.filter(unit =>
+          unit.curriculum_version === version && unit.grade_level === grade
+        ),
+        'subject'
+      ).sort((a,b) => a.localeCompare(b, 'ko'));
+      fillManualSelect('mSubject', subjects, '과목을 선택하세요', value => value);
+      fillManualSelect('mUnitCode', [], '단원을 선택하세요', value => value);
+      $('mSubject').disabled = !version || !grade || subjects.length === 0;
+      $('mUnitCode').disabled = true;
+    }
+
+    function refreshManualUnits(){
+      const version = $('mCurriculumVersion').value;
+      const grade = $('mGradeLevel').value;
+      const subject = $('mSubject').value;
+      const units = state.curriculumUnits
+        .filter(unit =>
+          unit.curriculum_version === version
+          && unit.grade_level === grade
+          && unit.subject === subject
+        )
+        .sort((a,b) => String(a.unit_code).localeCompare(String(b.unit_code), 'ko', { numeric:true }));
+      const select = $('mUnitCode');
+      select.innerHTML = '<option value="">단원을 선택하세요</option>'
+        + units.map(unit => `<option value="${escapeHtml(unit.unit_code)}">${escapeHtml(manualUnitLabel(unit))}</option>`).join('');
+      select.disabled = !version || !grade || !subject || units.length === 0;
+    }
+
+    function selectedManualUnit(){
+      const version = $('mCurriculumVersion').value;
+      const grade = $('mGradeLevel').value;
+      const subject = $('mSubject').value;
+      const unitCode = $('mUnitCode').value;
+      return state.curriculumUnits.find(unit =>
+        unit.curriculum_version === version
+        && unit.grade_level === grade
+        && unit.subject === subject
+        && unit.unit_code === unitCode
+      ) || null;
+    }
     function buildStudentAssignmentLink(assignmentId){ if(!assignmentId) return ''; const url=new URL(window.location.href); const basePath=url.pathname.replace(/[^/]+$/, 'student-answer-omr-v4.html'); return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`; }
     async function copyText(text){ if(!text) throw new Error('복사할 내용이 없습니다.'); if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return true; } const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.focus(); ta.select(); const ok=document.execCommand('copy'); ta.remove(); return ok; }
 
@@ -953,6 +1083,83 @@
       $('courseSelect').innerHTML = '<option value="">전체</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
     }
 
+    function loadCurriculumUnits({ force=false }={}){
+      if (state.curriculumUnitsLoadPromise) {
+        return state.curriculumUnitsLoadPromise;
+      }
+      if (!force && ['ready','empty'].includes(state.curriculumUnitsStatus)) {
+        return Promise.resolve(state.curriculumUnits);
+      }
+
+      state.curriculumUnitsStatus = 'loading';
+      state.curriculumUnitsError = null;
+
+      const loadPromise = (async () => {
+        const pageSize = 500;
+        const maxPages = 100;
+        const rows = [];
+        let totalCount = null;
+        let pageCount = 0;
+
+        while (totalCount == null || rows.length < totalCount) {
+          pageCount += 1;
+          if (pageCount > maxPages) {
+            throw new Error(`활성 단원 조회가 ${maxPages}페이지를 초과해 중단했습니다.`);
+          }
+
+          const from = rows.length;
+          const { data, error, count } = await state.supabase
+            .schema('auto_grading')
+            .from('curriculum_units')
+            .select(
+              'curriculum_version,grade_level,subject,unit_code,unit_level,major_unit_code,major_unit_name,minor_unit_code,minor_unit_name,nano_unit_code,nano_unit_name',
+              { count:'exact' }
+            )
+            .eq('is_active', true)
+            .order('curriculum_version', { ascending:false })
+            .order('grade_level', { ascending:true })
+            .order('subject', { ascending:true })
+            .order('unit_code', { ascending:true })
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+
+          const page = Array.isArray(data) ? data : [];
+          if (totalCount == null && Number.isInteger(count)) totalCount = count;
+          if (!page.length) {
+            if (totalCount != null && rows.length < totalCount) {
+              throw new Error(`활성 단원 ${totalCount}건 중 ${rows.length}건만 불러왔습니다.`);
+            }
+            break;
+          }
+          rows.push(...page);
+        }
+
+        if (totalCount != null && rows.length !== totalCount) {
+          throw new Error(`활성 단원 ${totalCount}건 중 ${rows.length}건만 불러왔습니다.`);
+        }
+
+        state.curriculumUnits = rows.map(unit => ({
+          ...unit,
+          curriculum_version:String(unit.curriculum_version || ''),
+          grade_level:String(unit.grade_level || ''),
+          subject:String(unit.subject || ''),
+          unit_code:String(unit.unit_code || '').padStart(3,'0')
+        }));
+        state.curriculumUnitsStatus = state.curriculumUnits.length ? 'ready' : 'empty';
+        return state.curriculumUnits;
+      })().catch(error => {
+        state.curriculumUnits = [];
+        state.curriculumUnitsStatus = 'error';
+        state.curriculumUnitsError = normalizeError(error);
+        throw error;
+      }).finally(() => {
+        state.curriculumUnitsLoadPromise = null;
+      });
+
+      state.curriculumUnitsLoadPromise = loadPromise;
+      return loadPromise;
+    }
+
     async function loadTestSets(){
       const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_search_test_sets', {
         p_search:null, p_grade_level:null, p_source:null, p_purpose:$('purposeSelect').value || null, p_only_active:true, p_limit:200, p_offset:0
@@ -999,21 +1206,57 @@
 
     function todayISO(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
+    function syncManualCurriculumAvailability(){
+      resetManualCurriculumSelectors();
+      const status = state.curriculumUnitsStatus;
+      $('mIssueBtn').disabled = status !== 'ready';
+
+      if (status === 'ready') {
+        setStatus('manualStatus','','info');
+      } else if (status === 'empty') {
+        setStatus('manualStatus','등록된 활성 교육과정 단원이 없어 수동 시험을 발행할 수 없습니다.','error');
+      } else if (status === 'error') {
+        const detail = state.curriculumUnitsError ? ` (${state.curriculumUnitsError})` : '';
+        setStatus('manualStatus',`활성 교육과정 단원 조회에 실패했습니다. 모달을 다시 열면 재시도합니다.${detail}`,'error');
+      } else {
+        setStatus('manualStatus','활성 교육과정 단원을 불러오는 중입니다...','info');
+      }
+    }
+
+    async function ensureManualCurriculumUnits(){
+      if (['ready','empty'].includes(state.curriculumUnitsStatus)) {
+        syncManualCurriculumAvailability();
+        return;
+      }
+
+      const force = state.curriculumUnitsStatus === 'error';
+      const pending = loadCurriculumUnits({ force });
+      syncManualCurriculumAvailability();
+      try {
+        await pending;
+      } catch (error) {
+        console.error('활성 교육과정 단원 재조회 실패:', error);
+      }
+      syncManualCurriculumAvailability();
+    }
+
     function openManualModal(){
       manual.testSetId=null; manual.title=''; manual.total=0; manual.students=[];
       $('mTitle').value=''; $('mTotal').value=''; $('mDate').value=todayISO();
       $('mIssuedTag').style.display='none'; $('mIssuedTag').textContent='';
       $('mStudentArea').style.display='none';
       $('mStudentList').innerHTML='';
-      $('mTitle').disabled=false; $('mTotal').disabled=false; $('mDate').disabled=false; $('mCourseSelect').disabled=false; $('mIssueBtn').disabled=false;
-      setStatus('manualStatus','','info');
+      $('mTitle').disabled=false; $('mTotal').disabled=false; $('mDate').disabled=false; $('mCourseSelect').disabled=false;
+      $('mCurriculumVersion').disabled=false; $('mGradeLevel').disabled=true; $('mSubject').disabled=true; $('mUnitCode').disabled=true;
       // 수강과정 옵션은 메인과 동일하게 채운다
       $('mCourseSelect').innerHTML = '<option value="">강좌를 선택하세요</option>' + state.courses.map(c => `<option value="${c.course_id}">${escapeHtml(c.course_name || c.course_id)}</option>`).join('');
       if ($('courseSelect').value && state.courses.some(c => c.course_id === $('courseSelect').value)) {
         $('mCourseSelect').value = $('courseSelect').value;
       }
+      resetManualCurriculumSelectors();
       $('mStudentSearch').value='';
       $('manualModal').classList.add('open');
+      void ensureManualCurriculumUnits();
     }
     function closeManualModal(){ $('manualModal').classList.remove('open'); }
 
@@ -1022,18 +1265,32 @@
         const title = $('mTitle').value.trim();
         const total = Number($('mTotal').value);
         const courseId = $('mCourseSelect').value || null;
+        const curriculumVersion = $('mCurriculumVersion').value;
+        const gradeLevel = $('mGradeLevel').value;
+        const subject = $('mSubject').value;
+        const unitCode = $('mUnitCode').value;
+        const unit = selectedManualUnit();
         if (!title) throw new Error('시험명을 입력하세요.');
         if (!Number.isInteger(total) || total <= 0) throw new Error('총 문항수는 1 이상의 정수여야 합니다.');
         if (!courseId) throw new Error('수동 시험을 기록할 활성 강좌를 선택하세요.');
+        if (!curriculumVersion || !gradeLevel || !subject || !unitCode || !unit) {
+          throw new Error('교육과정, 학년, 과목, 단원을 모두 선택하세요.');
+        }
         setStatus('manualStatus','시험을 발행하는 중...','info');
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_create_manual_test_set', {
-          p_title: title, p_total_items: total, p_grade_level: null, p_subject: null
+          p_title: title,
+          p_total_items: total,
+          p_grade_level: gradeLevel,
+          p_curriculum_version: curriculumVersion,
+          p_subject: subject,
+          p_unit_code: unitCode
         });
         if (error) throw error;
         ensureRpcOk(data, '시험 발행에 실패했습니다.');
         manual.testSetId = data.test_set_id; manual.title = title; manual.total = total;
-        $('mTitle').disabled=true; $('mTotal').disabled=true; $('mDate').disabled=true; $('mCourseSelect').disabled=true; $('mIssueBtn').disabled=true;
-        $('mIssuedTag').textContent = `발행됨: ${title} · ${total}문항`;
+        $('mTitle').disabled=true; $('mTotal').disabled=true; $('mDate').disabled=true; $('mCourseSelect').disabled=true;
+        $('mCurriculumVersion').disabled=true; $('mGradeLevel').disabled=true; $('mSubject').disabled=true; $('mUnitCode').disabled=true; $('mIssueBtn').disabled=true;
+        $('mIssuedTag').textContent = `발행됨: ${title} · ${total}문항 · ${gradeLabel(gradeLevel)} ${subject} ${manualUnitLabel(unit)}`;
         $('mIssuedTag').style.display='inline-flex';
         $('mStudentArea').style.display='block';
         setStatus('manualStatus','시험이 발행되었습니다. 학생을 불러와 점수를 입력하세요.','ok');
@@ -1135,6 +1392,9 @@
       $('openManualBtn').addEventListener('click', openManualModal);
       $('manualCloseBtn').addEventListener('click', closeManualModal);
       $('mIssueBtn').addEventListener('click', issueManualTest);
+      $('mCurriculumVersion').addEventListener('change', refreshManualGrades);
+      $('mGradeLevel').addEventListener('change', refreshManualSubjects);
+      $('mSubject').addEventListener('change', refreshManualUnits);
       $('mLoadStudentsBtn').addEventListener('click', loadManualStudents);
       $('manualDoneBtn').addEventListener('click', async () => { closeManualModal(); await loadAssignments(); });
       $('manualModal').addEventListener('click', (e) => { if (e.target === $('manualModal')) closeManualModal(); });
@@ -1153,6 +1413,11 @@
       updateSummary();
       try {
         await Promise.all([loadCourses(), loadTestSets()]);
+        try {
+          await loadCurriculumUnits();
+        } catch (unitError) {
+          console.error('활성 교육과정 단원 최초 조회 실패:', unitError);
+        }
         await loadAssignments();
       } catch (err) {
         setStatus('assignmentStatus', normalizeError(err), 'error');

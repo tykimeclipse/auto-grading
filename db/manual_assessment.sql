@@ -33,7 +33,9 @@
 --   누적 성취도는 영구적으로 "정답 문항수 / 총 문항수" 기준. 배점/부분점수는
 --   지원하지 않는다(정답수 컬럼이 integer). 총점 기반 시험은 문항수로 환산해 입력.
 --
--- 실행 순서: assert_admin.sql 선행 필수.
+-- 실행 순서: assert_admin.sql, curriculum_units.sql 선행 필수.
+-- 운영 DB 부분 배포 정본: stage7_part4_manual_test_metadata.sql과 이 파일의
+-- teacher_create_manual_test_set 본문을 항상 동일하게 유지한다.
 -- ================================================================
 
 -- ----------------------------------------------------------------
@@ -51,13 +53,25 @@ alter table auto_grading.test_sets
 
 -- ----------------------------------------------------------------
 -- 1) teacher_create_manual_test_set
---    수동 시험(문항 없는 test_set) 1건 발행
+--    수동 시험(문항 없는 test_set) 1건 발행.
+--    신규 수동 시험은 성취도 단원 집계를 위해 교육과정 메타데이터를
+--    모두 필수로 받는다. 과거 미분류 시험은 변경하지 않는다.
 -- ----------------------------------------------------------------
+-- 4-arg 구버전이 PostgREST 오버로드로 남지 않도록 먼저 제거
+drop function if exists auto_grading.teacher_create_manual_test_set(
+  text,
+  integer,
+  text,
+  text
+);
+
 create or replace function auto_grading.teacher_create_manual_test_set(
-  p_title       text,
-  p_total_items integer,
-  p_grade_level text default null,
-  p_subject     text default null
+  p_title              text,
+  p_total_items        integer,
+  p_grade_level        text,
+  p_curriculum_version text,
+  p_subject            text,
+  p_unit_code          text
 )
 returns jsonb
 language plpgsql
@@ -66,28 +80,87 @@ set search_path to 'auto_grading', 'public'
 as $function$
 declare
   v_id uuid;
+  v_grade_level text := nullif(btrim(p_grade_level), '');
+  v_curriculum_version text := nullif(btrim(p_curriculum_version), '');
+  v_subject text := nullif(btrim(p_subject), '');
+  v_unit_code text := nullif(btrim(p_unit_code), '');
+  v_unit_level text;
+  v_major_unit_code text;
+  v_major_unit_name text;
 begin
   perform auto_grading.assert_admin();
 
   if coalesce(btrim(p_title), '') = '' then
     raise exception '시험명을 입력하세요.';
   end if;
+
   if p_total_items is null or p_total_items <= 0 then
     raise exception '총 문항수는 1 이상이어야 합니다.';
   end if;
 
+  if v_grade_level is null
+     or v_curriculum_version is null
+     or v_subject is null
+     or v_unit_code is null then
+    raise exception '교육과정, 학년, 과목, 단원을 모두 선택하세요.';
+  end if;
+
+  if v_unit_code !~ '^[0-9]{3}$' then
+    raise exception '단원 코드는 3자리 숫자여야 합니다.';
+  end if;
+
+  select
+    cu.unit_level,
+    cu.major_unit_code,
+    cu.major_unit_name
+  into
+    v_unit_level,
+    v_major_unit_code,
+    v_major_unit_name
+  from auto_grading.curriculum_units cu
+  where cu.grade_level = v_grade_level
+    and cu.curriculum_version = v_curriculum_version
+    and cu.subject = v_subject
+    and cu.unit_code = v_unit_code
+    and cu.is_active = true;
+
+  if not found then
+    raise exception '선택한 활성 교육과정 단원을 찾을 수 없습니다.';
+  end if;
+
   insert into auto_grading.test_sets(
-    title, source_type, total_items, grade_level, subject, is_active
+    title,
+    source_type,
+    total_items,
+    grade_level,
+    curriculum_version,
+    subject,
+    unit_code,
+    is_active
   ) values (
-    btrim(p_title), 'manual', p_total_items, p_grade_level, nullif(btrim(p_subject), ''), true
+    btrim(p_title),
+    'manual',
+    p_total_items,
+    v_grade_level,
+    v_curriculum_version,
+    v_subject,
+    v_unit_code,
+    true
   )
   returning id into v_id;
 
   return jsonb_build_object(
-    'ok',          true,
+    'ok', true,
     'test_set_id', v_id,
-    'title',       btrim(p_title),
-    'total_items', p_total_items
+    'title', btrim(p_title),
+    'total_items', p_total_items,
+    'grade_level', v_grade_level,
+    'curriculum_version', v_curriculum_version,
+    'subject', v_subject,
+    'unit_code', v_unit_code,
+    'unit_level', v_unit_level,
+    'major_unit_code', v_major_unit_code,
+    'major_unit_name', v_major_unit_name
   );
 
 exception
@@ -338,14 +411,34 @@ $function$;
 --    security definer + assert_admin() 로 게이트하고 authenticated 에만 부여.
 --    (default privileges 로 authenticated 에 자동 부여되더라도 명시)
 -- ----------------------------------------------------------------
-revoke execute on function auto_grading.teacher_create_manual_test_set(text, integer, text, text) from public, anon;
-grant  execute on function auto_grading.teacher_create_manual_test_set(text, integer, text, text) to authenticated;
+revoke execute on function auto_grading.teacher_create_manual_test_set(
+  text,
+  integer,
+  text,
+  text,
+  text,
+  text
+) from public, anon, service_role;
+grant execute on function auto_grading.teacher_create_manual_test_set(
+  text,
+  integer,
+  text,
+  text,
+  text,
+  text
+) to authenticated;
 
 revoke execute on function auto_grading.teacher_upsert_manual_score(uuid, uuid, integer, integer, date, text, uuid) from public, anon;
 grant  execute on function auto_grading.teacher_upsert_manual_score(uuid, uuid, integer, integer, date, text, uuid) to authenticated, service_role;
 
-comment on function auto_grading.teacher_create_manual_test_set(text, integer, text, text)
-  is '교사용. 수동 시험(source_type=manual, 문항 없는 test_set) 1건 발행.';
+comment on function auto_grading.teacher_create_manual_test_set(
+  text,
+  integer,
+  text,
+  text,
+  text,
+  text
+) is '교사용. 활성 교육과정·학년·과목·단원을 필수로 연결해 수동 시험 1건을 발행.';
 
 comment on function auto_grading.teacher_upsert_manual_score(uuid, uuid, integer, integer, date, text, uuid)
   is '교사용. 수동 시험 학생별 점수 입력/수정. assignment당 attempt 1건 유지(upsert). teacher_final 입력 시 최종 확정. course_id 저장으로 과정별 집계 포함. 문항수 기준만 지원.';
