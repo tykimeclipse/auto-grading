@@ -315,11 +315,8 @@
             </div>
             <div class="field">
               <label for="subject">교육과정 과목</label
-              ><select id="subject">
-                <option value="중1과학">중1 과학</option>
-                <option value="중2과학">중2 과학</option>
-                <option value="중3과학" selected>중3 과학</option>
-                <option value="고1통합과학">고1 통합과학</option>
+              ><select id="subject" disabled>
+                <option value="">단원 목록을 불러오는 중입니다</option>
               </select>
             </div>
             <div class="field">
@@ -521,6 +518,7 @@
       const state = {
         supabase: null,
         units: [],
+        unitsStatus: "idle", // "idle" | "loading" | "ready" | "empty" | "error"
         csvRows: [],
         csvFileName: "",
         csvSectionCount: 0,
@@ -735,13 +733,18 @@
         );
       }
 
-      function fillSimpleSelect(el, options, preferredValue = "") {
+      function fillSimpleSelect(
+        el,
+        options,
+        preferredValue = "",
+        emptyLabel = "선택 가능 항목 없음",
+      ) {
         const current = preferredValue || el.value;
         el.innerHTML = "";
         if (!options.length) {
           const opt = document.createElement("option");
           opt.value = "";
-          opt.textContent = "선택 가능 항목 없음";
+          opt.textContent = emptyLabel;
           el.appendChild(opt);
           return;
         }
@@ -758,23 +761,16 @@
         }
       }
 
-      function populateFallbackSubjects() {
-        const fallback = [
-          { value: "중1과학", label: "중1 과학" },
-          { value: "중2과학", label: "중2 과학" },
-          { value: "중3과학", label: "중3 과학" },
-          { value: "고1통합과학", label: "고1 통합과학" },
-        ];
-        fillSimpleSelect(
-          $("subject"),
-          fallback,
-          $("subject").value || "중3과학",
-        );
-      }
-
       function refreshSubjectOptionsFromUnits() {
-        if (!state.units.length) {
-          populateFallbackSubjects();
+        if (state.unitsStatus !== "ready") {
+          const emptyLabel = {
+            idle: "단원 목록을 불러오는 중입니다",
+            loading: "단원 목록을 불러오는 중입니다",
+            empty: "등록된 활성 교육과정 단원이 없습니다",
+            error: "교육과정 단원 조회에 실패했습니다",
+          }[state.unitsStatus] || "선택 가능 항목 없음";
+          fillSimpleSelect($("subject"), [], "", emptyLabel);
+          $("subject").disabled = true;
           refreshUnitSelectors();
           return;
         }
@@ -791,12 +787,12 @@
               .map((unit) => String(unit.subject)),
           ),
         ];
-        const options = (
-          subjects.length
-            ? subjects
-            : [...new Set(state.units.map((u) => String(u.subject)))]
-        ).map((value) => ({ value, label: formatSubjectLabel(value) }));
+        const options = subjects.map((value) => ({
+          value,
+          label: formatSubjectLabel(value),
+        }));
         fillSimpleSelect($("subject"), options, $("subject").value);
+        $("subject").disabled = options.length === 0;
         refreshUnitSelectors();
       }
 
@@ -815,6 +811,7 @@
           ).values(),
         ]);
         fillSimpleSelect($("majorUnit"), majorOptions, $("majorUnit").value);
+        $("majorUnit").disabled = majorOptions.length === 0;
 
         const selectedMajor = $("majorUnit").value;
         const minorMap = new Map();
@@ -838,6 +835,7 @@
           ...sortOptionValues([...minorMap.values()]),
         ];
         fillSimpleSelect($("middleUnit"), minorOptions, $("middleUnit").value);
+        $("middleUnit").disabled = majorOptions.length === 0;
 
         const selectedMinor = $("middleUnit").value;
         const nanoMap = new Map();
@@ -864,20 +862,29 @@
           ...sortOptionValues([...nanoMap.values()]),
         ];
         fillSimpleSelect($("nanoUnit"), nanoOptions, $("nanoUnit").value);
+        $("nanoUnit").disabled = majorOptions.length === 0;
 
         updateUnitGuide(filteredUnits);
       }
 
       function updateUnitGuide(filteredUnits = getFilteredUnits()) {
         const guide = $("unitGuide");
-        if (!state.units.length) {
+        if (state.unitsStatus === "loading" || state.unitsStatus === "idle") {
           guide.innerHTML =
             "DB 연결 후 curriculum_units에서 단원 목록을 불러옵니다.";
           return;
         }
+        if (state.unitsStatus === "error") {
+          guide.innerHTML = "교육과정 단원 목록을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.";
+          return;
+        }
+        if (state.unitsStatus === "empty") {
+          guide.innerHTML = "등록된 활성 교육과정 단원이 없습니다.";
+          return;
+        }
         if (!filteredUnits.length) {
           guide.innerHTML =
-            "현재 선택한 교육과정 / 학년 / 과목 조합에 해당하는 단원 데이터가 없습니다.";
+            "현재 선택한 교육과정 / 시험 내용 학년 / 교육과정 과목 조합에 해당하는 단원 데이터가 없습니다.";
           return;
         }
         const selected = getSelectedUnit();
@@ -1275,10 +1282,19 @@
         if (!/^\d{3}$/.test(unitCode))
           throw new Error("단원 코드는 3자리 숫자로 입력해 주세요.");
         if (!state.csvRows.length) throw new Error("CSV를 먼저 검증해 주세요.");
-        if (!subject) throw new Error("과목 값이 비어 있습니다.");
-        if (state.units.length && !getSelectedUnit()) {
+        if (state.unitsStatus !== "ready") {
           throw new Error(
-            "선택한 교육과정/학년/과목 기준으로 해당 unit_code row를 찾지 못했습니다. curriculum_units에 100/110/111 계층 row가 있는지 확인해 주세요.",
+            "교육과정 단원 목록이 준비되지 않아 문제지를 등록할 수 없습니다. 새로고침 후 다시 시도해 주세요.",
+          );
+        }
+        if (!subject) {
+          throw new Error(
+            "선택한 교육과정과 시험 내용 학년에 등록된 교육과정 과목이 없습니다.",
+          );
+        }
+        if (!getSelectedUnit()) {
+          throw new Error(
+            "선택한 교육과정/시험 내용 학년/교육과정 과목 기준으로 해당 unit_code row를 찾지 못했습니다. curriculum_units에 100/110/111 계층 row가 있는지 확인해 주세요.",
           );
         }
 
@@ -1350,10 +1366,7 @@
         $("title").value = "";
         $("curriculumVersion").value = "2022";
         $("gradeLevel").value = "M3";
-        populateFallbackSubjects();
-        if ([...$("subject").options].some((opt) => opt.value === "중3과학")) {
-          $("subject").value = "중3과학";
-        }
+        refreshSubjectOptionsFromUnits();
         $("unitCode").value = "112";
         $("sourceType").value = "problem_bank|족보(빈출)";
         $("csvFile").value = "";
@@ -1363,8 +1376,7 @@
         state.csvUsesSections = false;
         state.csvWarnings = [];
         setStatus("", "info");
-        if (state.units.length) {
-          refreshSubjectOptionsFromUnits();
+        if (state.unitsStatus === "ready") {
           syncSelectorsFromUnitCode();
         } else {
           refreshUnitSelectors();
@@ -1669,7 +1681,8 @@
       async function init() {
         if (!(await requireAuth())) return;
         state.supabase = window.adminSupabase;
-        populateFallbackSubjects();
+        state.unitsStatus = "loading";
+        refreshSubjectOptionsFromUnits();
         refreshUnitSelectors();
         wireEvents();
         setMode("register");
@@ -1687,8 +1700,12 @@
             .order("unit_code", { ascending: true });
           if (error) throw error;
           state.units = Array.isArray(data) ? data : [];
+          state.unitsStatus = state.units.length ? "ready" : "empty";
           refreshSubjectOptionsFromUnits();
         } catch (err) {
+          state.units = [];
+          state.unitsStatus = "error";
+          refreshSubjectOptionsFromUnits();
           setStatus(normalizeError(err), "error");
         }
         syncSelectorsFromUnitCode();
