@@ -240,7 +240,17 @@
       }
       .catalog-filters {
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .catalog-path-title {
+        margin: 16px 0 8px;
+        font-size: 15px;
+        color: #334155;
+      }
+      .catalog-unit-filters {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
       }
       .catalog-summary {
@@ -285,7 +295,8 @@
         .topbar {
           flex-direction: column;
         }
-        .catalog-filters {
+        .catalog-filters,
+        .catalog-unit-filters {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
         .panel-heading {
@@ -294,7 +305,8 @@
         }
       }
       @media (max-width: 640px) {
-        .catalog-filters {
+        .catalog-filters,
+        .catalog-unit-filters {
           grid-template-columns: 1fr;
         }
       }
@@ -428,7 +440,7 @@
             <h2>등록된 교육과정 단원</h2>
             <p class="sub">
               DB에 저장된 `curriculum_units`의 조합과 단원 코드를 조회합니다.
-              기본값은 활성 단원이며 상태 필터에서 비활성·전체 목록도 확인할 수 있습니다.
+              교육과정부터 소단원까지 차례로 선택하면 해당 단원 경로만 표시됩니다.
             </p>
           </div>
           <button id="catalogReloadBtn" class="soft" type="button">목록 새로고침</button>
@@ -437,15 +449,15 @@
         <div class="catalog-filters">
           <div class="field">
             <label for="catalogVersion">교육과정</label>
-            <select id="catalogVersion"><option value="">전체</option></select>
+            <select id="catalogVersion"><option value="">교육과정을 선택하세요</option></select>
           </div>
           <div class="field">
             <label for="catalogGrade">학년</label>
-            <select id="catalogGrade"><option value="">전체</option></select>
+            <select id="catalogGrade" disabled><option value="">먼저 교육과정을 선택하세요</option></select>
           </div>
           <div class="field">
             <label for="catalogSubject">과목</label>
-            <select id="catalogSubject"><option value="">전체</option></select>
+            <select id="catalogSubject" disabled><option value="">먼저 학년을 선택하세요</option></select>
           </div>
           <div class="field">
             <label for="catalogActive">상태</label>
@@ -455,9 +467,21 @@
               <option value="inactive">비활성</option>
             </select>
           </div>
+        </div>
+
+        <h3 class="catalog-path-title">단원 경로</h3>
+        <div class="catalog-unit-filters">
           <div class="field">
-            <label for="catalogSearch">코드·단원명 검색</label>
-            <input id="catalogSearch" type="search" placeholder="예: 512 또는 생식과 유전" />
+            <label for="catalogMajor">대단원</label>
+            <select id="catalogMajor" disabled><option value="">먼저 과목을 선택하세요</option></select>
+          </div>
+          <div class="field">
+            <label for="catalogMiddle">중단원</label>
+            <select id="catalogMiddle" disabled><option value="">먼저 대단원을 선택하세요</option></select>
+          </div>
+          <div class="field">
+            <label for="catalogNano">소단원</label>
+            <select id="catalogNano" disabled><option value="">먼저 중단원을 선택하세요</option></select>
           </div>
         </div>
 
@@ -481,7 +505,7 @@
               </tr>
             </thead>
             <tbody id="catalogBody">
-              <tr><td colspan="9" class="mini">단원 목록을 불러오는 중입니다.</td></tr>
+              <tr><td colspan="9" class="mini">단원 정보를 불러오는 중입니다.</td></tr>
             </tbody>
           </table>
         </div>
@@ -584,67 +608,198 @@
           || String(a).localeCompare(String(b), "ko");
       }
 
-      function fillCatalogSelect(id, values, labeler = (value) => value) {
+      function fillCatalogSelect(
+        id,
+        options,
+        emptyLabel,
+        parentSelected = true,
+      ) {
         const select = $(id);
         const current = select.value;
-        select.innerHTML = '<option value="">전체</option>'
-          + values.map((value) => (
-            `<option value="${escapeHtml(value)}">${escapeHtml(labeler(value))}</option>`
+        select.innerHTML = `<option value="">${escapeHtml(emptyLabel)}</option>`
+          + options.map((item) => (
+            `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`
           )).join("");
-        select.value = values.includes(current) ? current : "";
+        select.value = options.some((item) => item.value === current)
+          ? current
+          : "";
+        select.disabled = !parentSelected || options.length === 0;
+      }
+
+      function resetCatalogSelects(ids) {
+        ids.forEach((id) => {
+          $(id).value = "";
+        });
+      }
+
+      function catalogRowsByStatus() {
+        const active = $("catalogActive").value;
+        return state.curriculumUnits.filter((unit) => {
+          if (active === "active") return unit.is_active;
+          if (active === "inactive") return !unit.is_active;
+          return true;
+        });
+      }
+
+      function uniqueCatalogOptions(rows, valueKey, labelBuilder, sorter) {
+        const options = [...new Map(rows.map((row) => {
+          const value = String(row[valueKey]);
+          return [value, { value, label: labelBuilder(row) }];
+        })).values()];
+        return options.sort(sorter);
       }
 
       function refreshCatalogFilters() {
-        const units = state.curriculumUnits;
-        const versions = [...new Set(units.map((unit) => unit.curriculum_version))]
-          .sort((a, b) => b.localeCompare(a, "ko", { numeric: true }));
-        const grades = [...new Set(units.map((unit) => unit.grade_level))]
-          .sort(compareGrade);
-        const subjects = [...new Set(units.map((unit) => unit.subject))]
-          .sort((a, b) => a.localeCompare(b, "ko"));
-        fillCatalogSelect("catalogVersion", versions);
+        const statusRows = catalogRowsByStatus();
+        const versionOptions = uniqueCatalogOptions(
+          statusRows,
+          "curriculum_version",
+          (unit) => String(unit.curriculum_version),
+          (a, b) => b.value.localeCompare(a.value, "ko", { numeric: true }),
+        );
+        fillCatalogSelect(
+          "catalogVersion",
+          versionOptions,
+          "교육과정을 선택하세요",
+        );
+
+        const version = $("catalogVersion").value;
+        const versionRows = statusRows.filter(
+          (unit) => unit.curriculum_version === version,
+        );
+        const gradeOptions = uniqueCatalogOptions(
+          versionRows,
+          "grade_level",
+          (unit) => `${unit.grade_level} · ${GRADE_LABELS[unit.grade_level] || unit.grade_level}`,
+          (a, b) => compareGrade(a.value, b.value),
+        );
         fillCatalogSelect(
           "catalogGrade",
-          grades,
-          (value) => `${value} · ${GRADE_LABELS[value] || value}`,
+          gradeOptions,
+          version ? "학년을 선택하세요" : "먼저 교육과정을 선택하세요",
+          Boolean(version),
         );
-        fillCatalogSelect("catalogSubject", subjects);
+
+        const grade = $("catalogGrade").value;
+        const gradeRows = versionRows.filter(
+          (unit) => unit.grade_level === grade,
+        );
+        const subjectOptions = uniqueCatalogOptions(
+          gradeRows,
+          "subject",
+          (unit) => String(unit.subject),
+          (a, b) => a.label.localeCompare(b.label, "ko"),
+        );
+        fillCatalogSelect(
+          "catalogSubject",
+          subjectOptions,
+          grade ? "과목을 선택하세요" : "먼저 학년을 선택하세요",
+          Boolean(grade),
+        );
+
+        const subject = $("catalogSubject").value;
+        const combinationRows = gradeRows.filter(
+          (unit) => unit.subject === subject,
+        );
+        const majorOptions = uniqueCatalogOptions(
+          combinationRows,
+          "major_unit_code",
+          (unit) => `${unit.major_unit_code} · ${unit.major_unit_name || "(대단원명 미지정)"}`,
+          (a, b) => Number(a.value) - Number(b.value),
+        );
+        fillCatalogSelect(
+          "catalogMajor",
+          majorOptions,
+          subject ? "대단원을 선택하세요" : "먼저 과목을 선택하세요",
+          Boolean(subject),
+        );
+
+        const major = $("catalogMajor").value;
+        const middleOptions = uniqueCatalogOptions(
+          combinationRows.filter((unit) => (
+            unit.major_unit_code === major
+            && unit.minor_unit_code !== "0"
+          )),
+          "minor_unit_code",
+          (unit) => `${unit.minor_unit_code} · ${unit.minor_unit_name || "(중단원명 미지정)"}`,
+          (a, b) => Number(a.value) - Number(b.value),
+        );
+        fillCatalogSelect(
+          "catalogMiddle",
+          middleOptions,
+          major
+            ? (middleOptions.length ? "중단원을 선택하세요" : "선택 가능한 중단원 없음")
+            : "먼저 대단원을 선택하세요",
+          Boolean(major),
+        );
+
+        const middle = $("catalogMiddle").value;
+        const nanoOptions = uniqueCatalogOptions(
+          combinationRows.filter((unit) => (
+            unit.major_unit_code === major
+            && unit.minor_unit_code === middle
+            && unit.nano_unit_code !== "0"
+          )),
+          "nano_unit_code",
+          (unit) => `${unit.nano_unit_code} · ${unit.nano_unit_name || "(소단원명 미지정)"}`,
+          (a, b) => Number(a.value) - Number(b.value),
+        );
+        fillCatalogSelect(
+          "catalogNano",
+          nanoOptions,
+          middle
+            ? (nanoOptions.length ? "소단원을 선택하세요" : "선택 가능한 소단원 없음")
+            : "먼저 중단원을 선택하세요",
+          Boolean(middle),
+        );
       }
 
-      function filteredCurriculumUnits() {
+      function selectedCatalogPathRows() {
         const version = $("catalogVersion").value;
         const grade = $("catalogGrade").value;
         const subject = $("catalogSubject").value;
-        const active = $("catalogActive").value;
-        const search = clean($("catalogSearch").value).toLocaleLowerCase("ko");
-        return state.curriculumUnits.filter((unit) => {
-          if (version && unit.curriculum_version !== version) return false;
-          if (grade && unit.grade_level !== grade) return false;
-          if (subject && unit.subject !== subject) return false;
-          if (active === "active" && !unit.is_active) return false;
-          if (active === "inactive" && unit.is_active) return false;
-          if (!search) return true;
-          return [
-            unit.curriculum_version,
-            unit.grade_level,
-            unit.subject,
-            unit.unit_code,
-            unit.major_unit_name,
-            unit.minor_unit_name,
-            unit.nano_unit_name,
-          ].some((value) => String(value || "").toLocaleLowerCase("ko").includes(search));
-        });
+        const major = $("catalogMajor").value;
+        const middle = $("catalogMiddle").value;
+        const nano = $("catalogNano").value;
+        if (!version || !grade || !subject || !major) return [];
+
+        const combinationRows = state.curriculumUnits.filter((unit) => (
+          unit.curriculum_version === version
+          && unit.grade_level === grade
+          && unit.subject === subject
+        ));
+        return combinationRows.filter((unit) => (
+          (
+            unit.unit_level === "major"
+            && unit.major_unit_code === major
+          )
+          || (
+            middle
+            && unit.unit_level === "middle"
+            && unit.major_unit_code === major
+            && unit.minor_unit_code === middle
+          )
+          || (
+            nano
+            && unit.unit_level === "nano"
+            && unit.major_unit_code === major
+            && unit.minor_unit_code === middle
+            && unit.nano_unit_code === nano
+          )
+        ));
       }
 
       function renderCurriculumUnits() {
         const body = $("catalogBody");
         const summary = $("catalogSummary");
         const combinationBox = $("catalogCombinations");
-        const rows = filteredCurriculumUnits();
-        const activeCount = rows.filter((unit) => unit.is_active).length;
-        const inactiveCount = rows.length - activeCount;
+        const overviewRows = catalogRowsByStatus();
+        const pathRows = selectedCatalogPathRows();
+        const totalActiveCount = state.curriculumUnits.filter(
+          (unit) => unit.is_active,
+        ).length;
         const combinationCounts = new Map();
-        rows.forEach((unit) => {
+        overviewRows.forEach((unit) => {
           const key = [
             unit.curriculum_version,
             unit.grade_level,
@@ -653,15 +808,15 @@
           combinationCounts.set(key, (combinationCounts.get(key) || 0) + 1);
         });
         const levelCounts = {
-          major: rows.filter((unit) => unit.unit_level === "major").length,
-          middle: rows.filter((unit) => unit.unit_level === "middle").length,
-          nano: rows.filter((unit) => unit.unit_level === "nano").length,
+          major: overviewRows.filter((unit) => unit.unit_level === "major").length,
+          middle: overviewRows.filter((unit) => unit.unit_level === "middle").length,
+          nano: overviewRows.filter((unit) => unit.unit_level === "nano").length,
         };
         summary.innerHTML = [
           `전체 ${state.curriculumUnits.length}건`,
-          `현재 표시 ${rows.length}건`,
-          `활성 ${activeCount}건`,
-          `비활성 ${inactiveCount}건`,
+          `활성 ${totalActiveCount}건`,
+          `비활성 ${state.curriculumUnits.length - totalActiveCount}건`,
+          `현재 상태 대상 ${overviewRows.length}건`,
           `교육과정·학년·과목 조합 ${combinationCounts.size}개`,
           `대 ${levelCounts.major} · 중 ${levelCounts.middle} · 소 ${levelCounts.nano}`,
         ].map((text) => `<span class="tag">${escapeHtml(text)}</span>`).join("");
@@ -675,19 +830,31 @@
           .join("");
 
         if (state.curriculumUnitsStatus === "loading") {
-          body.innerHTML = '<tr><td colspan="9" class="mini">단원 목록을 불러오는 중입니다.</td></tr>';
+          body.innerHTML = '<tr><td colspan="9" class="mini">단원 정보를 불러오는 중입니다.</td></tr>';
           return;
         }
         if (state.curriculumUnitsStatus === "error") {
-          body.innerHTML = '<tr><td colspan="9" class="mini">단원 목록을 불러오지 못했습니다.</td></tr>';
+          body.innerHTML = '<tr><td colspan="9" class="mini">단원 정보를 불러오지 못했습니다.</td></tr>';
           return;
         }
-        if (!rows.length) {
-          body.innerHTML = '<tr><td colspan="9" class="mini">조건에 맞는 단원이 없습니다.</td></tr>';
+        if (!overviewRows.length) {
+          body.innerHTML = '<tr><td colspan="9" class="mini">선택한 상태에 해당하는 단원이 없습니다.</td></tr>';
+          return;
+        }
+        if (!$("catalogSubject").value) {
+          body.innerHTML = '<tr><td colspan="9" class="mini">교육과정, 학년, 과목을 차례로 선택해 주세요.</td></tr>';
+          return;
+        }
+        if (!$("catalogMajor").value) {
+          body.innerHTML = '<tr><td colspan="9" class="mini">대단원을 선택하면 선택한 단원 경로가 표시됩니다.</td></tr>';
+          return;
+        }
+        if (!pathRows.length) {
+          body.innerHTML = '<tr><td colspan="9" class="mini">선택한 단원 경로를 찾지 못했습니다.</td></tr>';
           return;
         }
 
-        body.innerHTML = rows.map((unit) => `
+        body.innerHTML = pathRows.map((unit) => `
           <tr class="${unit.is_active ? "" : "inactive-row"}">
             <td>${escapeHtml(unit.curriculum_version)}</td>
             <td>${escapeHtml(`${unit.grade_level} · ${GRADE_LABELS[unit.grade_level] || unit.grade_level}`)}</td>
@@ -1045,15 +1212,44 @@
           $("subject").value = normalizeSubjectIdentifier($("subject").value);
           updateSummary();
         });
-        [
-          "catalogVersion",
-          "catalogGrade",
-          "catalogSubject",
-          "catalogActive",
-        ].forEach((id) => {
-          $(id).addEventListener("change", renderCurriculumUnits);
+        const catalogDependencies = {
+          catalogActive: [
+            "catalogVersion",
+            "catalogGrade",
+            "catalogSubject",
+            "catalogMajor",
+            "catalogMiddle",
+            "catalogNano",
+          ],
+          catalogVersion: [
+            "catalogGrade",
+            "catalogSubject",
+            "catalogMajor",
+            "catalogMiddle",
+            "catalogNano",
+          ],
+          catalogGrade: [
+            "catalogSubject",
+            "catalogMajor",
+            "catalogMiddle",
+            "catalogNano",
+          ],
+          catalogSubject: [
+            "catalogMajor",
+            "catalogMiddle",
+            "catalogNano",
+          ],
+          catalogMajor: ["catalogMiddle", "catalogNano"],
+          catalogMiddle: ["catalogNano"],
+          catalogNano: [],
+        };
+        Object.entries(catalogDependencies).forEach(([id, dependents]) => {
+          $(id).addEventListener("change", () => {
+            resetCatalogSelects(dependents);
+            refreshCatalogFilters();
+            renderCurriculumUnits();
+          });
         });
-        $("catalogSearch").addEventListener("input", renderCurriculumUnits);
         $("catalogReloadBtn").addEventListener("click", loadCurriculumUnits);
       }
 
