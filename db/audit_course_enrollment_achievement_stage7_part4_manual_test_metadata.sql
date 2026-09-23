@@ -143,6 +143,25 @@ invalid_manual_test_sets as (
   from manual_test_sets mts
   where mts.metadata_state = 'invalid_metadata'
 ),
+active_curriculum_groups as (
+  select
+    cu.curriculum_version,
+    cu.grade_level,
+    cu.subject,
+    count(*)::integer as active_unit_count,
+    count(*) filter (where cu.unit_level = 'major')::integer
+      as major_unit_count,
+    count(*) filter (where cu.unit_level = 'middle')::integer
+      as middle_unit_count,
+    count(*) filter (where cu.unit_level = 'nano')::integer
+      as nano_unit_count
+  from auto_grading.curriculum_units cu
+  where cu.is_active = true
+  group by
+    cu.curriculum_version,
+    cu.grade_level,
+    cu.subject
+),
 active_curriculum_summary as (
   select
     count(*)::integer as active_unit_count,
@@ -369,6 +388,18 @@ audit_rows as (
       'curriculum_version_count', acs.curriculum_version_count,
       'grade_count', acs.grade_count,
       'curriculum_grade_subject_count', acs.curriculum_grade_subject_count,
+      'active_combinations', coalesce((
+        select jsonb_agg(
+          to_jsonb(acg)
+          order by
+            acg.curriculum_version desc,
+            acg.grade_level,
+            acg.subject
+        )
+        from active_curriculum_groups acg
+      ), '[]'::jsonb),
+      'grade_count_scope',
+        'distinct grade levels across all active curriculum versions and subjects',
       'rule', 'the manual-test UI can issue only against active curriculum units'
     )
   from active_curriculum_summary acs

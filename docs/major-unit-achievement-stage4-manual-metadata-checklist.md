@@ -6,6 +6,7 @@
 2. `db/audit_course_enrollment_achievement_stage7_part4_manual_test_metadata.sql`
 3. `db/manual_assessment.sql`의 정본 함수 동기화
 4. `frontend/teacher-assignment-management.html`
+5. `frontend/curriculum-units-upload.html`의 등록 단원 조회 섹션
 
 신규 수동시험은 활성 `curriculum_units`의 교육과정·시험 내용 학년·교육과정
 과목·단원을
@@ -30,7 +31,9 @@
    실행한다.
 3. 감사 결과 다섯 섹션의 `blocking_issue_count`가 모두 `0`인지 확인한다.
 4. `frontend/teacher-assignment-management.html`을 배포한다.
-5. `Ctrl+F5` 후 수동시험 모달과 기존 발행상황 관리 기능을 회귀검증한다.
+5. `frontend/curriculum-units-upload.html`을 배포한다.
+6. `Ctrl+F5` 후 수동시험 모달, 등록 단원 목록, 기존 발행상황 관리 기능을
+   회귀검증한다.
 
 > `db/manual_assessment.sql`은 신규 환경과 재실행을 위한 정본이며 part 4와 같은
 > 함수 정의를 담는다. 운영 DB에는 위 part 4 파일만 실행한다.
@@ -62,6 +65,11 @@
   네트워크·권한 오류를 서로 다른 문구로 안내한다.
 - 기존의 네 값이 모두 `null`인 수동시험은 허용한다. 일부 값만 존재하거나
   단원 참조가 끊긴 수동시험은 감사 차단 대상이다.
+- 교육과정 단원 업로드 화면 하단에서는 활성·비활성 단원을 모두 조회할 수
+  있으며 교육과정·학년·과목·상태와 코드·단원명 검색으로 필터링한다.
+- 등록 단원 조회도 `count='exact'`와 범위 조회를 사용한다. 조회 정렬 키는
+  `curriculum_version, grade_level, subject, unit_code`로 고정하고 최대
+  100페이지에서 중단하여 누락이나 무한 조회를 차단한다.
 
 ## 화면 확인
 
@@ -82,6 +90,10 @@
 9. 활성 단원 조회가 실패해도 기존 발행상황 조회·점수 수정·강좌 재귀속 기능은
    계속 동작하고, 수동시험 발행만 차단된다. 모달을 닫았다 다시 열면 단원
    조회를 재시도하고, 성공하면 새로고침 없이 발행 버튼이 활성화된다.
+10. 교육과정 단원 업로드 화면 하단에서 등록 조합과 조합별 단원 수를 확인한다.
+    기본 활성 필터, 비활성·전체 필터, 코드·단원명 검색이 모두 동작해야 한다.
+11. CSV 업로드 완료 직후 목록이 자동으로 갱신되어 새 단원과 조합별 건수가
+    새로고침 없이 반영되어야 한다.
 
 ## 감사 결과 5개 섹션
 
@@ -96,6 +108,10 @@ DB의 스키마·테이블 권한과 RLS 정책을 확인해 의도한 관리자
 후 감사를 다시 실행한다. 정적 정책 검사는 정책 표현식이 실제 JWT 조건에서
 행을 반환하는지까지 보증하지 않으므로, 배포 후 교사 계정 브라우저 확인도
 반드시 수행한다.
+
+`active_curriculum_options.details.active_combinations`에는 활성 단원이 존재하는
+교육과정·학년·과목 조합과 조합별 대·중·소단원 수가 출력된다. `grade_count`는
+특정 교육과정 한 개가 아니라 모든 활성 교육과정 연도를 합친 고유 학년 수다.
 
 ## 다음 단계
 
