@@ -305,7 +305,7 @@
               </select>
             </div>
             <div class="field">
-              <label for="gradeLevel">학년 코드</label
+              <label for="gradeLevel">시험 내용 학년</label
               ><select id="gradeLevel">
                 <option value="M1">중1</option>
                 <option value="M2">중2</option>
@@ -314,12 +314,12 @@
               </select>
             </div>
             <div class="field">
-              <label for="subject">과목</label
+              <label for="subject">교육과정 과목</label
               ><select id="subject">
-                <option value="중1 과학">중1 과학</option>
-                <option value="중2 과학">중2 과학</option>
-                <option value="중3 과학" selected>중3 과학</option>
-                <option value="고1 통합과학">고1 통합과학</option>
+                <option value="중1과학">중1 과학</option>
+                <option value="중2과학">중2 과학</option>
+                <option value="중3과학" selected>중3 과학</option>
+                <option value="고1통합과학">고1 통합과학</option>
               </select>
             </div>
             <div class="field">
@@ -333,7 +333,7 @@
                 value="112"
               />
               <div class="hint">
-                학년 코드는 위에서 선택하고, 여기에는 curriculum_units의
+                시험 내용 학년은 위에서 선택하고, 여기에는 curriculum_units의
                 unit_code 3자리만 입력합니다. 대단원은 `100`, 중단원은 `110`,
                 소단원은 `111`처럼 뒤 자리를 0으로 채워 계층을 표현합니다.
               </div>
@@ -764,7 +764,6 @@
           { value: "중2과학", label: "중2 과학" },
           { value: "중3과학", label: "중3 과학" },
           { value: "고1통합과학", label: "고1 통합과학" },
-          { value: "통합과학", label: "통합과학" },
         ];
         fillSimpleSelect(
           $("subject"),

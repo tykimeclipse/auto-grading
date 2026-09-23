@@ -265,7 +265,7 @@
               </select>
             </div>
             <div class="field">
-              <label for="gradeLevel">학년 코드</label>
+              <label for="gradeLevel">교육과정 학년 코드</label>
               <select id="gradeLevel">
                 <option value="M1">M1</option>
                 <option value="M2">M2</option>
@@ -274,11 +274,11 @@
               </select>
             </div>
             <div class="field wide">
-              <label for="subject">과목</label>
+              <label for="subject">교육과정 과목</label>
               <input id="subject" type="text" value="중3과학" />
               <div class="hint">
-                DB에 저장되는 `subject` 문자열입니다. 기존 문제지 등록 페이지와 정확히
-                같은 값을 넣어야 합니다.
+                DB에 저장되는 `subject` 식별자입니다. 기존 문제지 등록 페이지와 정확히
+                같은 값을 넣어야 하며, 중등 과학은 `중1과학`처럼 공백 없이 입력합니다.
               </div>
             </div>
             <div class="field wide">
@@ -403,6 +403,18 @@
         return String(value ?? "").trim();
       }
 
+      function normalizeSubjectIdentifier(value) {
+        const subject = clean(value);
+        const compact = subject.replace(/\s+/g, "");
+        const knownSubjects = new Set([
+          "중1과학",
+          "중2과학",
+          "중3과학",
+          "고1통합과학",
+        ]);
+        return knownSubjects.has(compact) ? compact : subject;
+      }
+
       function oneDigit(value, label, allowZero = false) {
         const text = clean(value);
         if (!text) return "";
@@ -422,7 +434,7 @@
 
       function updateSummary() {
         $("summaryMeta").textContent =
-          `${$("curriculumVersion").value} / ${$("gradeLevel").value} / ${$("subject").value.trim() || "-"}`;
+          `${$("curriculumVersion").value} / ${$("gradeLevel").value} / ${normalizeSubjectIdentifier($("subject").value) || "-"}`;
         $("summarySourceRows").textContent = `${state.parsedRows.length}건`;
         $("summaryUploadCalls").textContent = `${state.parsedRows.length}건`;
         $("summaryMajorRows").textContent = `${state.stats?.majorCount || 0}건`;
@@ -612,8 +624,9 @@
 
           const gradeLevel = $("gradeLevel").value;
           const curriculumVersion = $("curriculumVersion").value;
-          const subject = $("subject").value.trim();
+          const subject = normalizeSubjectIdentifier($("subject").value);
           if (!subject) throw new Error("과목 값을 입력해 주세요.");
+          $("subject").value = subject;
 
           const responses = [];
           for (let i = 0; i < state.parsedRows.length; i += 1) {
@@ -674,6 +687,10 @@
         ["curriculumVersion", "gradeLevel", "subject"].forEach((id) => {
           $(id).addEventListener("input", updateSummary);
           $(id).addEventListener("change", updateSummary);
+        });
+        $("subject").addEventListener("change", () => {
+          $("subject").value = normalizeSubjectIdentifier($("subject").value);
+          updateSummary();
         });
       }
 

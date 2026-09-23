@@ -264,11 +264,11 @@
             <select id="mCurriculumVersion"><option value="">교육과정을 선택하세요</option></select>
           </div>
           <div class="field">
-            <label for="mGradeLevel">학년 (필수)</label>
+            <label for="mGradeLevel">시험 내용 학년 (필수)</label>
             <select id="mGradeLevel" disabled><option value="">학년을 선택하세요</option></select>
           </div>
           <div class="field">
-            <label for="mSubject">과목 (필수)</label>
+            <label for="mSubject">교육과정 과목 (필수)</label>
             <select id="mSubject" disabled><option value="">과목을 선택하세요</option></select>
           </div>
           <div class="field manual-unit-field">
@@ -276,7 +276,7 @@
             <select id="mUnitCode" disabled><option value="">단원을 선택하세요</option></select>
           </div>
         </div>
-        <p class="modal-sub">신규 수동 시험은 단원별 누적 성취도에 포함되므로 교육과정·학년·과목·단원을 반드시 지정합니다.</p>
+        <p class="modal-sub">신규 수동 시험은 단원별 누적 성취도에 포함되므로 교육과정·시험 내용 학년·교육과정 과목·단원을 반드시 지정합니다.</p>
         <div class="actions" style="margin-bottom:14px;">
           <button id="mIssueBtn" class="btn-primary" type="button">시험 발행</button>
           <span id="mIssuedTag" class="issued-tag" style="display:none;"></span>
@@ -1274,7 +1274,7 @@
         if (!Number.isInteger(total) || total <= 0) throw new Error('총 문항수는 1 이상의 정수여야 합니다.');
         if (!courseId) throw new Error('수동 시험을 기록할 활성 강좌를 선택하세요.');
         if (!curriculumVersion || !gradeLevel || !subject || !unitCode || !unit) {
-          throw new Error('교육과정, 학년, 과목, 단원을 모두 선택하세요.');
+          throw new Error('교육과정, 시험 내용 학년, 교육과정 과목, 단원을 모두 선택하세요.');
         }
         setStatus('manualStatus','시험을 발행하는 중...','info');
         const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_create_manual_test_set', {
