@@ -275,7 +275,29 @@
       }
       .catalog-table {
         min-width: 1180px;
+        table-layout: fixed;
       }
+      .catalog-table .catalog-col-version {
+        width: 88px;
+      }
+      .catalog-table .catalog-col-grade {
+        width: 100px;
+      }
+      .catalog-table .catalog-col-subject {
+        width: 120px;
+      }
+      .catalog-table .catalog-col-code {
+        width: 88px;
+      }
+      .catalog-table .catalog-col-level {
+        width: 82px;
+      }
+      .catalog-table .catalog-col-status {
+        width: 72px;
+      }
+      .catalog-table td:nth-child(1),
+      .catalog-table td:nth-child(2),
+      .catalog-table td:nth-child(3),
       .catalog-table td:nth-child(4),
       .catalog-table td:nth-child(5),
       .catalog-table td:nth-child(9) {
@@ -491,6 +513,17 @@
 
         <div class="table-wrap">
           <table class="catalog-table">
+            <colgroup>
+              <col class="catalog-col-version" />
+              <col class="catalog-col-grade" />
+              <col class="catalog-col-subject" />
+              <col class="catalog-col-code" />
+              <col class="catalog-col-level" />
+              <col />
+              <col />
+              <col />
+              <col class="catalog-col-status" />
+            </colgroup>
             <thead>
               <tr>
                 <th>교육과정</th>
