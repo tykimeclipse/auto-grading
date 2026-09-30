@@ -97,6 +97,11 @@
     .editor-box{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
     .editor-box input{min-height:34px;padding:6px 8px}
     .editor-box .mini-note{font-size:11px;color:var(--muted)}
+    .manual-score-editor{display:grid;gap:5px}
+    .manual-score-line{display:grid;grid-template-columns:30px 1fr;gap:5px;align-items:center}
+    .manual-score-line .mini-note{font-size:11px;color:var(--muted);font-weight:700}
+    .manual-score-line input{min-height:32px;padding:5px 7px}
+    .manual-score-actions{display:flex;gap:4px;flex-wrap:wrap}
     @media (max-width:1400px){
       .list-head,.list-row{min-width:1900px}
       .list-card{overflow-x:auto}
@@ -212,7 +217,7 @@
     <section class="panel" style="margin-top:20px;">
       <div class="panel-header">
         <h2>발행상황 관리</h2>
-        <p>빈 값은 모두 <strong>-</strong>로 표시합니다. 최종점수 수정은 정답수만 입력하면 퍼센트는 총 문항수 기준으로 자동 계산됩니다.</p>
+        <p>빈 값은 모두 <strong>-</strong>로 표시합니다. 점수 수정은 정답수만 입력하면 퍼센트는 총 문항수 기준으로 자동 계산됩니다.</p>
       </div>
       <div class="panel-body">
         <div class="list-card">
@@ -227,7 +232,7 @@
             <div>1차</div>
             <div>2차</div>
             <div>최종</div>
-            <div>최종점수 수정</div>
+            <div>점수 수정</div>
             <div>입력 초기화</div>
             <div>열림</div>
           </div>
@@ -665,6 +670,25 @@
           ${canFinalize ? `<button class="mini-btn primary confirm-final-btn" type="button" data-assignment-id="${row.assignment_id}">확정</button>` : ''}`;
       }
       const total = Number(row.total_items || 0);
+      if (isManualRow(row)) {
+        const firstPreset = row.round1_correct_count ?? '';
+        const finalPreset = hasTeacherFinal(row) ? (row.final_correct_count ?? '') : '';
+        return `
+          <div class="manual-score-editor">
+            <label class="manual-score-line">
+              <span class="mini-note">1차</span>
+              <input class="manual-first-input" type="number" min="0" max="${total}" value="${firstPreset}" data-assignment-id="${row.assignment_id}" aria-label="1차 정답수" />
+            </label>
+            <label class="manual-score-line">
+              <span class="mini-note">최종</span>
+              <input class="manual-final-input" type="number" min="0" max="${total}" value="${finalPreset}" data-assignment-id="${row.assignment_id}" placeholder="선택" aria-label="최종 정답수" />
+            </label>
+            <div class="manual-score-actions">
+              <button class="mini-btn primary save-manual-score-btn" type="button" data-assignment-id="${row.assignment_id}">저장</button>
+              <button class="mini-btn cancel-final-btn" type="button" data-assignment-id="${row.assignment_id}">취소</button>
+            </div>
+          </div>`;
+      }
       const preset = hasTeacherFinal(row) ? (row.final_correct_count ?? '') : '';
       return `
         <div class="editor-box">
@@ -754,6 +778,7 @@
       body.querySelectorAll('.confirm-final-btn').forEach(btn => btn.addEventListener('click', async () => { await finalizeAttempt(btn.dataset.assignmentId); }));
       body.querySelectorAll('.cancel-final-btn').forEach(btn => btn.addEventListener('click', () => { state.editingAssignmentId = null; renderAssignmentList(); }));
       body.querySelectorAll('.save-final-btn').forEach(btn => btn.addEventListener('click', async () => { await saveTeacherFinal(btn.dataset.assignmentId); }));
+      body.querySelectorAll('.save-manual-score-btn').forEach(btn => btn.addEventListener('click', async () => { await saveManualAssignmentScore(btn.dataset.assignmentId); }));
       body.querySelectorAll('.open-toggle').forEach(el => el.addEventListener('change', async () => { await setAssignmentOpenState(el.dataset.assignmentId, el.checked); }));
       body.querySelectorAll('.reset-open-btn').forEach(btn => btn.addEventListener('click', () => { state.resetingAssignmentId = btn.dataset.assignmentId; state.editingAssignmentId = null; renderAssignmentList(); }));
       body.querySelectorAll('.cancel-reset-btn').forEach(btn => btn.addEventListener('click', () => { state.resetingAssignmentId = null; renderAssignmentList(); }));
@@ -888,6 +913,54 @@
         if (error) throw error;
         ensureRpcOk(data, 'assignment 상태 변경에 실패했습니다.');
         setStatus('assignmentStatus', `assignment를 ${isOpen ? '열림' : '닫힘'} 상태로 변경했습니다.`, 'ok');
+        await loadAssignments();
+      } catch (err) {
+        setStatus('assignmentStatus', normalizeError(err), 'error');
+      }
+    }
+
+    async function saveManualAssignmentScore(assignmentId){
+      try {
+        const row = state.assignments.find(r => r.assignment_id === assignmentId);
+        if (!row) throw new Error('assignment 정보를 찾지 못했습니다.');
+        if (!isManualRow(row)) throw new Error('수동시험 점수만 이 방식으로 수정할 수 있습니다.');
+        if (!canEditTeacherFinal(row)) throw new Error(finalEditHint(row));
+
+        const firstInput = document.querySelector(`.manual-first-input[data-assignment-id="${assignmentId}"]`);
+        const finalInput = document.querySelector(`.manual-final-input[data-assignment-id="${assignmentId}"]`);
+        const total = Number(row.total_items || 0);
+        const firstRaw = firstInput?.value ?? '';
+        const finalRaw = finalInput?.value ?? '';
+        const first = Number(firstRaw);
+        if (firstRaw === '' || !Number.isInteger(first) || first < 0 || first > total) {
+          throw new Error(`1차 정답수는 0 ~ ${total} 사이 정수여야 합니다.`);
+        }
+
+        let finalCount = null;
+        if (finalRaw !== '') {
+          finalCount = Number(finalRaw);
+          if (!Number.isInteger(finalCount) || finalCount < 0 || finalCount > total) {
+            throw new Error(`최종 정답수는 0 ~ ${total} 사이 정수여야 합니다.`);
+          }
+        }
+
+        const eventDate = String(row.round1_submitted_at || row.assigned_at || '').slice(0, 10) || null;
+        const payload = {
+          p_test_set_id: row.test_set_id,
+          p_student_id: row.student_id,
+          p_first_correct_count: first,
+          p_teacher_final_correct_count: finalCount,
+          p_event_date: eventDate,
+          p_note: null,
+          p_course_id: row.course_id
+        };
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_upsert_manual_score', payload);
+        if (error) throw error;
+        ensureRpcOk(data, '수동시험 점수 수정에 실패했습니다.');
+
+        state.editingAssignmentId = null;
+        const finalMessage = finalCount == null ? '최종 미확정' : `최종 ${finalCount}/${total}`;
+        setStatus('assignmentStatus', `수동시험 점수를 수정했습니다. (1차 ${first}/${total} · ${finalMessage})`, 'ok');
         await loadAssignments();
       } catch (err) {
         setStatus('assignmentStatus', normalizeError(err), 'error');
