@@ -128,18 +128,6 @@ duplicate_display_orders as (
   group by ti.test_set_id, ti.display_order
   having count(*) > 1
 ),
-ranked_section_items as (
-  select
-    ti.test_set_id,
-    ti.section_order,
-    ti.section_title,
-    ti.display_item_no,
-    row_number() over (
-      partition by ti.test_set_id, ti.section_order
-      order by ti.display_order, ti.item_no
-    ) as section_item_rank
-  from auto_grading.test_items ti
-),
 active_attempts as (
   select
     at.id as attempt_id,
@@ -315,13 +303,6 @@ audit_rows as (
         select count(*)
         from section_title_variants x
         where x.title_count > 1
-      ),
-      'titled_section_first_item_not_one_count', (
-        select count(*)
-        from ranked_section_items x
-        where x.section_title is not null
-          and x.section_item_rank = 1
-          and x.display_item_no <> 1
       ),
       'duplicate_display_item_no_pair_count', (
         select count(*) from duplicate_display_item_nos

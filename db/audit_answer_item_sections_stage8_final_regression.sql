@@ -151,18 +151,6 @@ section_title_variants as (
   from auto_grading.test_items ti
   group by ti.test_set_id, ti.section_order
 ),
-ranked_section_items as (
-  select
-    ti.test_set_id,
-    ti.section_order,
-    ti.section_title,
-    ti.display_item_no,
-    row_number() over (
-      partition by ti.test_set_id, ti.section_order
-      order by ti.display_order, ti.item_no
-    ) as section_item_rank
-  from auto_grading.test_items ti
-),
 duplicate_internal_item_nos as (
   select ti.test_set_id, ti.item_no
   from auto_grading.test_items ti
@@ -258,13 +246,6 @@ storage_metrics as (
       from section_title_variants x
       where x.title_count > 1
     ) as section_title_mismatch_count,
-    (
-      select count(*)
-      from ranked_section_items x
-      where x.section_title is not null
-        and x.section_item_rank = 1
-        and x.display_item_no <> 1
-    ) as titled_section_first_item_not_one_count,
     (select count(*) from duplicate_internal_item_nos)
       as duplicate_internal_item_no_pair_count,
     (select count(*) from duplicate_display_item_nos)
@@ -370,7 +351,7 @@ contract_status as (
         and f.prosrc ~ '''section_title'''
         and f.prosrc ~ '''display_order'''
         and f.prosrc ~ 'P_ITEMS_DISPLAY_METADATA_INVALID'
-        and f.prosrc ~ 'SECTION_FIRST_DISPLAY_ITEM_NO_INVALID'
+        and not (f.prosrc ~ 'SECTION_FIRST_DISPLAY_ITEM_NO_INVALID')
         and not f.public_can_execute
         and not f.anon_can_execute
         and f.authenticated_can_execute
@@ -435,7 +416,6 @@ release_status as (
       and s.empty_normalized_answer_key_count = 0
       and s.mixed_title_mode_test_set_count = 0
       and s.section_title_mismatch_count = 0
-      and s.titled_section_first_item_not_one_count = 0
       and s.duplicate_internal_item_no_pair_count = 0
       and s.duplicate_display_item_no_pair_count = 0
       and s.duplicate_display_order_pair_count = 0

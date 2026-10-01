@@ -494,8 +494,8 @@ audit_rows as (
       'csv_validation_policy', jsonb_build_object(
         'titleless_csv_requires_first_item_no_one', false,
         'titleless_csv_allows_gaps', true,
-        'sectioned_csv_requires_each_section_to_start_at_one', true,
-        'sectioned_csv_allows_gaps_after_first_item', true
+        'sectioned_csv_allows_arbitrary_positive_start', true,
+        'sectioned_csv_allows_gaps', true
       )
     )
 

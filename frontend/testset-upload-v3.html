@@ -406,8 +406,9 @@
               </div>
               <div class="hint" style="margin-top: 10px">
                 섹션 제목을 사용하려면 item_no 칸에 제목을 적고 나머지 칸은
-                비워 주세요. 각 섹션의 첫 문항은 1번이어야 하며, 제목 없는
-                기존 CSV도 그대로 사용할 수 있습니다. 숫자만 입력한 제목은
+                비워 주세요. 문항번호는 섹션마다 1번부터 다시 시작하거나
+                문제집의 누적 번호를 그대로 사용할 수 있으며, 제목 없는 기존
+                CSV도 그대로 사용할 수 있습니다. 숫자만 입력한 제목은
                 문항번호로 인식되므로 제목에는 문자를 포함해 주세요.
               </div>
               <div style="margin-top: 14px">
@@ -556,8 +557,6 @@
           "같은 섹션 안에서 표시 문항번호가 중복되었습니다.",
         P_ITEMS_DISPLAY_ORDER_DUPLICATE:
           "문제지 안에서 출력순서가 중복되었습니다.",
-        SECTION_FIRST_DISPLAY_ITEM_NO_INVALID:
-          "각 섹션의 첫 문항번호는 1이어야 합니다.",
         chk_test_items_answer_key_normalized_not_empty:
           "정답 형식을 인식할 수 없는 문항이 있습니다. 정답은 숫자로 입력하고, 복수정답은 | 또는 쉼표로 구분해 주세요.",
         TEST_ITEM_SECTION_TITLE_MODE_MISMATCH:
@@ -1085,6 +1084,7 @@
         let currentSectionHasItems = false;
         let seenDisplayItemNos = new Set();
         let prevDisplayItemNo = null;
+        let previousSectionLastDisplayItemNo = null;
 
         normalized.forEach((row) => {
           const lineNo = row.source_line_no;
@@ -1121,6 +1121,9 @@
                 `${lineNo}행: 이전 섹션 "${currentSectionTitle}"에 문항이 없습니다.`,
               );
             }
+            if (currentSectionHasItems && prevDisplayItemNo !== null) {
+              previousSectionLastDisplayItemNo = prevDisplayItemNo;
+            }
 
             sectionCount += 1;
             currentSectionOrder = sectionCount;
@@ -1147,10 +1150,15 @@
             hasSections &&
             currentSectionOrder > 0 &&
             !currentSectionHasItems &&
-            displayItemNo !== 1
+            displayItemNoIsValid &&
+            previousSectionLastDisplayItemNo !== null &&
+            displayItemNo !== 1 &&
+            displayItemNo < previousSectionLastDisplayItemNo
           ) {
-            errors.push(
-              `${lineNo}행: 섹션 "${currentSectionTitle}"의 첫 문항번호는 1이어야 합니다.`,
+            warnings.push(
+              `${lineNo}행: 섹션 "${currentSectionTitle}"의 첫 문항번호(${displayItemNo})가 ` +
+                `직전 섹션 마지막 문항번호(${previousSectionLastDisplayItemNo})보다 작습니다. ` +
+                "제목 행 위치를 확인해 주세요. 의도한 번호라면 그대로 등록해도 됩니다.",
             );
           }
           if (seenDisplayItemNos.has(displayItemNo)) {

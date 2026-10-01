@@ -267,45 +267,6 @@ begin
     raise exception 'TEST_ITEM_SECTION_TITLE_MISMATCH';
   end if;
 
-  -- 제목 있는 시험지는 각 섹션의 첫 출력 문항이 표시번호 1이어야 한다.
-  with parsed as (
-    select
-      btrim(j.item ->> 'item_no')::integer as item_no,
-      coalesce(
-        nullif(btrim(j.item ->> 'display_item_no'), '')::integer,
-        btrim(j.item ->> 'item_no')::integer
-      ) as display_item_no,
-      coalesce(
-        nullif(btrim(j.item ->> 'section_order'), '')::integer,
-        1
-      ) as section_order,
-      nullif(btrim(j.item ->> 'section_title'), '') as section_title,
-      coalesce(
-        nullif(btrim(j.item ->> 'display_order'), '')::integer,
-        btrim(j.item ->> 'item_no')::integer
-      ) as display_order
-    from jsonb_array_elements(p_items) as j(item)
-  ),
-  ranked as (
-    select
-      p.*,
-      row_number() over (
-        partition by p.section_order
-        order by p.display_order, p.item_no
-      ) as section_item_rank
-    from parsed p
-  )
-  select count(*)::integer
-  into v_invalid_count
-  from ranked r
-  where r.section_title is not null
-    and r.section_item_rank = 1
-    and r.display_item_no <> 1;
-
-  if v_invalid_count > 0 then
-    raise exception 'SECTION_FIRST_DISPLAY_ITEM_NO_INVALID';
-  end if;
-
   insert into auto_grading.test_sets (
     title,
     source_type,

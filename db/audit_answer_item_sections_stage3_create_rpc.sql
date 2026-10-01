@@ -266,11 +266,12 @@ audit_rows as (
           f.prosrc ~ 'UNTITLED_TEST_ITEM_SECTION_ORDER_INVALID',
         'validates_section_title_consistency',
           f.prosrc ~ 'TEST_ITEM_SECTION_TITLE_MISMATCH',
-        'validates_section_first_display_item_no',
-          f.prosrc ~ 'SECTION_FIRST_DISPLAY_ITEM_NO_INVALID',
+        'allows_cumulative_section_display_item_no',
+          not (f.prosrc ~ 'SECTION_FIRST_DISPLAY_ITEM_NO_INVALID'),
         'expected_all_validation_flags', true,
         'section_title_max_characters', 120,
-        'sectioned_csv_requires_each_section_to_start_at_one', true,
+        'sectioned_csv_allows_arbitrary_positive_start', true,
+        'sectioned_csv_allows_gaps', true,
         'titleless_csv_requires_first_item_no_one', false
       )
       from target_functions f
