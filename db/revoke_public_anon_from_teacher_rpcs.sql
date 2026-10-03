@@ -64,10 +64,16 @@ grant execute on function auto_grading.teacher_reset_attempt_round2(uuid, uuid)
 grant execute on function auto_grading.teacher_reset_attempt_full(uuid, uuid)
   to authenticated, service_role;
 
--- teacher_list_assignments (v2 시그니처 — 현재 운용 버전)
+-- teacher_list_assignments (14개 인자 — 권위 정의: teacher_list_assignments_v2.sql)
+-- 예외: assert_admin 게이트 함수이므로 authenticated 만 부여하고 service_role 은 회수한다.
+revoke execute on function auto_grading.teacher_list_assignments(
+  uuid, uuid, uuid, boolean, text, text, text, integer, integer,
+  text, text, text, text, text
+) from service_role;
 grant execute on function auto_grading.teacher_list_assignments(
-  uuid, uuid, uuid, boolean, text, text, text, integer, integer
-) to authenticated, service_role;
+  uuid, uuid, uuid, boolean, text, text, text, integer, integer,
+  text, text, text, text, text
+) to authenticated;
 
 -- teacher_save_final_score, teacher_set_assignment_open_state
 grant execute on function auto_grading.teacher_save_final_score(uuid, integer, text, boolean)

@@ -56,8 +56,11 @@ grant execute
   to authenticated, service_role;
 
 -- ── teacher_list_assignments ──────────────────────────────────
+-- 14개 인자 시그니처 (권위 정의: teacher_list_assignments_v2.sql)
+-- assert_admin 게이트 함수이므로 service_role 도 회수한다 (authenticated 만 실행).
 revoke execute
   on function auto_grading.teacher_list_assignments(
-    uuid, uuid, uuid, boolean, text, text, text, integer, integer
+    uuid, uuid, uuid, boolean, text, text, text, integer, integer,
+    text, text, text, text, text
   )
-  from anon;
+  from anon, service_role;

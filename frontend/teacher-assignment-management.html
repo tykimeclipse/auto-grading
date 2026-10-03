@@ -17,9 +17,10 @@
     .title-wrap h1{margin:0;font-size:28px;line-height:1.2}
     .title-wrap p{margin:8px 0 0;color:var(--muted);font-size:14px}
     .top-summary{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;width:760px;max-width:100%}
-    .summary-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px}
+    .summary-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px;min-width:0}
     .summary-card .label{display:block;font-size:12px;color:var(--muted);margin-bottom:8px}
     .summary-card .value{font-size:24px;font-weight:700;letter-spacing:-.02em}
+    .summary-card .value.text-value{font-size:15px;line-height:1.35;min-height:29px;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
     .panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
     .panel-header{padding:18px 20px 14px;border-bottom:1px solid var(--line);background:linear-gradient(to bottom,#fff,#fbfcff)}
     .panel-header h2{margin:0;font-size:20px;line-height:1.2}
@@ -71,6 +72,13 @@
     .list-head{background:#f4f7fb;color:#48505e;font-size:12px;font-weight:700;border-bottom:1px solid var(--line)}
     .list-row{border-bottom:1px solid #eef2f7}
     .list-row:last-child{border-bottom:0}
+    .pager{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px}
+    .pager-info{font-size:13px;min-width:140px}
+    .pager-pages{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;flex:1}
+    .page-btn{min-height:34px;min-width:34px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--text);font-size:13px;font-weight:600}
+    .page-btn.current,.page-btn.current:disabled{background:var(--primary);border-color:var(--primary);color:#fff;cursor:default;opacity:1}
+    .pager-size{display:flex;align-items:center;gap:8px;font-size:13px;min-width:140px;justify-content:flex-end}
+    .pager-size select{width:auto;min-height:34px;padding:6px 10px}
     .muted{color:var(--muted)}
     .score-cell{font-weight:700}
     .score-cell.blank{color:#b0b8c5;font-weight:500}
@@ -164,17 +172,17 @@
         <p>과제 조회, 학생용 링크, 성취도·최종점수, 열림 상태와 강좌 재귀속 이력을 한 화면에서 관리합니다.</p>
       </div>
       <div class="top-summary">
-        <div class="summary-card"><span class="label">표시 중 assignment</span><div id="sumAssignments" class="value">0건</div></div>
+        <div class="summary-card"><span class="label">조회 결과 assignment</span><div id="sumAssignments" class="value">0건</div></div>
         <div class="summary-card"><span class="label">열림 assignment</span><div id="sumOpenAssignments" class="value">0건</div></div>
         <div class="summary-card"><span class="label">최종 확정 완료</span><div id="sumTeacherFinal" class="value">0건</div></div>
-        <div class="summary-card"><span class="label">현재 선택 시험</span><div id="sumSelectedTest" class="value">전체</div></div>
+        <div class="summary-card"><span class="label">현재 선택 단원</span><div id="sumSelectedUnit" class="value text-value">전체</div></div>
       </div>
     </div>
 
     <section class="panel">
       <div class="panel-header">
         <h2>조회 조건</h2>
-        <p>수강과정, 시험, 학생명으로 범위를 좁힌 뒤 발행상황과 교사 최종점수를 관리합니다.</p>
+        <p>수강과정, 대단원, 출처, 학생명·시험명으로 범위를 좁힌 뒤 발행상황과 교사 최종점수를 관리합니다. 선택 항목은 바꾸는 즉시 조회되고, 검색어는 Enter 또는 발행상황 불러오기로 조회합니다.</p>
       </div>
       <div class="panel-body">
         <div class="search-grid">
@@ -183,21 +191,16 @@
             <select id="courseSelect"><option value="">전체</option></select>
           </div>
           <div class="field">
-            <label for="testSetSelect">시험</label>
-            <select id="testSetSelect"><option value="">전체</option></select>
+            <label for="majorUnitSelect">단원(대단원)</label>
+            <select id="majorUnitSelect"><option value="">전체</option></select>
           </div>
           <div class="field">
-            <label for="studentSearch">학생명/학생번호</label>
-            <input id="studentSearch" type="text" placeholder="예: 김동하 또는 101" />
+            <label for="studentSearch">학생명/학생번호/시험명</label>
+            <input id="studentSearch" type="text" placeholder="예: 김동하, 101, 시험명" />
           </div>
           <div class="field">
-            <label for="purposeSelect">용도</label>
-            <select id="purposeSelect">
-              <option value="">전체</option>
-              <option value="숙제">숙제</option>
-              <option value="클리닉">클리닉</option>
-              <option value="보충">보충</option>
-            </select>
+            <label for="sourceSelect">출처</label>
+            <select id="sourceSelect"><option value="">전체</option></select>
           </div>
         </div>
         <div class="toolbar" style="justify-content:space-between;">
@@ -237,6 +240,18 @@
             <div>열림</div>
           </div>
           <div id="assignmentListBody"></div>
+        </div>
+        <div class="pager">
+          <div id="pagerInfo" class="pager-info muted">0건</div>
+          <nav id="assignmentPager" class="pager-pages" aria-label="발행상황 페이지"></nav>
+          <label class="pager-size">
+            <span class="muted">페이지당</span>
+            <select id="pageSizeSelect">
+              <option value="10" selected>10건</option>
+              <option value="30">30건</option>
+              <option value="50">50건</option>
+            </select>
+          </label>
         </div>
       </div>
     </section>
@@ -349,8 +364,15 @@
       curriculumUnitsStatus:'idle',
       curriculumUnitsError:null,
       curriculumUnitsLoadPromise:null,
-      testSets:[],
+      majorUnits:[],
+      sourceCategories:[],
       assignments:[],
+      page:1,
+      pageSize:10,
+      totalCount:0,
+      filteredOpenCount:0,
+      filteredFinalCount:0,
+      listRequestId:null,
       editingAssignmentId:null,
       resetingAssignmentId:null,
       reassignmentAssignmentId:null,
@@ -469,6 +491,85 @@
         && unit.unit_code === unitCode
       ) || null;
     }
+    // ── 조회 조건: 대단원 / 출처 ─────────────────────────────
+    // 대단원 키 = 교육과정 + 학년 + 과목 + 대단원 번호(unit_code 앞자리).
+    // 같은 학년이라도 교육과정 개정에 따라 대단원 번호의 의미가 달라지므로 넷을 함께 쓴다.
+    // 옵션은 이미 불러온 활성 단원표(curriculum_units)로 만든다.
+    function majorUnitKey(unit){
+      return [unit.curriculum_version, unit.grade_level, unit.subject, String(unit.major_unit_code || '')].join('|');
+    }
+
+    function majorUnitOptionLabel(unit){
+      return `${gradeLabel(unit.grade_level)} (${unit.curriculum_version}) · ${unit.subject} · ${unit.major_unit_code}. ${unit.major_unit_name || '대단원명 미지정'}`;
+    }
+
+    function buildMajorUnits(units){
+      const byKey = new Map();
+      for (const unit of units || []) {
+        if (!unit?.major_unit_code) continue;
+        const key = majorUnitKey(unit);
+        const current = byKey.get(key);
+        // 대단원명은 대단원 행(unit_level=major)의 이름을 우선한다.
+        if (!current || (unit.unit_level === 'major' && current.unit_level !== 'major')) {
+          byKey.set(key, {
+            key,
+            curriculum_version: unit.curriculum_version,
+            grade_level: unit.grade_level,
+            subject: unit.subject,
+            major_unit_code: String(unit.major_unit_code),
+            major_unit_name: String(unit.major_unit_name || '').trim(),
+            unit_level: unit.unit_level
+          });
+        }
+      }
+      return [...byKey.values()].sort((a,b) => {
+        const aGrade = GRADE_ORDER.indexOf(a.grade_level);
+        const bGrade = GRADE_ORDER.indexOf(b.grade_level);
+        return b.curriculum_version.localeCompare(a.curriculum_version, 'ko', { numeric:true })
+          || (aGrade < 0 ? 999 : aGrade) - (bGrade < 0 ? 999 : bGrade)
+          || a.subject.localeCompare(b.subject, 'ko')
+          || a.major_unit_code.localeCompare(b.major_unit_code, 'ko', { numeric:true });
+      });
+    }
+
+    function renderMajorUnitOptions(){
+      const select = $('majorUnitSelect');
+      const current = select.value;
+      state.majorUnits = buildMajorUnits(state.curriculumUnits);
+      select.innerHTML = '<option value="">전체</option>'
+        + state.majorUnits.map(unit => `<option value="${escapeHtml(unit.key)}">${escapeHtml(majorUnitOptionLabel(unit))}</option>`).join('');
+      select.value = state.majorUnits.some(unit => unit.key === current) ? current : '';
+      select.title = state.curriculumUnitsStatus === 'error' ? '활성 교육과정 단원을 불러오지 못해 전체만 선택할 수 있습니다.' : '';
+    }
+
+    function selectedMajorUnit(){
+      const key = $('majorUnitSelect').value;
+      return key ? (state.majorUnits.find(unit => unit.key === key) || null) : null;
+    }
+
+    // 출처는 test_sets 의 기존 출처 분류(source_category)를 그대로 쓴다.
+    // source_category 가 없는 수동 시험은 특정 출처를 고르면 빠지고 '전체'에서만 보인다(의도된 동작).
+    async function loadSourceCategories(){
+      try {
+        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_source_categories');
+        if (error) throw error;
+        state.sourceCategories = (Array.isArray(data) ? data : []).map(r => r.source_category).filter(Boolean);
+      } catch (err) {
+        // 출처 목록 로드 실패가 발행상황 조회 자체를 막지 않도록 '전체'만 남긴다.
+        console.error('출처 목록 조회 실패:', err);
+        state.sourceCategories = [];
+      }
+      renderSourceOptions();
+    }
+
+    function renderSourceOptions(){
+      const select = $('sourceSelect');
+      const current = select.value;
+      select.innerHTML = '<option value="">전체</option>'
+        + state.sourceCategories.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+      select.value = state.sourceCategories.includes(current) ? current : '';
+    }
+
     function buildStudentAssignmentLink(assignmentId){ if(!assignmentId) return ''; const url=new URL(window.location.href); const basePath=url.pathname.replace(/[^/]+$/, 'student-answer-omr-v4.html'); return `${url.origin}${basePath}?assignment_id=${encodeURIComponent(assignmentId)}`; }
     async function copyText(text){ if(!text) throw new Error('복사할 내용이 없습니다.'); if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return true; } const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.focus(); ta.select(); const ok=document.execCommand('copy'); ta.remove(); return ok; }
 
@@ -619,6 +720,9 @@
       return data;
     }
 
+    // 최종 확정 규칙. 상단 '최종 확정 완료' 카드의 전체 집계는 서버가 계산하며
+    // db/teacher_list_assignments_v2.sql 의 filtered_final_confirmed_count 가 이 함수
+    // (+ isPerfectScore / isManualRow) 와 같은 규칙이다. 바꿀 때 두 곳을 함께 고친다.
     function derivedFinalDisplay(row){
       if (hasTeacherFinal(row)) {
         return { correct: row.final_correct_count, percent: row.final_score_percent, auto:false };
@@ -717,6 +821,7 @@
       if (!state.assignments.length) {
         body.innerHTML = '<div class="list-row"><div class="muted" style="grid-column:1/-1;">발행상황 결과가 없습니다.</div></div>';
         updateSummary();
+        renderPager();
         return;
       }
       wrongCache.clear();
@@ -790,6 +895,7 @@
         el.addEventListener('mouseleave', hideWrongTip);
       });
       updateSummary();
+      renderPager();
     }
 
     async function saveTeacherFinal(assignmentId){
@@ -1227,51 +1333,134 @@
         throw error;
       }).finally(() => {
         state.curriculumUnitsLoadPromise = null;
+        renderMajorUnitOptions();
       });
 
       state.curriculumUnitsLoadPromise = loadPromise;
       return loadPromise;
     }
 
-    async function loadTestSets(){
-      const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_search_test_sets', {
-        p_search:null, p_grade_level:null, p_source:null, p_purpose:$('purposeSelect').value || null, p_only_active:true, p_limit:200, p_offset:0
-      });
-      if (error) throw error;
-      state.testSets = Array.isArray(data) ? data : [];
-      $('testSetSelect').innerHTML = '<option value="">전체</option>' + state.testSets.map(t => `<option value="${t.test_set_id}">${escapeHtml(t.test_title || t.test_set_id)}</option>`).join('');
+    // 조회 시작 시점의 조건을 고정한다. 빈 페이지 재조회도 같은 조건으로 보낸다.
+    function currentAssignmentFilters(){
+      const unit = selectedMajorUnit();
+      return {
+        p_course_id: $('courseSelect').value || null,
+        p_test_set_id: null,
+        p_student_id: null,
+        p_is_open: $('filterOpenOnly').checked ? true : null,
+        // 용도(p_purpose) 필터는 RPC 에 남겨 두고 이 화면에서는 쓰지 않는다.
+        p_purpose: null,
+        p_status: null,
+        p_search: $('studentSearch').value.trim() || null,
+        p_source_category: $('sourceSelect').value || null,
+        p_curriculum_version: unit ? unit.curriculum_version : null,
+        p_grade_level: unit ? unit.grade_level : null,
+        p_subject: unit ? unit.subject : null,
+        p_major_unit_code: unit ? unit.major_unit_code : null
+      };
     }
 
-    async function loadAssignments(){
+    async function fetchAssignmentPage(filters, page){
+      const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_assignments', {
+        ...filters,
+        p_limit: state.pageSize,
+        p_offset: (page - 1) * state.pageSize
+      });
+      if (error) throw error;
+      return Array.isArray(data) ? data : [];
+    }
+
+    // resetPage: 조건·페이지 크기 변경과 조회 버튼은 1페이지부터,
+    // 점수 수정·열림 전환·초기화·재귀속 뒤 재조회는 현재 페이지를 유지한다.
+    async function loadAssignments({ resetPage = false } = {}){
+      if (resetPage) state.page = 1;
+      const requestId = Symbol();
+      state.listRequestId = requestId;
+      const filters = currentAssignmentFilters();
       try {
-        const params = {
-          p_course_id: $('courseSelect').value || null,
-          p_test_set_id: $('testSetSelect').value || null,
-          p_student_id: null,
-          p_is_open: $('filterOpenOnly').checked ? true : null,
-          p_purpose: $('purposeSelect').value || null,
-          p_status: null,
-          p_search: $('studentSearch').value.trim() || null,
-          p_limit: 200,
-          p_offset: 0
-        };
         setStatus('assignmentStatus','발행상황을 불러오는 중입니다.','info');
-        const { data, error } = await state.supabase.schema('auto_grading').rpc('teacher_list_assignments', params);
-        if (error) throw error;
-        state.assignments = Array.isArray(data) ? data : [];
+        let rows = await fetchAssignmentPage(filters, state.page);
+        if (state.listRequestId !== requestId) return;
+        // 현재 페이지가 비면(마지막 행이 닫히거나 빠진 경우) total_count 도 읽을 수 없으므로
+        // 한 페이지 앞을 다시 조회하고, 그래도 비면 1페이지로 간다.
+        if (!rows.length && state.page > 1) {
+          state.page -= 1;
+          rows = await fetchAssignmentPage(filters, state.page);
+          if (state.listRequestId !== requestId) return;
+          if (!rows.length && state.page > 1) {
+            state.page = 1;
+            rows = await fetchAssignmentPage(filters, state.page);
+            if (state.listRequestId !== requestId) return;
+          }
+        }
+        const head = rows[0];
+        state.assignments = rows;
+        state.totalCount = head ? Number(head.total_count || 0) : 0;
+        state.filteredOpenCount = head ? Number(head.filtered_open_count || 0) : 0;
+        state.filteredFinalCount = head ? Number(head.filtered_final_confirmed_count || 0) : 0;
         renderAssignmentList();
-        setStatus('assignmentStatus', `assignment ${state.assignments.length}건을 불러왔습니다.`, 'ok');
+        if (!state.totalCount) {
+          setStatus('assignmentStatus', '조건에 맞는 assignment가 없습니다.', 'ok');
+        } else {
+          const from = (state.page - 1) * state.pageSize + 1;
+          const to = from + rows.length - 1;
+          setStatus('assignmentStatus', `assignment ${state.totalCount}건 중 ${from}–${to}번째를 표시합니다.`, 'ok');
+        }
       } catch (err) {
+        if (state.listRequestId !== requestId) return;
         setStatus('assignmentStatus', normalizeError(err), 'error');
       }
     }
 
     function updateSummary(){
-      $('sumAssignments').textContent = `${state.assignments.length}건`;
-      $('sumOpenAssignments').textContent = `${state.assignments.filter(r => r.is_open).length}건`;
-      $('sumTeacherFinal').textContent = `${state.assignments.filter(r => derivedFinalDisplay(r)).length}건`;
-      const selectedText = $('testSetSelect').selectedOptions[0]?.textContent || '전체';
-      $('sumSelectedTest').textContent = selectedText;
+      $('sumAssignments').textContent = `${state.totalCount}건`;
+      $('sumOpenAssignments').textContent = `${state.filteredOpenCount}건`;
+      $('sumTeacherFinal').textContent = `${state.filteredFinalCount}건`;
+      const selectedText = $('majorUnitSelect').selectedOptions[0]?.textContent || '전체';
+      $('sumSelectedUnit').textContent = selectedText;
+      $('sumSelectedUnit').title = selectedText;
+    }
+
+    function renderPager(){
+      const pager = $('assignmentPager');
+      const total = state.totalCount;
+      if (!total) {
+        $('pagerInfo').textContent = '0건';
+        pager.innerHTML = '';
+        return;
+      }
+      const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+      const current = Math.min(Math.max(state.page, 1), totalPages);
+      const from = (current - 1) * state.pageSize + 1;
+      const to = Math.min(current * state.pageSize, total);
+      $('pagerInfo').textContent = `총 ${total}건 · ${from}–${to}`;
+
+      // 게시판처럼 페이지 번호를 10개 단위로 묶어 보여준다.
+      const blockSize = 10;
+      const blockStart = Math.floor((current - 1) / blockSize) * blockSize + 1;
+      const blockEnd = Math.min(blockStart + blockSize - 1, totalPages);
+      const navButton = (label, page, disabled, ariaLabel) =>
+        `<button class="page-btn" type="button" data-page="${page}" aria-label="${ariaLabel}" ${disabled ? 'disabled' : ''}>${label}</button>`;
+      let html = navButton('«', 1, current === 1, '첫 페이지')
+        + navButton('‹', current - 1, current === 1, '이전 페이지');
+      for (let p = blockStart; p <= blockEnd; p += 1) {
+        html += p === current
+          ? `<button class="page-btn current" type="button" aria-current="page" disabled>${p}</button>`
+          : `<button class="page-btn" type="button" data-page="${p}">${p}</button>`;
+      }
+      html += navButton('›', current + 1, current === totalPages, '다음 페이지')
+        + navButton('»', totalPages, current === totalPages, '마지막 페이지');
+      pager.innerHTML = html;
+    }
+
+    async function goToPage(page){
+      const totalPages = Math.max(1, Math.ceil(state.totalCount / state.pageSize));
+      if (!Number.isInteger(page) || page < 1 || page > totalPages || page === state.page) return;
+      state.page = page;
+      await loadAssignments();
+      // 페이지를 넘긴 뒤 목록 머리가 화면 위로 벗어나 있으면 목록 처음으로 올린다.
+      const panel = $('assignmentListBody').closest('.panel');
+      if (panel && panel.getBoundingClientRect().top < 0) panel.scrollIntoView({ block:'start', behavior:'smooth' });
     }
 
     // ── 수동 시험 점수 입력 모달 ──────────────────────────────
@@ -1449,18 +1638,26 @@
       }
     }
 
-    function resetFilters(){ $('courseSelect').value=''; $('testSetSelect').value=''; $('studentSearch').value=''; $('purposeSelect').value=''; $('filterOpenOnly').checked=true; }
+    function resetFilters(){ $('courseSelect').value=''; $('majorUnitSelect').value=''; $('studentSearch').value=''; $('sourceSelect').value=''; $('filterOpenOnly').checked=true; }
     function wireEvents(){
-      $('loadAssignmentsBtn').addEventListener('click', loadAssignments);
+      $('loadAssignmentsBtn').addEventListener('click', () => loadAssignments({ resetPage:true }));
       $('resetFiltersBtn').addEventListener('click', async () => {
         resetFilters();
-        await loadTestSets();
-        await loadAssignments();
+        await loadAssignments({ resetPage:true });
       });
-      $('purposeSelect').addEventListener('change', async () => { await loadTestSets(); await loadAssignments(); });
-      $('studentSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadAssignments(); });
-      $('courseSelect').addEventListener('change', updateSummary);
-      $('testSetSelect').addEventListener('change', updateSummary);
+      // 선택형 조건은 바꾸는 즉시 1페이지부터 조회한다. 검색어는 Enter 또는 조회 버튼으로 조회한다.
+      ['courseSelect', 'majorUnitSelect', 'sourceSelect', 'filterOpenOnly'].forEach(id => {
+        $(id).addEventListener('change', () => loadAssignments({ resetPage:true }));
+      });
+      $('pageSizeSelect').addEventListener('change', () => {
+        state.pageSize = toPositiveInteger($('pageSizeSelect').value, 10);
+        loadAssignments({ resetPage:true });
+      });
+      $('assignmentPager').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-page]');
+        if (btn && !btn.disabled) goToPage(Number(btn.dataset.page));
+      });
+      $('studentSearch').addEventListener('keydown', async (e) => { if (e.key === 'Enter') await loadAssignments({ resetPage:true }); });
       // 수동 시험 모달
       $('openManualBtn').addEventListener('click', openManualModal);
       $('manualCloseBtn').addEventListener('click', closeManualModal);
@@ -1469,7 +1666,8 @@
       $('mGradeLevel').addEventListener('change', refreshManualSubjects);
       $('mSubject').addEventListener('change', refreshManualUnits);
       $('mLoadStudentsBtn').addEventListener('click', loadManualStudents);
-      $('manualDoneBtn').addEventListener('click', async () => { closeManualModal(); await loadAssignments(); });
+      // 새로 발행한 수동 시험은 발행일 최신순 정렬상 1페이지에 나온다.
+      $('manualDoneBtn').addEventListener('click', async () => { closeManualModal(); await loadAssignments({ resetPage:true }); });
       $('manualModal').addEventListener('click', (e) => { if (e.target === $('manualModal')) closeManualModal(); });
       $('mStudentSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadManualStudents(); });
       // 과제 강좌 재귀속 모달
@@ -1485,8 +1683,9 @@
       wireEvents();
       updateSummary();
       try {
-        await Promise.all([loadCourses(), loadTestSets()]);
+        await Promise.all([loadCourses(), loadSourceCategories()]);
         try {
+          // 대단원 드롭다운은 로드가 끝나면(실패 포함) renderMajorUnitOptions 로 채워진다.
           await loadCurriculumUnits();
         } catch (unitError) {
           console.error('활성 교육과정 단원 최초 조회 실패:', unitError);

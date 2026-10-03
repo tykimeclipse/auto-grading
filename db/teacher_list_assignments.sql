@@ -1,4 +1,33 @@
-﻿-- =========================================================
+-- =========================================================
+-- ⛔ 실행 금지 레거시 파일 (2026-10-03)
+--
+-- 이 파일의 함수 3개는 모두 다른 파일로 대체되었다.
+--   - teacher_list_assignments          → teacher_list_assignments_v2.sql (권위 정의, 14개 인자)
+--   - teacher_save_final_score          → teacher_score_and_state_rpcs.sql
+--   - teacher_set_assignment_open_state → teacher_score_and_state_rpcs.sql
+--
+-- 이 파일을 실행하면
+--   - 구 9개 인자 teacher_list_assignments 오버로드가 다시 생겨 PostgREST 함수 선택이 혼란스러워지고
+--     assert_admin 이 없는 구 목록 함수가 노출된다.
+--   - 점수·열림 RPC 2개가 구 버전으로 되돌아간다.
+--
+-- 안전장치
+--   1) 아래 DO 블록이 즉시 예외를 낸다.
+--      (Supabase SQL 편집기처럼 스크립트를 한 번에 보내는 실행은 여기서 중단된다.)
+--   2) 원본 본문 전체를 블록 주석으로 감쌌다.
+--      (psql 처럼 오류 뒤에도 다음 문장을 계속 실행하는 클라이언트에서도 아무것도 생성되지 않는다.)
+--
+-- 원본 본문은 참고용으로만 남긴다. git 이력에서도 확인할 수 있다.
+-- =========================================================
+
+do $$
+begin
+  raise exception 'LEGACY_FILE_DO_NOT_RUN: teacher_list_assignments.sql 은 실행 금지 레거시입니다. teacher_list_assignments_v2.sql 과 teacher_score_and_state_rpcs.sql 을 사용하세요.';
+end $$;
+
+/* ===== LEGACY BODY START — 아래 원본은 실행되지 않는다 =====
+
+-- =========================================================
 -- 교사용 RPC 수정본 전체
 -- 반영 내용
 -- 1) latest attempt 선정 기준: updated_at -> created_at
@@ -482,3 +511,5 @@ create index if not exists idx_attempts_assignment_created_id_desc
 
 create index if not exists idx_assignments_course_test_student
   on auto_grading.assignments (course_id, test_set_id, student_id);
+
+===== LEGACY BODY END ===== */
